@@ -13,6 +13,22 @@ Self-contained teaching workflows for the two image tasks of the suite.
 | `lora_dry_run.py` | Times a small 4-bit LoRA run on the converted model + adapter-loaded generation check (§8.2; report in `data/dryrun-adapter/`) |
 | `mnist_features.ows` / `cloud_features.ows` | **Committed** canvas workflows (generated via `make_workflows.py`; Import Images paths inside are machine-local — regenerate or re-point the File widget if they don't match) |
 
+## Stage-1 measured timescales (run_stage1.py, dev M4/32 GB; a classroom Mini
+is ~1.5–3× slower)
+
+| Tier | Time | Result |
+|---|---|---|
+| bigram (k=1, e5) | 3.2 s | loss 2.84 → 2.36 — the plateau |
+| MLP-over-window (k=16, emb 32, hidden 128, e8, 79 k params) | **1.7 s/epoch** (14 s) | loss 2.21 → 1.50, val 1.56 |
+| LSTM (k=32, emb 64, units 128, 1 layer, e2) | 50.7 s/epoch | val 1.67 in 2 epochs (≈1.6 within e5 extrapolated) → good results ≈ 1–9 min |
+
+Sample evolution (greedy, from `the `): e1 `the sustine of the seland the
+empereat of the semplest` → e3 `the and of the emperor and the emperor of
+the senate` → e7 `the arms of the senate was and of the senate` — the
+gibberish → domain-pastiche lesson in three epochs, seconds per epoch. The
+spec's "minutes" budget is generous; classroom runs can afford deeper
+models or more epochs.
+
 ## The workflows
 
 ```
