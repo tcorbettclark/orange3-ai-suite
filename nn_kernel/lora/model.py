@@ -151,6 +151,42 @@ class LoRAModel:
         )
         return prompt + sep + output
 
+    def perplexity(self, text: str, max_tokens: int = 4000, batch: int = 8) -> dict:
+        """Exponential mean cross-entropy over the text's next-token predictions
+        — the same convention as the Keras LanguageModel.perplexity, feeding
+        the spec §6 in-domain / out-of-domain tables. Chunks by ``batch``
+        windows of ``max_seq_length``; returns {'loss', 'perplexity'}.
+        """
+        import math
+
+        import mlx.nn as nn
+        import mlx.core as mx
+
+        model, tokenizer = self._variant(self.adapter_enabled)
+        ids = tokenizer.encode(text)
+        if len(ids) < 2:
+            return {"loss": float("nan"), "perplexity": float("nan")}
+        nll_sum, n_tokens = 0.0, 0
+        step = self._seq_len() - batch
+        step = max(step, 1)
+        for start in range(0, min(len(ids), max_tokens) - 1, step):
+            window = ids[start : start + self._seq_len()]
+            if len(window) < 2:
+                continue
+            x = mx.array([window[:-1]])
+            targets = mx.array(window[1:])
+            logits = model(x)
+            log_probs = nn.log_softmax(logits.reshape(logits.shape[1], -1), axis=-1)
+            picked = log_probs[mx.arange(len(window) - 1), targets]
+            nll_sum += float(-picked.sum())
+            n_tokens += len(window) - 1
+        loss = nll_sum / max(n_tokens, 1)
+        return {"loss": float(loss), "perplexity": float(math.exp(loss))}
+
+    def _seq_len(self) -> int:
+        # inference window; short windows keep the 32000-vocab logits small
+        return 512
+
     def artifact(self) -> LoRAAdapter:
         return LoRAAdapter(
             base_model=self.base_model,

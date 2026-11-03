@@ -128,6 +128,12 @@ def train_lora(
     whole child tree; the adapter files are verified afterwards.
     """
     opts = options or LoraOptions()
+    if len(data.valid) < opts.batch_size and opts.iters > 0:
+        raise ValueError(
+            f"valid split has {len(data.valid)} rows but batch_size is "
+            f"{opts.batch_size} — mlx-lm requires the valid split to hold at "
+            "least one full batch; add data or reduce batch_size"
+        )
     staged = data.stage(
         data_dir or Path(adapter_dir).with_suffix(".data")
     )

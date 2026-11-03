@@ -29,9 +29,36 @@ REPO_ID = "britllm/britllm-3b-v0.1"
 TARGET = Path(__file__).resolve().parent.parent / "data" / "models" / "britllm-4bit"
 
 
+MINIMAL_CHAT_TEMPLATE = (
+    "{% for message in messages %}{{ message['role'] }}: "
+    "{{ message['content'] }}\\n{% endfor %}"
+    "{% if add_generation_prompt %}assistant:{% endif %}"
+)
+
+
+def add_minimal_chat_template(model_dir: Path) -> bool:
+    """britllm is a RAW base model: its tokenizer ships no chat template, but
+    mlx-lm's SFT prompt-masking path (CompletionsDataset.process) requires
+    one. Our converted copy gets a minimal, generic role-templated template
+    ('user: .../assistant: ...') so the Stage-3b SFT beat can run; weights are
+    untouched. Recorded in the manifest.
+    """
+    cfg_path = model_dir / "tokenizer_config.json"
+    cfg = json.loads(cfg_path.read_text())
+    if cfg.get("chat_template"):
+        return False  # already templated
+    cfg["chat_template"] = MINIMAL_CHAT_TEMPLATE
+    cfg_path.write_text(json.dumps(cfg, indent=1))
+    return True
+
+
 def main() -> None:
     if (TARGET / "model.safetensors").exists():
-        print(f"already converted: {TARGET} — delete to refetch")
+        # idempotent: ensure the SFT template ships even on pre-existing
+        # conversions (the check below is the self-containment guarantee)
+        templated = add_minimal_chat_template(TARGET)
+        print(f"already converted: {TARGET} (chat template "
+              f"{'added' if templated else 'present'})")
         return
     t0 = time.perf_counter()
     src = snapshot_download(REPO_ID)
@@ -49,6 +76,7 @@ def main() -> None:
     if result.returncode != 0:
         raise SystemExit(f"mlx_lm convert failed ({result.returncode})")
     converted_seconds = time.perf_counter() - t0
+    templated = add_minimal_chat_template(TARGET)
 
     import mlx.core as mx
     import struct
@@ -76,6 +104,7 @@ def main() -> None:
         "n_params_fp16_estimate_billions": n_params,
         "model_type": config.get("model_type"),
         "converted_seconds": round(converted_seconds, 1),
+        "chat_template_added": templated,
         "size_mb": round(sum(p.stat().st_size for p in TARGET.rglob("*") if p.is_file())
                          / 1e6, 1),
     }

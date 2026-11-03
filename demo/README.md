@@ -13,6 +13,25 @@ Self-contained teaching workflows for the two image tasks of the suite.
 | `lora_dry_run.py` | Times a small 4-bit LoRA run on the converted model + adapter-loaded generation check (§8.2; report in `data/dryrun-adapter/`) |
 | `mnist_features.ows` / `cloud_features.ows` | **Committed** canvas workflows (generated via `make_workflows.py`; Import Images paths inside are machine-local — regenerate or re-point the File widget if they don't match) |
 
+## Stage-2/3 arc record (run_stages23.py; `--effort low` ≈ 2.5 min,
+`medium`/`high` as the longer records; report in data/stage23-report.json,
+generation transcript in data/review/stage23_transcript.txt)
+
+Findings at teaching effort (--effort low, 30 CPT + 20 SFT iters):
+- the raw base model is fluent and — for a *famous* domain — already answers
+  domain facts (Gibbon is in web pre-training); "raw model" ≠ ignorant;
+- the Stage-3b SFT beat shows behaviourally: `A:` prompts elicit
+  assistant-pattern completions and corpus-dominant phrases, WITH degenerate
+  repetition + <unk> runs at 20 iters (instructive honest artefact);
+- perplexity nuance: modern boilerplate scores ppl 2.6 vs Gibbon 13.3 on the
+  base model — perplexity tracks generic predictability, not domain depth;
+  held-out ppl worsened after 20–30 QLoRA iters (perturbation, not
+  memorisation) — the perplexity *drop* is a high-effort finding.
+- britllm's tokenizer ships no chat template (raw base model); our converted
+  copy gets a minimal generic one at conversion time (demo/fetch_britllm.py)
+  because mlx-lm's prompt-masking SFT path requires it;
+- kernel: LoraData.from_pairs/from_texts now validate valid-vs-batch-size.
+
 ## Stage-1 measured timescales (run_stage1.py, dev M4/32 GB; a classroom Mini
 is ~1.5–3× slower)
 
