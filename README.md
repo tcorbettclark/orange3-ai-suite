@@ -13,14 +13,15 @@ language-model kernel are not yet started. Design lives in `spec/` — read
 ## Development
 
 ```bash
-uv sync --extra lm --no-install-package Orange3
-# ^ Orange3 is a runtime dependency (the add-on installer needs it) but must
-# NOT be installed into the dev venv: kernel tests must run without Orange
-# (REPO-CONTEXT §4), and widget tests run under the Orange interpreter:
+uv sync --extra lm
+# ^ installs the kernel + Keras into the dev venv; Orange3 is deliberately
+# NOT a dependency — kernel tests must run without Orange (REPO-CONTEXT §4),
+# and widget tests run under the Orange interpreter.
 uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
     --no-deps -e . --no-build-isolation   # one-time: hatchling/editables first
-uv run pytest                          # kernel tests, plain Python
+uv run pytest                                    # kernel tests, plain Python
 /Applications/Orange.app/Contents/MacOS/python -m pytest -q  # widget tests, offscreen
+/Applications/Orange.app/Contents/MacOS/python -m Orange.canvas  # run the canvas
 ```
 
 Install for Orange (macOS Orange.app bundle), per `spec/REPO-CONTEXT.md` §4:

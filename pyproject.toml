@@ -24,10 +24,17 @@ requires-python = ">=3.11"
 # Base: what the pure-Python kernel needs regardless of course stage.
 # numpy/scipy are also pulled in by Orange itself, so this costs nothing in
 # the Orange environment and keeps plain-Python kernel tests runnable.
+# Base: what the pure-Python kernel needs regardless of course stage.
+# Deliberately NOT a dependency: Orange3 — the Orange environment already
+# provides it (and is installed with --no-deps per REPO-CONTEXT §4, so a
+# dependency line would never even be resolved there); and the Python-only
+# teaching stream must be able to install the kernel headless. The Orange
+# floor is Orange3>=3.39.0 (orange-canvas-core>=0.1.28, orange-widget-base
+# >=4.20.0, the orange3-imagenets-proven set); if exact add-on metadata
+# wants Orange3 listed at release, revisit then.
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
-    "Orange3>=3.39.0",
 ]
 
 [project.optional-dependencies]
