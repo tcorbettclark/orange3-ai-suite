@@ -9,6 +9,8 @@ Self-contained teaching workflows for the two image tasks of the suite.
 | `fetch_mnist.py` | Regenerates `mnist/` (idempotently; needs the dev venv `[lm]` for keras) |
 | `mnist/` | **Committed**: 6,000 PNGs — MNIST digits upscaled to 56×56, seeded stratified subset (500/class train, 100/class val), one subfolder per label (Import Images layout) |
 | `fetch_clouds.py` | Curated cloud-corpus fetcher (see below); network needed, ~5 min |
+| `fetch_britllm.py` | Fetches `britllm/britllm-3b-v0.1` (cache-aware) and converts it to MLX 4-bit → `data/models/britllm-4bit` (§8.1) |
+| `lora_dry_run.py` | Times a small 4-bit LoRA run on the converted model + adapter-loaded generation check (§8.2; report in `data/dryrun-adapter/`) |
 | `mnist_features.ows` / `cloud_features.ows` | **Committed** canvas workflows (generated via `make_workflows.py`; Import Images paths inside are machine-local — regenerate or re-point the File widget if they don't match) |
 
 ## The workflows

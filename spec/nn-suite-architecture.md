@@ -154,14 +154,20 @@ with pytest instead of inspected in the canvas.
 
 ---
 
-## 8. Action items (pre-implementation, unchanged in substance)
+## 8. Action items (pre-implementation gates) — RESOLVED
 
-1. Verify/produce an MLX conversion of BritLLM (`britllm/britllm-3b-v0.1`;
-   Llama-family ⇒ expected to be supported; dry run required — assume no
-   community conversion exists until checked).
-2. Dry-run LoRA training time on a 16 GB Mac Mini (expect tens of minutes, not
-   hours, on a small corpus).
-3. Pin `mlx-lm[train]` inside the kernel's `[lora]` extra.
-4. Confirm the toolbox shows one merged "Neural Networks" category for the
-   combined add-on (expected trivially true for a single add-on; recorded so it
-   is verified once, not assumed).
+1. ✅ **MLX conversion of BritLLM produced** by `demo/fetch_britllm.py`:
+   4-bit affine, group 64, 1.5 GB, llama family. Community conversions exist
+   only as GGUF; a community MLX conversion had to be produced here. The
+   fp16 source measures **2.67 B parameters** (safetensors headers; the
+   "3B" name is a class label — ledger corrected).
+2. ✅ **Timing dry run** (`demo/lora_dry_run.py`, reference hyperparameters):
+   100 iterations (batch 4, seq 512, 16 layers, lr 1e-4) = **79 s wall,
+   223 tok/s median** on the M4/32 GB dev machine; trainable parameters
+   **0.233 % (6.21 M / 2.67 B)** — the spec's gasp-at-the-number moment,
+   measured. 300 iters ≈ 4 min here; a 16 GB classroom Mini should sit in
+   single-digit to low-tens of minutes. Adapter-loaded generation verified.
+3. ✅ **`mlx-lm[train]==0.32.2`** pinned in the `[lora]` extra (with an
+   Apple-Silicon platform marker).
+4. ✅ **Category check** — satisfied by construction and observed at the
+   widget milestone: one add-on, one merged "Neural Networks" category.

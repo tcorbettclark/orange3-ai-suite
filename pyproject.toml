@@ -49,12 +49,11 @@ lm = [
     "keras>=3.10.0",
     "tf-keras>=2.19.0",
 ]
-# ACTION ITEM (architecture doc §8.3): pin `mlx-lm[train]` to the exact
-# version recorded at the first successful BritLLM dry run; policy is exact
-# pin only, so the extra stays commented out until then. Intended shape:
-# lora = [
-#     'mlx-lm[train]==<pinned-at-dry-run>; platform_machine == "arm64" and sys_platform == "darwin"',
-# ]
+lora = [
+    # Apple-silicon-only (mlx is not portable); EXACT pin per REPO-CONTEXT §5 —
+    # recorded at the first successful BritLLM dry run (§8.3, resolved).
+    'mlx-lm[train]==0.32.2; platform_machine == "arm64" and sys_platform == "darwin"',
+]
 
 # Development-only tooling (PEP 735 group, installed by `uv sync` by default).
 [dependency-groups]
