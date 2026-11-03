@@ -43,9 +43,10 @@ Two related cautions:
    for the "QThread + Keras callback + live pyqtgraph loss curve" widget design cited
    throughout the docs. Being **inspired by the pattern is fine; copying its code is
    not** — it would infect this repository. Write widget code from scratch.
-2. **`orange3-nnviewer` folds into this suite** (per the architecture doc). When it
-   does, normalize its license to MIT as part of the fold (verify what it currently
-   carries before publishing).
+2. **`orange3-nnviewer` folds into this suite** (per the architecture doc) — **DONE:** the
+   widget, icon and adapted offscreen tests now live in `orangecontrib.nn_suite` and the
+   standalone was uninstalled from the Orange instance. License verified MIT as part of
+   the fold, satisfying the caution above.
 
 ---
 
@@ -103,7 +104,7 @@ bug in that add-on and a bug we must not copy, along with its code, per §3.)
 
 | Reference | Role | Caution |
 |---|---|---|
-| [`orange3-nnviewer`](https://github.com/tcorbettclark/orange3-nnviewer) (ours) | In-house thin-shell pattern: widget boilerplate, `uv` workflow, offscreen tests, `--no-deps` install. **Its README content migrates into this document's §4 when the repo folds in.** | Normalize license to MIT |
+| [`orange3-nnviewer`](https://github.com/tcorbettclark/orange3-nnviewer) (ours) | In-house thin-shell pattern: widget boilerplate, `uv` workflow, offscreen tests, `--no-deps` install. **Folded into this suite (widget + tests); the standalone repo can be retired.** | License verified MIT |
 | [`orange3-imagenets`](https://github.com/chrislee35/orange3-imagenets) (PyPI `orange3-imagenets` v0.0.3) | Pattern source only: `OWWidget` + Keras `Callback` streaming loss to pyqtgraph; QThread preprocessing; prebuilt-model dropdowns; save/load `.h5` | **CC-BY-NC-SA — no code copying.** Also known defects to avoid: no validation split, an unused dropout setting, mixed Qt imports, absolute thresholds |
 | [`orange3-nlp`](https://github.com/chrislee35/orange3-nlp), [`orange3-ollama`](https://github.com/chrislee35/orange3-ollama) (same author) | Ecosystem context: what exists (embedders, RAG, Doc2Vec training, Ollama inference) | Experimental; nothing is reused |
 | [Orange3-Text](https://orange3-text.readthedocs.io/) | The evaluation spine (Word Enrichment, Word Cloud, Concordance, Topic Modelling, Document Embedding/Map) — all existing widgets, used as-is | None |
