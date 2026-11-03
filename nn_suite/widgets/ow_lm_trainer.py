@@ -210,6 +210,7 @@ class OWLMTrainer(OWWidget):
             "sample_prompt": self.sample_prompt,
             "sample_temperature": self.sample_temperature if self.store_samples else None,
             "sample_max_new_tokens": self.sample_max_new_tokens,
+            "sample_seed": 0,
         }
 
     def start_training(self):

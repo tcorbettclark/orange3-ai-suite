@@ -26,6 +26,11 @@ if not _orange_usable():
 import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# The offscreen platform's font database default family is literally
+# "Sans Serif"; its one-time alias-population message goes straight to stderr
+# (not a Python warning, so pytest filterwarnings can't catch it) — real
+# canvas runs (cocoa) never show it. Silence it in the test harness only.
+os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.fonts*=false")
 
 import numpy as np
 import pytest

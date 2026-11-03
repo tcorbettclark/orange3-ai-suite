@@ -103,6 +103,24 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
     assert 0 < hp["validation_fraction"] < 1
 
 
+def test_stop_requested_stops_training_cleanly(tokenizer):
+    seen = []
+
+    def hook(stats):
+        seen.append(stats["epoch"])
+
+    def stop_requested():
+        return len(seen) >= 2  # the widget's Stop button analogue
+
+    model = train_language_model(
+        CORPUS, tokenizer, "mlp_window", context_size=8,
+        embedding_dim=8, hidden_units=16, epochs=50, batch_size=32,
+        seed=0, on_epoch=hook, stop_requested=stop_requested,
+    )
+    assert model is not None
+    assert max(seen) <= 3 and len(seen) < 50  # training ended early
+
+
 def test_train_validation_split_is_mandatory():
     with pytest.raises(ValueError, match="validation_fraction"):
         train_language_model(CORPUS, Tokenizer.from_corpus(CORPUS, "char"),

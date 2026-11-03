@@ -62,21 +62,29 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
         assert losses[-1] < losses[0]
 
 
-def test_worker_stop_flag_honoured(qapp, capture, text_table):
-    if not KERAS_AVAILABLE:
-        pytest.skip("Keras not installed in this Orange environment ([lm] extra)")
+def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
+    """The Stop button's effect, mid-run: 200 epochs requested, stop after 3."""
     w = OWLMTrainer()
     w.show()
     w.set_data(text_table)
-    w.epochs = 200  # would take a while; the stop flag must cut it short
+    w.epochs = 200
     w.context_size = 8
     w.embedding_dim = 8
     w.hidden_units = 16
-    w.worker = None
+
+    original = w._on_epoch
+    calls = {"n": 0}
+
+    def on_epoch(stats):  # the button handler runs outside the worker; the
+        original(stats)    # hook is the only mid-run injection point here
+        calls["n"] += 1
+        if calls["n"] >= 3:
+            w.stop_training()
+
+    monkeypatch.setattr(w, "_on_epoch", on_epoch)
     model_sent = capture(w.Outputs.model)
     w.run_training_blocking()
-    # the worker stopped early: far fewer stats recorded than requested epochs
-    assert 0 < len(w.epoch_stats) < 200
+    assert 3 <= len(w.epoch_stats) < 200  # ended early, not crashed
     assert w.model is not None and model_sent[-1] is w.model
 
 
