@@ -16,9 +16,9 @@ from nn_kernel.features import (
 from synth import cloud_image
 
 
-EXPECTED_GROUP_SIZES = {"A": 6, "B": 12, "C": 6, "D": 6, "E": 3, "F": 3}
+EXPECTED_GROUP_SIZES = {"A": 6, "B": 12, "C": 6, "D": 6, "E": 3, "F": 3, "G": 4}
 TOTAL = sum(EXPECTED_GROUP_SIZES.values())
-assert TOTAL == 36
+assert TOTAL == 40
 
 
 def test_registry_structure():
@@ -59,14 +59,16 @@ def test_get_feature_errors():
 
 def test_extraction_full_vector():
     vec = extract_features(cloud_image(seed=1))
-    assert len(vec) == TOTAL
-    assert vec.names() == all_feature_names()
-    arr = vec.to_array()
-    assert arr.dtype == np.float64
-    assert np.isfinite(arr).all()
+    assert len(vec) == 36  # default: all groups EXCEPT the colour trap
+    assert vec.names() == all_feature_names()[:36]  # A-F, G excluded by default
+    assert all(vec.group_of(n) != "G" for n in vec.names())
+
+    full = extract_features(cloud_image(seed=1), groups="ABCDEFG")
+    assert len(full) == TOTAL
+    assert np.isfinite(full.to_array()).all()
     # deterministic
     vec2 = extract_features(cloud_image(seed=1))
-    assert np.array_equal(arr, vec2.to_array())
+    assert np.array_equal(vec.to_array(), vec2.to_array())
 
 
 def test_extraction_rgb_and_rgba_input():
@@ -89,7 +91,7 @@ def test_group_subsetting_ablation():
 def test_feature_level_exclusion():
     full = extract_features(cloud_image(seed=1))
     fewer = extract_features(cloud_image(seed=1), exclude={"skewness", "hole_count"})
-    assert len(fewer) == TOTAL - 2
+    assert len(fewer) == 34
     assert "skewness" not in fewer and "hole_count" not in fewer
     for name in fewer.names():
         assert fewer[name] == full[name]  # other values unchanged
@@ -116,4 +118,4 @@ def test_error_paths():
 def test_extraction_uses_fixed_working_size():
     big = np.kron(cloud_image(seed=4), np.ones((2, 2), dtype=np.float32))  # 256x256
     vec = extract_features(big)  # centre-cropped + resized to 128
-    assert len(vec) == TOTAL and np.isfinite(vec.to_array()).all()
+    assert len(vec) == 36 and np.isfinite(vec.to_array()).all()

@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 
 from .options import FeatureOptions
-from .preprocess import preprocess
-from .registry import GROUP_ORDER, FEATURES, _MODULES
+from .preprocess import preprocess, preprocess_colour
+from .registry import DEFAULT_GROUPS, GROUP_ORDER, FEATURES, _MODULES
 
 
 class FeatureVector:
@@ -70,14 +70,15 @@ def extract_features(
     options:
         FeatureOptions; defaults applied when None.
     groups:
-        None (all groups) or a subset string such as ``"AD"`` for group
-        ablation experiments (domain doc §5).
+        None (all non-trap groups, ``ABCDEF``) or a subset string such as
+        ``"AD"`` for group ablation experiments (domain doc §5); the colour
+        trap group G is opt-in only.
     exclude:
         None, or an iterable of feature names to drop — per-feature
         switching on top of group selection.
     """
     opts = options or FeatureOptions()
-    selected = GROUP_ORDER if groups is None else tuple(groups)
+    selected = DEFAULT_GROUPS if groups is None else tuple(groups)
     unknown_groups = set(selected) - set(GROUP_ORDER)
     if unknown_groups:
         raise ValueError(
@@ -94,7 +95,9 @@ def extract_features(
     group_of: dict[str, str] = {}
     for letter in selected:
         module = _MODULES[letter]
-        for name, value in module.compute(preprocessed, opts).items():
+        # the colour trap group computes on absolute colours, not luminance
+        input_image = preprocess_colour(image, opts) if letter == "G" else preprocessed
+        for name, value in module.compute(input_image, opts).items():
             if name in excluded:
                 continue
             values[name] = float(value)

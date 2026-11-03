@@ -19,8 +19,9 @@ from .options import FeatureOptions
 _EPS = 1e-12
 
 # ITU-R BT.601 luma weights, RGB channel order convention (the widget adapter
-# is responsible for converting cv2's BGR before calling the kernel).
-_LUMA = np.array([0.299, 0.587, 0.114], dtype=np.float64)
+# is responsible for converting cv2's BGR before calling the kernel). Applied
+# elementwise in to_luminance (kept for documentation/tests).
+_LUMA = (0.299, 0.587, 0.114)
 
 
 def to_luminance(image: np.ndarray) -> np.ndarray:
@@ -28,6 +29,9 @@ def to_luminance(image: np.ndarray) -> np.ndarray:
 
     Accepts 2-D input as-is (already grayscale) and 3-D input with 3 (RGB,
     per this module's convention) or 4 (RGBA, alpha dropped) channels.
+    Elementwise sums, deliberately NOT a matrix-vector matmul: some numpy
+    builds (e.g. 2.1.3/macOS arm) emit spurious BLAS warnings on the `@`
+    dispatch for mathematically identical operations.
     """
     img = np.asarray(image)
     if img.ndim == 2:
@@ -41,11 +45,14 @@ def to_luminance(image: np.ndarray) -> np.ndarray:
             f"expected 1, 3 or 4 channels, got {img.shape[-1]} — pass RGB "
             "(convert cv2 BGR to RGB in the widget adapter before calling)"
         )
-    return (img.astype(np.float64) @ _LUMA).astype(np.float32)
+    r = img[..., 0].astype(np.float64)
+    g = img[..., 1].astype(np.float64)
+    b = img[..., 2].astype(np.float64)
+    return (0.299 * r + 0.587 * g + 0.114 * b).astype(np.float32)
 
 
 def _centre_crop_to_square(img: np.ndarray) -> np.ndarray:
-    h, w = img.shape
+    h, w = img.shape[:2]
     side = min(h, w)
     y0 = (h - side) // 2
     x0 = (w - side) // 2
@@ -63,6 +70,30 @@ def _contrast_normalise(img: np.ndarray) -> np.ndarray:
     if hi - lo < _EPS:
         return np.zeros_like(img)
     return np.clip((img - lo) / (hi - lo), 0.0, 1.0).astype(np.float32)
+
+
+def preprocess_colour(image: np.ndarray, options: FeatureOptions) -> np.ndarray:
+    """Geometric pipeline only (centre-crop + resize), NO intensity ops:
+    colour statistics need absolute channels, which contrast normalisation
+    or median filtering would distort. RGB in [0, 1] or grayscale passthrough.
+    (Used by the optional colour trap group only.)
+    """
+    img = np.asarray(image)
+    if img.ndim == 3:
+        if img.shape[-1] == 4:
+            img = img[..., :3]
+        img = img.astype(np.float64)
+        if img.max() > 1.0:
+            img = img / 255.0
+    if options.centre_crop:
+        img = _centre_crop_to_square(img)
+    if options.working_size is not None and img.shape != (options.working_size,) * 2:
+        img = cv2.resize(
+            img,
+            (options.working_size, options.working_size),
+            interpolation=cv2.INTER_AREA,
+        )
+    return np.ascontiguousarray(img, dtype=np.float32)
 
 
 def preprocess(image: np.ndarray, options: FeatureOptions) -> np.ndarray:

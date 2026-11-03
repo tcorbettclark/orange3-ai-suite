@@ -25,7 +25,7 @@ if importlib.util.find_spec("cv2") is None:
     collect_ignore += [
         f"tests/test_{name}.py"
         for name in (
-            "extract", "photometry", "preprocess", "profiles", "spatial",
+            "colour", "extract", "photometry", "preprocess", "profiles", "spatial",
             "stability", "symmetry", "texture", "topology",
         )
     ]

@@ -7,8 +7,9 @@ module's ``DEFINITIONS``). See registry.all_features() / get_feature().
 """
 
 from .options import FeatureOptions
-from .preprocess import preprocess, to_luminance
+from .preprocess import preprocess, preprocess_colour, to_luminance
 from .registry import (
+    DEFAULT_GROUPS,
     GROUP_ORDER,
     FEATURES,
     Feature,
@@ -25,9 +26,11 @@ __all__ = [
     "FeatureVector",
     "extract_features",
     "preprocess",
+    "preprocess_colour",
     "to_luminance",
     "Feature",
     "FEATURES",
+    "DEFAULT_GROUPS",
     "GROUP_ORDER",
     "all_features",
     "all_feature_names",

@@ -29,6 +29,26 @@ group toggles are the ablation experiment; watch the confusion matrix change.
 MNIST: working size 56 (why: 28-wide images starve the 5×5/16×16 texture
 features). Clouds: 128.
 
+## Measured results (the honest ceiling on this corpus)
+
+5-fold CV, Orange's Neural Network learner (the canvas default path)
+reproduced headlessly by `demo/diagnose_cloud.py` / `demo/probe_colour.py`
+(kept as the record of these measurements):
+
+| Feature set | CA |
+|---|---|
+| 36 luminance features (A–F), raw | ~0.37 |
+| 36 z-scored | ~0.35–0.40 |
+| + colour group G (the trap) | ~0.38–0.44 |
+| majority baseline | 0.225 |
+
+Interpretation: genera genuinely confound under hand-crafted features on this
+kind of photography (Atlas catalogue photos are often close-ups naming two
+genera in their titles, or twilight shots); colour is the single biggest
+lever — which is exactly why it is the spec's designated trap group. The
+confusion matrix *is* the lesson: read which genera confound and
+ask which spatial structure the missing feature would capture.
+
 ## Cloud corpus provenance (fetch_clouds.py)
 
 Images come from the **WMO International Cloud Atlas** (WMO-No. 407,

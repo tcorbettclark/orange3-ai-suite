@@ -39,6 +39,7 @@ GROUP_LABELS = (
     ("D", "D: texture"),
     ("E", "E: topology"),
     ("F", "F: symmetry"),
+    ("G", "G: colour — the shortcut trap (default off, spec §2)"),
 )
 
 
@@ -82,6 +83,7 @@ class OWImageFeatureExtractor(OWWidget):
     peak_prominence_frac = Setting(0.10)
     edge_density_frac = Setting(0.50)
     groups_enabled = Setting("ABCDEF")
+    scale_features = Setting(False)
     preview_index = Setting(0)
 
     def __init__(self):
@@ -111,7 +113,12 @@ class OWImageFeatureExtractor(OWWidget):
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
 
-        gui.auto_commit(self.controlArea, self, "auto_apply", "Extract features")
+        gui.auto_commit(self.controlArea, self, "auto_apply", "Extract features",
+                        commit=self.commit)
+        gui.checkBox(self.controlArea, self, "scale_features",
+                     "Scale features (z-score, whole-batch; measured +0.03 CA on "
+                     "the cloud demo — note: stats come from the whole table, "
+                     "so keep Test & Score's folds in mind)")
 
         self._setup_preview()
         self.resize(950, 700)
@@ -281,6 +288,9 @@ class OWImageFeatureExtractor(OWWidget):
         values = np.asarray(
             [[vec[name] for name in ordered] for vec in rows], dtype=np.float64
         )
+        if self.scale_features and len(values) > 1:
+            stds = values.std(axis=0)
+            values = (values - values.mean(axis=0)) / np.where(stds < 1e-12, 1.0, stds)
         source = self.data.domain
         kept_idx = np.asarray(readable, dtype=int)
         domain = Domain(

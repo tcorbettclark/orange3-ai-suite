@@ -30,7 +30,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import numpy as np
 import pytest
 from AnyQt.QtWidgets import QApplication
-from Orange.data import Domain, StringVariable, Table
+from Orange.data import DiscreteVariable, Domain, StringVariable, Table
 
 
 @pytest.fixture(scope="session")
@@ -118,6 +118,52 @@ def widget(qapp, make_model):
     w.show()
     yield w
     w.close()
+
+
+@pytest.fixture(scope="module")
+def image_dir(tmp_path_factory):
+    """flat / noisy / disc images on disk, PNG, 64x64."""
+    rng = np.random.default_rng(0)
+    d = tmp_path_factory.mktemp("images")
+    paths = []
+
+    def save(arr, name):
+        from PIL import Image
+
+        path = d / name
+        Image.fromarray(arr.astype(np.uint8)).save(path)
+        paths.append(path)
+
+    # flat: solid mid-gray (contrast-normalises to all-zeros)
+    save(np.full((64, 64, 3), 128), "flat1.png")
+    save(np.full((64, 64, 3), 130), "flat2.png")
+    # noisy: strong texture
+    save(rng.uniform(0, 255, size=(64, 64, 3)), "noisy1.png")
+    save(rng.uniform(0, 255, size=(64, 64, 3)), "noisy2.png")
+    # disc: a bright disc on black (topology-friendly)
+    yy, xx = np.mgrid[0:64, 0:64]
+    disc = np.zeros((64, 64, 3))
+    disc[(yy - 32) ** 2 + (xx - 32) ** 2 <= 20**2] = 255
+    save(disc, "disc.png")
+    return d, paths
+
+
+@pytest.fixture()
+def images_table(image_dir):
+    """Import-Images-style table: path meta marked type='image' with origin."""
+    d, paths = image_dir
+    var = StringVariable("image")
+    var.attributes["type"] = "image"
+    var.attributes["origin"] = str(d)
+    domain = Domain(
+        [],
+        class_vars=[DiscreteVariable("class", values=("flat", "noisy", "disc"))],
+        metas=[var],
+    )
+    names = [p.name for p in paths]
+    classes = [0, 0, 1, 1, 2]
+    metas = np.asarray(names, dtype=object).reshape(-1, 1)
+    return Table.from_numpy(domain, np.empty((len(names), 0)), np.asarray(classes), metas)
 
 
 @pytest.fixture()

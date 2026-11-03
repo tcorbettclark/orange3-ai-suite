@@ -10,51 +10,6 @@ from nn_suite.adapters import image_paths
 rng = np.random.default_rng(0)
 
 
-@pytest.fixture(scope="module")
-def image_dir(tmp_path_factory):
-    """flat / noisy / disc images on disk, PNG, 64x64."""
-    d = tmp_path_factory.mktemp("images")
-    paths = []
-
-    def save(arr, name):
-        from PIL import Image
-
-        path = d / name
-        Image.fromarray(arr.astype(np.uint8)).save(path)
-        paths.append(path)
-
-    # flat: solid mid-gray (contrast-normalises to all-zeros)
-    save(np.full((64, 64, 3), 128), "flat1.png")
-    save(np.full((64, 64, 3), 130), "flat2.png")
-    # noisy: strong texture
-    save(rng.uniform(0, 255, size=(64, 64, 3)), "noisy1.png")
-    save(rng.uniform(0, 255, size=(64, 64, 3)), "noisy2.png")
-    # disc: a bright disc on black (topology-friendly)
-    yy, xx = np.mgrid[0:64, 0:64]
-    disc = np.zeros((64, 64, 3))
-    disc[(yy - 32) ** 2 + (xx - 32) ** 2 <= 20**2] = 255
-    save(disc, "disc.png")
-    return d, paths
-
-
-@pytest.fixture()
-def images_table(image_dir):
-    """Import-Images-style table: path meta marked type='image' with origin."""
-    d, paths = image_dir
-    var = StringVariable("image")
-    var.attributes["type"] = "image"
-    var.attributes["origin"] = str(d)
-    domain = Domain(
-        [],
-        class_vars=[DiscreteVariable("class", values=("flat", "noisy", "disc"))],
-        metas=[var],
-    )
-    names = [p.name for p in paths]
-    classes = [0, 0, 1, 1, 2]
-    metas = np.asarray(names, dtype=object).reshape(-1, 1)
-    return Table.from_numpy(domain, np.empty((len(names), 0)), np.asarray(classes), metas)
-
-
 def test_image_paths_adapter(images_table, image_dir):
     d, _ = image_dir
     column, paths = image_paths(images_table)
@@ -65,7 +20,9 @@ def test_image_paths_adapter(images_table, image_dir):
 
 
 def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
-    from nn_kernel.features import all_feature_names
+    from nn_kernel.features import group_names  # default = A–F, colour excluded
+
+    expected = [n for g in ("A", "B", "C", "D", "E", "F") for n in group_names(g)]
 
     w = OWImageFeatureExtractor()
     w.show()
@@ -76,7 +33,7 @@ def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
     out = features_sent[-1]
     assert out is not None
     assert len(out) == 5
-    assert [v.name for v in out.domain.attributes] == list(all_feature_names())
+    assert [v.name for v in out.domain.attributes] == expected
     assert out.domain.class_var.name == "class"  # class inherited
     assert out.domain.metas[0].name == "image"   # traceability kept
     assert np.isfinite(out.X).all()

@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import photometry, profiles, spatial, texture, topology, symmetry
+from . import colour, photometry, profiles, spatial, symmetry, texture, topology
 
-GROUP_ORDER = ("A", "B", "C", "D", "E", "F")
+GROUP_ORDER = ("A", "B", "C", "D", "E", "F", "G")
+DEFAULT_GROUPS = "ABCDEF"  # the colour trap group is opt-in (spec §2)
 
 _MODULES = {
     "A": photometry,
@@ -26,6 +27,7 @@ _MODULES = {
     "D": texture,
     "E": topology,
     "F": symmetry,
+    "G": colour,
 }
 
 

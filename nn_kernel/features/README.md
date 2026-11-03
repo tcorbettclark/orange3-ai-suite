@@ -49,12 +49,21 @@ in the default feature set).
    enumerates 36; all 36 are implemented.
 3. **Border peaks.** Peak counts include maxima at the image border
    (minimum-padding); a "cloud band at the top of the frame" must count.
-4. **Colour group.** Optional switchable trap group (spec §2) — deferred
-   until groups A–F are tested; the registry is designed for it to slot in
-   as another group module.
+4. **Colour group.** Implemented as group **G** (4 shortcut features:
+   bluish_fraction, blueness_mean, saturation_mean, greenery_fraction),
+   **default off** — activation is the classroom's shortcut-learning demo.
+   Measured on the Atlas cloud corpus: features-only CA ~0.37, with colour
+   ~0.44 (vs 0.225 majority baseline) — colour is the single biggest lever,
+   exactly as the spec predicted.
 5. **Coarse-to-fine ratio.** The spec's ``coarse / fine`` divides two small
    numbers and is ill-conditioned exactly when images are smooth (an
    additive-noise bump legitimately halves it; stability tests exposed this).
    Implemented as the bounded, monotone equivalent
    ``coarse / (coarse + fine)`` in [0, 1] — same ranking of puffy vs. wispy,
    stable under jitter.
+6. **Feature scaling.** The spec's engineering note expected "projection sums
+   ~1000x larger than skewness values"; the actual feature scale spread on
+   the demo corpus is ~0.04–15 and z-scoring measured only +0.03 CA, and
+   per-batch scaling leaks whole-table statistics into cross-validation. So
+   scaling lives in the *widget* as an explicit, **default-off** option
+   (with that caveat printed), not in the emitted feature definition.
