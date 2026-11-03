@@ -85,4 +85,9 @@ filterwarnings = [
     # a third-party bug that numpy will eventually turn into an error —
     # revisit the [lm] pin (spec: exact pins at release) when Keras fixes it.
     "ignore::DeprecationWarning:keras.*",
+    # orange-canvas-core 0.2.x warns about its own legacy localization module
+    # path (orangecanvas.utils.localization -> orangecanvas.localization).
+    # Emitted only inside orangecanvas; revisit when the installed
+    # canvas-core no longer emits it (nothing to do in our code).
+    "ignore::DeprecationWarning:orangecanvas.*",
 ]
