@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from orangecontrib.nn_suite.widgets.ow_nn_viewer import EdgeItem
+from nn_suite.widgets.ow_nn_viewer import EdgeItem
 
 
 def test_labels_align_with_edges(widget, make_model):

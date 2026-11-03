@@ -130,6 +130,9 @@ months before relying on it in code.
 | Orange's built-in Neural Network widget is a scikit-learn MLP on feature vectors; Orange cannot train CNNs/LLMs in the GUI — the gap this suite fills | Established | Orange docs |
 | `orange3-imagenets` dependency set (Orange ≥ 3.39, Keras ≥ 3.10, `tf_kera` ≥ 2.19, OpenCV ≥ 4.12) works inside Orange widgets — the basis of §5's floors | Verified | PyPI metadata for `orange3-imagenets` v0.0.3 |
 | Orange3-Text ships Word Enrichment and the analysis widgets the evaluation spine needs | Verified | [Orange3-Text docs](https://orange3-text.readthedocs.io/) |
+| Orange3-ImageAnalytics path columns: StringVariable metas marked `attributes["type"] == "image"` with an `origin` prefix; its `filter_image_attributes` is too loose (returns ANY string meta) — mark-check explicitly. `extract_paths(table, column)` is the public resolver | Verified (0.13.0, installed in the dev Orange) | imageanalytics utils/image_utils.py |
+| Orange >= 3.38 add-ons need no `orangecontrib` namespace (entry-point discovery only); pkgutil-style `orangecontrib` is shadowed by any add-on wheel shipping a pip nspkg.pth (ImageAnalytics does) | Verified (Orange 3.40 / canvas-core 0.2.7: pkgmeta has zero orangecontrib references) | nn_suite is a new-style plain package |
+| uv's build isolation breaks against the Orange framework Python (C stdlib invisible); sdists need `$OP -m pip install` instead | Verified (hatchling `_csv` and ndf failures) | Editable install works with `--no-build-isolation` |
 
 ---
 

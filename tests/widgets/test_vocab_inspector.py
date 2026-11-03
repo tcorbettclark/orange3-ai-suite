@@ -2,7 +2,7 @@
 
 import pytest
 
-from orangecontrib.nn_suite.widgets.ow_vocab_inspector import OWVocabInspector
+from nn_suite.widgets.ow_vocab_inspector import OWVocabInspector
 
 
 class NoTokenizerModel:

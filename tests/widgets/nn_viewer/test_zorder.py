@@ -1,7 +1,7 @@
 """The z-order stack is explicit and hover-aware."""
 
-from orangecontrib.nn_suite.widgets import ow_nn_viewer as m
-from orangecontrib.nn_suite.widgets.ow_nn_viewer import EdgeItem, NodeItem
+from nn_suite.widgets import ow_nn_viewer as m
+from nn_suite.widgets.ow_nn_viewer import EdgeItem, NodeItem
 
 
 def _edges(widget):

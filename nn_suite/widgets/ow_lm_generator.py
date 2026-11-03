@@ -17,7 +17,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, OWWidget, Output
 
-from orangecontrib.nn_suite.adapters import generations_table
+from nn_suite.adapters import generations_table
 
 
 # ``object`` inputs auto_summarize=None keeps Orange from registering a

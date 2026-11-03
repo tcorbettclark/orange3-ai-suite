@@ -23,7 +23,7 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, OWWidget, Output
 from AnyQt.QtCore import QThread, pyqtSignal
 
-from orangecontrib.nn_suite.adapters import checkpoint_table, table_texts
+from nn_suite.adapters import checkpoint_table, table_texts
 
 ARCHITECTURE_LABELS = ["Bigram", "MLP-over-window", "LSTM"]
 ARCHITECTURE_VALUES = ["bigram", "mlp_window", "lstm"]

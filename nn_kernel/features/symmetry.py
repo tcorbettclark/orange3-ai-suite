@@ -61,10 +61,12 @@ def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
         return 1.0 if abs(float(a.mean()) - float(b.mean())) < 1e-6 else 0.0
     if a_flat or b_flat:
         return 0.0
-    den = float(np.sqrt((am @ am) * (bm @ bm)))
+    den = float(np.sqrt((am * am).sum() * (bm * bm).sum()))
     if den == 0.0 or not np.isfinite(den):
         return 0.0
-    return float(np.clip((am @ bm) / den, -1.0, 1.0))
+    # elementwise-sum, NOT `am @ bm`: matmul dispatch hits spurious BLAS
+    # warnings on some numpy builds (seen: 2.1.3/macOS arm) for identical math
+    return float(np.clip((am * bm).sum() / den, -1.0, 1.0))
 
 
 def _mirror_symmetry(img: np.ndarray, axis: int) -> float:

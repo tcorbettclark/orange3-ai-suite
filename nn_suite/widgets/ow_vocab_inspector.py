@@ -17,7 +17,7 @@ from Orange.widgets import gui
 from Orange.widgets.widget import Input, Msg, OWWidget
 from AnyQt.QtWidgets import QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QTabWidget
 
-from orangecontrib.nn_suite.adapters import table_texts
+from nn_suite.adapters import table_texts
 
 
 def _fill_table(table_widget: QTableWidget, rows: list[tuple]) -> None:

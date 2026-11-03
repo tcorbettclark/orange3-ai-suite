@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from Orange.data import Table
 
-from orangecontrib.nn_suite.widgets.ow_lm_generator import OWLMGenerator
+from nn_suite.widgets.ow_lm_generator import OWLMGenerator
 
 
 class StubModel:
@@ -36,7 +36,7 @@ def test_generate_passes_the_kernel_convention_positionally(qapp, capture):
     assert model.calls[1] == ("the", 0.5, 12, 8)
     table = sent[-1]
     assert isinstance(table, Table) and len(table) == 2
-    from orangecontrib.nn_suite.adapters import generations_strings
+    from nn_suite.adapters import generations_strings
 
     assert generations_strings(table)[0].startswith("the-t0.5-s7")
 

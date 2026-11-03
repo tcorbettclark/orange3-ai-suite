@@ -64,17 +64,21 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["nn_kernel", "orangecontrib"]
-# orangecontrib is the pkgutil-style namespace shared across Orange add-ons
-# (orange3-nnviewer precedent); widgets register via the entry points below
-# (both spellings, per the nnviewer comment — canvas reads "orange.widgets"
-# since ~3.36; older versions "Orange.widgets").
+packages = ["nn_kernel", "nn_suite"]
+# nn_suite is a NEW-STYLE Orange add-on: a plain top-level package, no
+# 'orangecontrib' namespace. Orange >= 3.38 discovers add-ons purely via the
+# entry points above (verified against canvas-core 0.2.7 / Orange 3.40:
+# pkgmeta has zero orangecontrib references). The old namespace has a real
+# operational hazard: any add-on wheel shipping a pip nspkg.pth
+# (Orange3-ImageAnalytics does) pre-imports a fake 'orangecontrib' pinned to
+# site-packages at interpreter startup, shadowing every pkgutil-style
+# colleague — abandon that class of bug entirely.
 
 [project.entry-points."orange.widgets"]
-"Neural Networks" = "orangecontrib.nn_suite.widgets"
+"Neural Networks" = "nn_suite.widgets"
 
 [project.entry-points."Orange.widgets"]
-"Neural Networks" = "orangecontrib.nn_suite.widgets"
+"Neural Networks" = "nn_suite.widgets"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

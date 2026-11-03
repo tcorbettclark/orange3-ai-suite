@@ -2,7 +2,7 @@
 
 from AnyQt.QtCore import QSize, Qt
 
-from orangecontrib.nn_suite.widgets.ow_nn_viewer import EdgeItem, NNView
+from nn_suite.widgets.ow_nn_viewer import EdgeItem, NNView
 
 
 def test_draws_network_with_tooltips(widget, make_model):
@@ -51,7 +51,7 @@ def test_redraw_refits(widget, make_model, qapp):
 def test_save_failure_warns(widget, make_model, monkeypatch):
     widget.set_model(make_model())
     monkeypatch.setattr(
-        "orangecontrib.nn_suite.widgets.ow_nn_viewer.QFileDialog.getSaveFileName",
+        "nn_suite.widgets.ow_nn_viewer.QFileDialog.getSaveFileName",
         lambda *a, **k: ("/nonexistent_dir_xyz/network.png", "PNG (*.png)"),
     )
     widget.save_png()

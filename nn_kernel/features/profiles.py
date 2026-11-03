@@ -160,10 +160,12 @@ def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
     amp = max(float(np.abs(am).max()), float(np.abs(bm).max()))
     if amp < 1e-6:
         return 0.0
-    den = float(np.sqrt((am @ am) * (bm @ bm)))
+    den = float(np.sqrt((am * am).sum() * (bm * bm).sum()))
     if den == 0.0 or not np.isfinite(den):
         return 0.0
-    return float(np.clip((am @ bm) / den, -1.0, 1.0))
+    # elementwise-sum, NOT `am @ bm`: matmul dispatch hits spurious BLAS
+    # warnings on some numpy builds (seen: 2.1.3/macOS arm) for identical math
+    return float(np.clip((am * bm).sum() / den, -1.0, 1.0))
 
 
 def _level_upcrossings(line: np.ndarray) -> float:

@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 from Orange.data import Domain, ContinuousVariable, Table
 
-from orangecontrib.nn_suite.adapters import checkpoint_table, table_texts
-from orangecontrib.nn_suite.widgets.ow_lm_trainer import OWLMTrainer, TrainingWorker
+from nn_suite.adapters import checkpoint_table, table_texts
+from nn_suite.widgets.ow_lm_trainer import OWLMTrainer, TrainingWorker
 
 KERAS_AVAILABLE = importlib.util.find_spec("keras") is not None
 

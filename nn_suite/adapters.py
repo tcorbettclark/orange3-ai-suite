@@ -14,12 +14,46 @@ from __future__ import annotations
 import numpy as np
 from Orange.data import (
     ContinuousVariable,
+    DiscreteVariable,
     Domain,
     StringVariable,
     Table,
 )
 
 CHECKPOINT_COLUMNS = ("epoch", "loss", "val_loss", "perplexity", "val_perplexity")
+
+
+def image_paths(table: Table):
+    """Image column and resolved paths from an Import-Images-style table.
+
+    Returns ``(column, paths)`` where paths are resolved against the
+    column's ``origin`` attribute — exactly the contract Import Images
+    (Orange3-ImageAnalytics) produces. Uses that add-on's public helpers via
+    a lazy import; the error message covers its absence.
+    """
+    try:
+        from orangecontrib.imageanalytics.utils.image_utils import extract_paths
+    except ImportError as exc:  # pragma: no cover - env dependent
+        raise ValueError(
+            "Orange3-ImageAnalytics is required for image inputs "
+            "(Install via Options > Add-ons)."
+        ) from exc
+    # Import Images marks its path column explicitly; require that marker —
+    # ImageAnalytics' own filter_image_attributes is too loose (it accepts
+    # ANY string/categorical meta, merely sorting marked ones first).
+    candidates = [
+        v for v in table.domain.metas
+        if isinstance(v, (StringVariable, DiscreteVariable))
+        and v.attributes.get("type") == "image"
+    ]
+    candidates.sort(key=lambda v: v.name)
+    if not candidates:
+        raise ValueError(
+            "no image column found: connect the Images output of Import Images "
+            "(a text column marked as an image path)."
+        )
+    column = candidates[0]
+    return column, extract_paths(table, column)
 
 
 def table_texts(table: Table) -> list[str]:
