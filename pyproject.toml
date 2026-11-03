@@ -79,3 +79,10 @@ packages = ["nn_kernel", "orangecontrib"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = [
+    # keras 3.15 (<3.16?) predates numpy 2's __array__ copy-keyword protocol;
+    # the warning is emitted inside keras.src.backend.tensorflow.core. This is
+    # a third-party bug that numpy will eventually turn into an error —
+    # revisit the [lm] pin (spec: exact pins at release) when Keras fixes it.
+    "ignore::DeprecationWarning:keras.*",
+]
