@@ -13,9 +13,14 @@ language-model kernel are not yet started. Design lives in `spec/` — read
 ## Development
 
 ```bash
-uv sync                 # creates .venv, installs the kernel + dev group
-uv run pytest           # offscreen-safe; no Orange, no Qt, no display needed
-uv build                # single self-contained wheel into dist/
+uv sync --extra lm --no-install-package Orange3
+# ^ Orange3 is a runtime dependency (the add-on installer needs it) but must
+# NOT be installed into the dev venv: kernel tests must run without Orange
+# (REPO-CONTEXT §4), and widget tests run under the Orange interpreter:
+uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
+    --no-deps -e . --no-build-isolation   # one-time: hatchling/editables first
+uv run pytest                          # kernel tests, plain Python
+/Applications/Orange.app/Contents/MacOS/python -m pytest -q  # widget tests, offscreen
 ```
 
 Install for Orange (macOS Orange.app bundle), per `spec/REPO-CONTEXT.md` §4:

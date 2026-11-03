@@ -27,6 +27,7 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
+    "Orange3>=3.39.0",
 ]
 
 [project.optional-dependencies]
@@ -56,8 +57,17 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["nn_kernel"]
-# The Orange add-on package joins this list when the widget layer is built.
+packages = ["nn_kernel", "orangecontrib"]
+# orangecontrib is the pkgutil-style namespace shared across Orange add-ons
+# (orange3-nnviewer precedent); widgets register via the entry points below
+# (both spellings, per the nnviewer comment — canvas reads "orange.widgets"
+# since ~3.36; older versions "Orange.widgets").
+
+[project.entry-points."orange.widgets"]
+"Neural Networks" = "orangecontrib.nn_suite.widgets"
+
+[project.entry-points."Orange.widgets"]
+"Neural Networks" = "orangecontrib.nn_suite.widgets"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

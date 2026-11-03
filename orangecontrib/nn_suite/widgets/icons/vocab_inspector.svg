@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <rect x="2" y="2" width="44" height="44" rx="9" fill="#2c7fb8" stroke="#222" stroke-width="2"/>
+  <text x="24" y="31" font-family="Helvetica, sans-serif" font-size="22" font-weight="bold"
+        fill="white" text-anchor="middle">🔍</text>
+</svg>
