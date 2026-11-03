@@ -317,3 +317,9 @@ class OWImageFeatureExtractor(OWWidget):
         n = len(self._paths)
         self.preview_index = min(self.preview_index, max(n - 1, 0))
         self._preview_spin.setMaximum(max(n - 1, 0))
+
+
+if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWImageFeatureExtractor).run()

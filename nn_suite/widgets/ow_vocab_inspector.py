@@ -134,3 +134,9 @@ class OWVocabInspector(OWWidget):
                 for i in range(tokenizer.vocab_size)
             ],
         )
+
+
+if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWVocabInspector).run()

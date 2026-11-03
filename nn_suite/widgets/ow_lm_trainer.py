@@ -102,6 +102,7 @@ class OWLMTrainer(OWWidget):
 
     class Information(OWWidget.Information):
         training = Msg("Training in progress; press Stop to end early.")
+        saved = Msg("Model saved (tokenizer + weights, one unit): {}.")
 
     # settings
     architecture_index = Setting(1)  # MLP-over-window (spec: flagship default)
@@ -161,6 +162,7 @@ class OWLMTrainer(OWWidget):
 
         gui.button(self.controlArea, self, "Train", callback=self.start_training)
         gui.button(self.controlArea, self, "Stop", callback=self.stop_training)
+        gui.button(self.controlArea, self, "Save model", callback=self.save_model)
         self.status_label = gui.label(self.controlArea, self, "")
 
         # live plot: train and validation loss (perplexity lives in the
@@ -295,8 +297,27 @@ class OWLMTrainer(OWWidget):
         else:
             self.Error.training_failed(last)
 
+    def save_model(self):
+        """The §4.5 one-unit serialisation, exposed: tokenizer + weights."""
+        from AnyQt.QtWidgets import QFileDialog
+
+        if self.model is None:
+            self.Warning.nothing_to_train()
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save model", "gibbon-lm")
+        if not path:
+            return
+        saved = self.model.save(path)
+        self.Information.saved(str(saved))
+
     def onDeleteWidget(self):
         if self.worker is not None:
             self.worker.request_stop = True
             self.worker.wait(3000)
         super().onDeleteWidget()
+
+
+if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWLMTrainer).run()

@@ -58,6 +58,7 @@ def test_real_training_path(qapp, capture):
 
     w = OWLoRATrainer()
     w.show()
+    w.base_model = str(model_file.parent)
     domain = Domain([], metas=[StringVariable("text")])
     texts = [f"the quick brown fox jumped over fence {i}" for i in range(8)]
     table = Table.from_numpy(domain, np.empty((len(texts), 0)), None,

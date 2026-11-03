@@ -74,6 +74,10 @@ class OWLoRATrainer(OWWidget):
     class Warning(OWWidget.Warning):
         no_text = Msg("Connect data with text columns (or prompt/completion pairs).")
         nothing_to_train = Msg("Press Train once data is connected.")
+        fp16_model = Msg(
+            "The base model is not 4-bit quantised. The spec allows 4-bit "
+            "QLoRA only — convert it first: uv run python demo/fetch_britllm.py"
+        )
 
     class Error(OWWidget.Error):
         mlx_missing = Msg(
@@ -84,6 +88,11 @@ class OWLoRATrainer(OWWidget):
 
     class Information(OWWidget.Information):
         training = Msg("Training in progress; press Stop to end early.")
+        saved = Msg("Adapter artifact saved to {}.")
+
+    class Information(OWWidget.Information):
+        training = Msg("Training in progress; press Stop to end early.")
+        saved = Msg("Adapter artifact saved to {}.")
 
     # settings
     auto_apply = Setting(True)
@@ -124,6 +133,7 @@ class OWLoRATrainer(OWWidget):
 
         gui.button(self.controlArea, self, "Train", callback=self.start_training)
         gui.button(self.controlArea, self, "Stop", callback=self.stop_training)
+        gui.button(self.controlArea, self, "Save adapter", callback=self.save_adapter)
         self.status_label = gui.label(self.controlArea, self, "")
 
         import pyqtgraph as pg
@@ -184,6 +194,9 @@ class OWLoRATrainer(OWWidget):
         if not self._mlx_available():
             self.Error.mlx_missing()
             return
+        if not self._model_is_quantised(self.base_model):
+            self.Warning.fp16_model()
+            return  # spec: no full-precision option exposed
         self.Outputs.model.send(None)
         self.model = None
         self._losses = []
@@ -207,9 +220,43 @@ class OWLoRATrainer(OWWidget):
         if self.worker is not None:
             self.worker.request_stop_flag = True
 
+    @staticmethod
+    def _model_is_quantised(base_model: str) -> bool:
+        """Local dirs: inspect config.json's 'quantization'. HF ids may still
+        be quantised on the Hub, but we cannot know without downloading the
+        card: treat them as unquantised (the spec's 4-bit-only rule then
+        points the classroom at the locally converted model)."""
+        from pathlib import Path
+        import json
+
+        candidate = Path(base_model)
+        if not candidate.is_dir():
+            return False  # HF id or missing path — not verifiably quantised
+        config = candidate / "config.json"
+        if not config.exists():
+            return False
+        return bool(json.loads(config.read_text()).get("quantization"))
+
+    def save_adapter(self):
+        from AnyQt.QtWidgets import QFileDialog
+
+        if self.model is None:
+            self.Warning.nothing_to_train()
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save adapter artifact", "lora-adapter"
+        )
+        if not path:
+            return
+        saved = self.model.save(path)
+        self.Information.saved(str(saved))
+
     def run_training_blocking(self):
         """Same-thread variant for tests/debugging."""
         if self.data is None or not self._mlx_available():
+            return
+        if not self._model_is_quantised(self.base_model):
+            self.Warning.fp16_model()
             return
         import tempfile
         from pathlib import Path
@@ -266,3 +313,9 @@ class OWLoRATrainer(OWWidget):
             self.worker.request_stop_flag = True
             self.worker.wait(5000)
         super().onDeleteWidget()
+
+
+if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWLoRATrainer).run()

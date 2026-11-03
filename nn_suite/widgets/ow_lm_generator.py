@@ -40,6 +40,7 @@ class OWLMGenerator(OWWidget):
 
     class Information(OWWidget.Information):
         hint = Msg("Set a prompt, then press Generate.")
+        loaded = Msg("Loaded {} model: {}.")
 
     prompt = Setting("the")
     temperature = Setting(0.8)
@@ -59,6 +60,7 @@ class OWLMGenerator(OWWidget):
         gui.spin(box, self, "max_new_tokens", 1, 512, label="Max new tokens")
         gui.spin(box, self, "n_generations", 1, 50, label="Number of generations")
         gui.spin(box, self, "seed", -1, 2**31 - 1, label="Seed (-1 = random)")
+        gui.button(self.controlArea, self, "Load model…", callback=self.load_model)
         gui.button(self.controlArea, self, "Generate", callback=self.generate)
         gui.rubber(self.controlArea)
 
@@ -68,6 +70,36 @@ class OWLMGenerator(OWWidget):
         self.Warning.not_generative(
             shown=model is not None and not callable(getattr(model, "generate", None))
         )
+
+    def load_model(self):
+        """Load a saved model artifact (tokenizer+weights as ONE unit).
+
+        Dispatches on the artifact kind: LanguageModel (Keras, 'meta.json')
+        or LoRAModel (MLX adapter, 'lora_meta.json'). The loaded model is
+        used until the next input signal replaces it.
+        """
+        from AnyQt.QtWidgets import QFileDialog
+        from pathlib import Path
+
+        src_dir = QFileDialog.getExistingDirectory(
+            self, "Select a saved model/adapter artifact directory"
+        )
+        if not src_dir:
+            return
+        src = Path(src_dir)
+        if (src / "lora_meta.json").exists():
+            from nn_kernel.lora import LoRAModel
+
+            model, kind = LoRAModel.from_artifact(src), "MLX LoRA"
+        elif (src / "meta.json").exists():
+            from nn_kernel.lm import LanguageModel
+
+            model, kind = LanguageModel.load(src), "Keras LM"
+        else:
+            self.Warning.not_generative()
+            return
+        self.set_model(model)
+        self.Information.loaded(kind, src.name)
 
     def generate(self):
         self.Outputs.generations.send(None)
@@ -86,3 +118,9 @@ class OWLMGenerator(OWWidget):
             )
         self.Outputs.generations.send(generations_table(outcomes))
         self.Information.hint(shown=False)
+
+
+if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWLMGenerator).run()
