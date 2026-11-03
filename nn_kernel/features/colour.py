@@ -1,22 +1,19 @@
-"""Group G — colour (the deliberate trap). Optional, OFF by default.
+"""Group G: colour (4 features). Optional and off by default.
 
-Spec §2: "with colour retained, 'fraction of bluish pixels' solves cloud
-detection trivially — a shortcut that teaches nothing about spatial
-structure. Compute all features on luminance only; expose colour features
-as an optional, switchable group to demonstrate the shortcut effect."
+Colour is the deliberate shortcut. ``bluish_fraction`` alone can solve "is
+there sky in this photo?", which teaches nothing about spatial structure.
+Groups A-F therefore run on luminance only; switching this group on is the
+shortcut-learning demonstration.
 
-Unlike A-F these features read the *colour* image (raw RGB in [0, 1]);
+These features read the colour image (raw RGB in [0, 1]); the pipeline's
+luminance image is untouched. The definitions are deliberately naive, and
+that naivety is the point:
 
-the pipeline's luminance image is untouched. Definitions (deliberately
-naive — these are the shortcut features, and their naivety is the point):
-
-- bluish_fraction: fraction of pixels with B > R + 0.04 — sky presence;
-  measured on the Atlas corpus this is worth several CA points on its own.
+- bluish_fraction: fraction of pixels with B > R + 0.04 - sky presence.
 - blueness_mean: mean(B - R), the overall sky colour balance.
-- saturation_mean: mean(max-min over channels) — colourfulness.
-- greenery_fraction: fraction with G > R and G > B — terrain/trees; a
-  ground-clutter detector (frames where the photographer was not pointing
-  at the sky).
+- saturation_mean: mean(max-min over channels) - colourfulness.
+- greenery_fraction: fraction with G > R and G > B - terrain, trees and other
+  ground clutter.
 
 Grayscale input has no colour: all four features are 0.0 by definition.
 """
@@ -36,16 +33,12 @@ FEATURE_NAMES = (
 
 DEFINITIONS = {
     "bluish_fraction": (
-        "THE SHORTCUT: fraction of pixels bluer than red + 0.04 — sky "
-        "presence, solves 'is there sky in this photo' trivially. Switching "
-        "this group on demonstrates shortcut learning."
+        "The shortcut: fraction of pixels bluer than red + 0.04 - sky "
+        "presence, which answers 'is there sky in this photo' trivially. "
+        "Switching this group on demonstrates shortcut learning."
     ),
-    "blueness_mean": (
-        "Overall sky colour balance: mean(B - R) in [-1, 1]."
-    ),
-    "saturation_mean": (
-        "Colourfulness: mean of (max - min) channel intensity."
-    ),
+    "blueness_mean": ("Overall sky colour balance: mean(B - R) in [-1, 1]."),
+    "saturation_mean": ("Colourfulness: mean of (max - min) channel intensity."),
     "greenery_fraction": (
         "Ground-clutter detector: fraction of pixels greener than both red "
         "and blue (grass, trees, terrain)."
@@ -63,8 +56,6 @@ def compute(colour: np.ndarray, opts: FeatureOptions) -> dict[str, float]:
     return {
         "bluish_fraction": float((b > r + 0.04).mean()),
         "blueness_mean": float((b - r).mean()),
-        "saturation_mean": float(
-            (colour.max(axis=-1) - colour.min(axis=-1)).mean()
-        ),
+        "saturation_mean": float((colour.max(axis=-1) - colour.min(axis=-1)).mean()),
         "greenery_fraction": float(((g > r) & (g > b)).mean()),
     }

@@ -15,7 +15,6 @@ from nn_kernel.features import (
 )
 from synth import cloud_image
 
-
 EXPECTED_GROUP_SIZES = {"A": 6, "B": 12, "C": 6, "D": 6, "E": 3, "F": 3, "G": 4}
 TOTAL = sum(EXPECTED_GROUP_SIZES.values())
 assert TOTAL == 40
@@ -119,3 +118,11 @@ def test_extraction_uses_fixed_working_size():
     big = np.kron(cloud_image(seed=4), np.ones((2, 2), dtype=np.float32))  # 256x256
     vec = extract_features(big)  # centre-cropped + resized to 128
     assert len(vec) == 36 and np.isfinite(vec.to_array()).all()
+
+
+def test_one_pixel_image_yields_finite_features():
+    vec = extract_features(
+        np.full((1, 1), 0.5, dtype=np.float32),
+        FeatureOptions(working_size=None),
+    )
+    assert np.isfinite(vec.to_array()).all()

@@ -1,16 +1,13 @@
-"""Fetch britllm/britllm-3b-v0.1 and convert it to MLX 4-bit — self-contained.
+"""Fetch britllm/britllm-3b-v0.1 and convert it to MLX 4-bit.
 
-Action item §8.1 (nn-suite-architecture.md): "Verify/produce an MLX
-conversion of BritLLM". This script produces the repo's own conversion from
-the Hugging Face snapshot (cache-aware: a warm ~/.cache/huggingface costs no
-re-download), using `mlx_lm convert --quantize` (4-bit affine, group 64 —
-the standard MLX defaults).
+The script downloads the Hugging Face snapshot (cache-aware, so a warm
+``~/.cache/huggingface`` costs no re-download) and converts it with
+``mlx_lm convert --quantize``: 4-bit affine, group size 64, the MLX defaults.
 
-Writes to UNTRACKED `data/models/britllm-4bit/` (weights stay © their
-licences; the model card states it is a raw base model — "should be further
-finetuned", which is exactly the Stage-3 lesson). Also writes
-`data/models/britllm-4bit-MANIFEST.json`: versions, sizes, parameter count,
-quantisation config — the machine-annotation the §8.2 timing record needs.
+The result goes to untracked ``data/models/britllm-4bit/``. The base model is
+a raw base model ("should be further finetuned"), which is exactly what makes
+the LoRA lessons visible. A sibling manifest records the versions, size,
+parameter count and quantisation config.
 
     uv run python demo/fetch_britllm.py
 """
@@ -37,11 +34,12 @@ MINIMAL_CHAT_TEMPLATE = (
 
 
 def add_minimal_chat_template(model_dir: Path) -> bool:
-    """britllm is a RAW base model: its tokenizer ships no chat template, but
-    mlx-lm's SFT prompt-masking path (CompletionsDataset.process) requires
-    one. Our converted copy gets a minimal, generic role-templated template
-    ('user: .../assistant: ...') so the Stage-3b SFT beat can run; weights are
-    untouched. Recorded in the manifest.
+    """Add a minimal chat template when the tokenizer has none.
+
+    A raw base model's tokenizer ships no chat template, but mlx-lm's
+    prompt-masking SFT path requires one. The converted copy gets a minimal
+    generic role template ('user: .../assistant: ...'); weights are untouched.
+    Whether the template was added is recorded in the manifest.
     """
     cfg_path = model_dir / "tokenizer_config.json"
     cfg = json.loads(cfg_path.read_text())
@@ -57,8 +55,7 @@ def main() -> None:
         # idempotent: ensure the SFT template ships even on pre-existing
         # conversions (the check below is the self-containment guarantee)
         templated = add_minimal_chat_template(TARGET)
-        print(f"already converted: {TARGET} (chat template "
-              f"{'added' if templated else 'present'})")
+        print(f"already converted: {TARGET} (chat template {'added' if templated else 'present'})")
         return
     t0 = time.perf_counter()
     src = snapshot_download(REPO_ID)
@@ -67,19 +64,27 @@ def main() -> None:
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     t0 = time.perf_counter()
     result = subprocess.run(
-        [sys.executable, "-m", "mlx_lm", "convert",
-         "--hf-path", str(src),
-         "--mlx-path", str(TARGET),
-         "--quantize"],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-m",
+            "mlx_lm",
+            "convert",
+            "--hf-path",
+            str(src),
+            "--mlx-path",
+            str(TARGET),
+            "--quantize",
+        ],
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
         raise SystemExit(f"mlx_lm convert failed ({result.returncode})")
     converted_seconds = time.perf_counter() - t0
     templated = add_minimal_chat_template(TARGET)
 
-    import mlx.core as mx
     import struct
+
     from mlx_lm.utils import load
 
     # honest parameter count: sum the *source* fp16 shard headers, since MLX
@@ -95,7 +100,7 @@ def main() -> None:
                 param_bytes += abs(meta["data_offsets"][1] - meta["data_offsets"][0])
     n_params = round(param_bytes / 2 / 1e9, 2)  # F16 = 2 bytes/param
 
-    model, _ = load(str(TARGET))
+    load(str(TARGET))
     config = json.loads((TARGET / "config.json").read_text())
     manifest = {
         "hf_repo": REPO_ID,
@@ -105,11 +110,9 @@ def main() -> None:
         "model_type": config.get("model_type"),
         "converted_seconds": round(converted_seconds, 1),
         "chat_template_added": templated,
-        "size_mb": round(sum(p.stat().st_size for p in TARGET.rglob("*") if p.is_file())
-                         / 1e6, 1),
+        "size_mb": round(sum(p.stat().st_size for p in TARGET.rglob("*") if p.is_file()) / 1e6, 1),
     }
-    (TARGET.parent / "britllm-4bit-MANIFEST.json").write_text(
-        json.dumps(manifest, indent=1))
+    (TARGET.parent / "britllm-4bit-MANIFEST.json").write_text(json.dumps(manifest, indent=1))
     for key, value in manifest.items():
         print(f"  {key}: {value}")
 

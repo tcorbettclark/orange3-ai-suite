@@ -1,9 +1,8 @@
 """Keras builder + LanguageModel tests.
 
-These tests need the [lm] extra (Keras/TensorFlow, the proven orange3-imagenets
-combo) and run in plain Python — no Orange, no Qt (REPO-CONTEXT §4). They
-must also stay collectible under the Orange interpreter, where they get
-skipped when Keras is absent there.
+These tests need the [lm] extra (Keras/TensorFlow) and run in plain Python:
+no Orange, no Qt. They must also stay collectible under the Orange
+interpreter, where they are skipped when Keras is absent.
 """
 
 import math
@@ -15,9 +14,9 @@ import pytest
 
 pytest.importorskip("keras", reason="[lm] extra (Keras) not installed")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from nn_kernel.lm import LanguageModel, Tokenizer, make_windows, train_language_model
+from nn_kernel.lm import LanguageModel, Tokenizer, train_language_model
 from nn_kernel.lm.builders import ARCHITECTURES, build_model
 from nn_kernel.lm.models import _sample
 
@@ -50,8 +49,13 @@ def mlp_model(tokenizer):
 def test_builder_forward_shape(tokenizer):
     for architecture in ARCHITECTURES:
         model = build_model(
-            architecture, vocab_size=tokenizer.vocab_size, context_size=8,
-            embedding_dim=8, hidden_units=16, lstm_units=16, seed=0,
+            architecture,
+            vocab_size=tokenizer.vocab_size,
+            context_size=8,
+            embedding_dim=8,
+            hidden_units=16,
+            lstm_units=16,
+            seed=0,
         )
         # bigram consumes a single token id (context of 1)
         x = np.zeros((2, 1) if architecture == "bigram" else (2, 8), dtype=np.int32)
@@ -86,9 +90,16 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
         seen.append(stats)
 
     model = train_language_model(
-        CORPUS, tokenizer, "mlp_window", context_size=8,
-        embedding_dim=8, hidden_units=16, epochs=12, batch_size=32,
-        seed=0, on_epoch=hook,
+        CORPUS,
+        tokenizer,
+        "mlp_window",
+        context_size=8,
+        embedding_dim=8,
+        hidden_units=16,
+        epochs=12,
+        batch_size=32,
+        seed=0,
+        on_epoch=hook,
     )
     assert [s["epoch"] for s in seen] == list(range(1, 13))
     assert seen[-1]["loss"] < seen[0]["loss"]  # the loss must fall
@@ -113,9 +124,17 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
         return len(seen) >= 2  # the widget's Stop button analogue
 
     model = train_language_model(
-        CORPUS, tokenizer, "mlp_window", context_size=8,
-        embedding_dim=8, hidden_units=16, epochs=50, batch_size=32,
-        seed=0, on_epoch=hook, stop_requested=stop_requested,
+        CORPUS,
+        tokenizer,
+        "mlp_window",
+        context_size=8,
+        embedding_dim=8,
+        hidden_units=16,
+        epochs=50,
+        batch_size=32,
+        seed=0,
+        on_epoch=hook,
+        stop_requested=stop_requested,
     )
     assert model is not None
     assert max(seen) <= 3 and len(seen) < 50  # training ended early
@@ -123,16 +142,18 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
 
 def test_train_validation_split_is_mandatory():
     with pytest.raises(ValueError, match="validation_fraction"):
-        train_language_model(CORPUS, Tokenizer.from_corpus(CORPUS, "char"),
-                             "mlp_window", validation_fraction=0.0)
+        train_language_model(
+            CORPUS, Tokenizer.from_corpus(CORPUS, "char"), "mlp_window", validation_fraction=0.0
+        )
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
-        train_language_model(["one sentence only."],
-                             Tokenizer.from_corpus(["one sentence only."], "char"),
-                             "mlp_window")
+        train_language_model(
+            ["one sentence only."],
+            Tokenizer.from_corpus(["one sentence only."], "char"),
+            "mlp_window",
+        )
     with pytest.raises(ValueError, match="epochs"):
-        train_language_model(CORPUS, Tokenizer.from_corpus(CORPUS, "char"),
-                             "mlp_window", epochs=0)
+        train_language_model(CORPUS, Tokenizer.from_corpus(CORPUS, "char"), "mlp_window", epochs=0)
 
 
 # ---- sampling ------------------------------------------------------------
@@ -154,8 +175,7 @@ def test_different_seeds_diverge_at_high_temperature(mlp_model):
     # A 30-epoch model on a tiny corpus is near-argmax, so use the low-epoch
     # distribution trick: temperature 3 keeps sampling stochastic.
     outs = {
-        mlp_model.generate("", temperature=3.0, max_new_tokens=25, seed=s)
-        for s in (1, 2, 3, 4, 5)
+        mlp_model.generate("", temperature=3.0, max_new_tokens=25, seed=s) for s in (1, 2, 3, 4, 5)
     }
     assert len(outs) > 1
 
@@ -184,7 +204,7 @@ def test_sample_temperature_zero_is_argmax():
     assert _sample(logits, -1.0, rng) == 1  # any non-positive temperature = greedy
 
 
-# ---- perplexity (evaluation spine §6) -------------------------------------
+# ---- perplexity ------------------------------------------------------------
 
 
 def test_perplexity_prefers_indomain_text(mlp_model):
@@ -206,11 +226,29 @@ def test_save_load_round_trip(mlp_model, tmp_path):
     assert loaded.parameter_count() == mlp_model.parameter_count()
     # deterministic comparison at greedy temperature: identical generations
     prompt = "the cat "
-    assert mlp_model.generate(prompt, temperature=0, max_new_tokens=20) == \
-        loaded.generate(prompt, temperature=0, max_new_tokens=20)
+    assert mlp_model.generate(prompt, temperature=0, max_new_tokens=20) == loaded.generate(
+        prompt, temperature=0, max_new_tokens=20
+    )
 
 
 def test_language_model_is_serialisable_in_principle(mlp_model):
     # tokenizer json has no exotic types
     import json
+
     json.dumps(mlp_model.tokenizer.to_dict())
+
+
+def test_stop_requested_works_without_epoch_hook(tokenizer):
+    """The stop flag must not depend on an on_epoch callback being present."""
+    model = train_language_model(
+        CORPUS,
+        tokenizer,
+        "mlp_window",
+        context_size=8,
+        embedding_dim=8,
+        hidden_units=16,
+        epochs=5,
+        batch_size=32,
+        stop_requested=lambda: True,
+    )
+    assert math.isfinite(model.hyperparameters["final_loss"])

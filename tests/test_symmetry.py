@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from nn_kernel.features import FeatureOptions
-from nn_kernel.features import symmetry
+from nn_kernel.features import FeatureOptions, symmetry
 from synth import band_image, ring_image, uniform_image
 
 OPTS = FeatureOptions()
@@ -40,7 +39,7 @@ def test_flat_image_is_perfectly_symmetric():
 
 def test_quadrant_localised_structure_scores_low():
     img = np.zeros((128, 128), dtype=np.float32)
-    img[: 64, : 64] = 1.0  # single bright quadrant, rest dark
+    img[:64, :64] = 1.0  # single bright quadrant, rest dark
     f = _compute(img)
     # three dark-dark quadrant pairs correlate perfectly, three bright-dark
     # pairs hit the constant-mismatch guard (0) -> mean ~0.5, below the
@@ -70,5 +69,5 @@ def test_one_sided_constant_guard():
 
     # A constant half against a different constant half is *not* symmetric.
     img = np.zeros((128, 128), dtype=np.float32)
-    img[:, : 64] = 0.5
+    img[:, :64] = 0.5
     assert _compute(img)["left_right_symmetry"] == 0.0

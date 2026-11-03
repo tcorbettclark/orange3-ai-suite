@@ -1,21 +1,18 @@
-"""The model object: tokenizer embedded, generate(), save/load as one unit.
+"""The trained language-model object.
 
-Spec commitments (tiny-lm-suite-design.md §4.2, §4.5):
-- the tokenizer travels with the model — embedding row i means token i only
-  because *this* tokenizer said so; MLX adapter models (later) share this
-  interface, keyed on ``generate(prompt, temperature)``;
-- Save/Load serialises vocabulary + weights as one unit (a directory: the
-  Keras model file plus the tokenizer/meta JSON) — a separate tokenizer
-  artifact is the vocab-mismatch bug by construction.
+The model owns its tokenizer, exposes ``generate()`` and ``perplexity()``, and
+saves and loads vocabulary and weights as one unit. The ``generate`` interface
+is the kernel-wide convention, shared with the MLX/LoRA models.
 """
 
 from __future__ import annotations
 
 import json
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -42,8 +39,8 @@ def _sample(logits: np.ndarray, temperature: float, rng: np.random.Generator) ->
 class LanguageModel:
     """A trained Keras LM: architecture + tokenizer + weights + hyperparameters.
 
-    Implements the kernel's model convention: ``generate(prompt, temperature)``
-    — the same interface the MLX/LoRA models of Stages 2-3 will expose.
+    Implements the kernel's model convention, ``generate(prompt, temperature)``
+    - the same interface the MLX/LoRA models expose.
     """
 
     architecture: str
@@ -61,25 +58,25 @@ class LanguageModel:
     ) -> str:
         """Autoregressive sampling: low temperature = repetitive, high = word salad.
 
-        The prompt is encoded raw (no sentence splitting — it is a completion
+        The prompt is encoded raw (no sentence splitting - it is a completion
         context); contexts are the last ``context_size`` ids, left-padded with
-        <bos>. A sampled <bos> (which training never emits as a target) ends
+        BOS. A sampled BOS (which training never emits as a target) ends
         generation defensively.
         """
         if temperature < 0:
             raise ValueError("temperature must be >= 0 (0 = greedy)")
         rng = np.random.default_rng(seed)
         prompt_ids = self.tokenizer.encode(prompt)
-        # Left-pad the prompt's tail with <bos> up to the window size — note
-        # the pad goes FIRST; a naive concatenation would exceed the window.
+        # Left-pad the prompt's tail with BOS up to the window size; the pad
+        # goes first, because a naive concatenation would exceed the window.
         tail = prompt_ids[-self.context_size :]
         context = [BOS_ID] * (self.context_size - len(tail)) + tail
         generated: list[int] = []
         for _ in range(max_new_tokens):
             window = context[-1:] if self.architecture == "bigram" else context
-            logits = self.keras_model(
-                np.asarray([window], dtype=np.int32), training=False
-            ).numpy()[0]
+            logits = self.keras_model(np.asarray([window], dtype=np.int32), training=False).numpy()[
+                0
+            ]
             next_id = _sample(logits, temperature, rng)
             if next_id == BOS_ID:
                 break
@@ -87,21 +84,17 @@ class LanguageModel:
             context = context[1:] + [next_id]
         return self.tokenizer.decode(prompt_ids + generated)
 
-    def perplexity(
-        self, texts: Iterable[str], batch_size: int = 256
-    ) -> dict[str, float]:
+    def perplexity(self, texts: Iterable[str], batch_size: int = 256) -> dict[str, float]:
         """Loss and perplexity (e^loss) over the windows of the given texts.
 
-        This is the in-domain / out-of-domain number the evaluation spine plots
-        (spec §6): the single-domain limitation as a chart.
+        This is the in-domain / out-of-domain number used by the evaluation
+        widgets: the single-domain limitation as a chart.
         """
         windows = make_windows(self.tokenizer, texts, self.context_size)
         # bigram consumes only the last token of a window (builders.py)
         x = windows.contexts[:, -1:] if self.architecture == "bigram" else windows.contexts
         loss = float(
-            self.keras_model.evaluate(
-                x, windows.targets, batch_size=batch_size, verbose=0
-            )
+            self.keras_model.evaluate(x, windows.targets, batch_size=batch_size, verbose=0)
         )
         return {"loss": loss, "perplexity": math.exp(loss)}
 
@@ -124,11 +117,8 @@ class LanguageModel:
         return out
 
     @classmethod
-    def load(cls, path: str | Path) -> "LanguageModel":
-        """Load a model directory saved by :meth:`save`.
-
-        Uses keras.models.load_model at call time (import-light module).
-        """
+    def load(cls, path: str | Path) -> LanguageModel:
+        """Load a model directory saved by :meth:`save`."""
         import keras  # local import: only needed when materialising weights
 
         src = Path(path)

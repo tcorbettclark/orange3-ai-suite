@@ -1,4 +1,6 @@
-"""Group D — texture / smoothness (6 features): the clouds workhorse.
+"""Group D: texture and smoothness (6 features).
+
+This group carries most of the signal for sky and cloud imagery.
 
 Definitions
 -----------
@@ -6,15 +8,15 @@ Definitions
 - edge density: fraction of pixels whose gradient magnitude reaches
   ``edge_density_frac`` (default 0.5) x the image's own gradient p99.
   Adaptive but non-degenerate: a fixed percentile threshold would return a
-  constant 25% for every image (documented in features/README.md).
+  constant 25% for every image.
 - fine texture: mean local standard deviation over 5x5 windows, via
   E[x^2] - E[x]^2 (box filter).
 - coarse texture: variance of 16x16 block means (INTER_AREA downsampling).
 - coarse-to-fine ratio: coarse texture as a fraction of total texture,
-  ``coarse / (coarse + fine + eps)`` in [0, 1] (0.5 = scale-neutral). The
-  spec's ``coarse / fine`` divides two small numbers and is ill-conditioned
-  exactly when images are smooth (documented deviation 5 in README.md);
-  puffy cumulus scores high, wispy cirrus low, identically ranked.
+  ``coarse / (coarse + fine + eps)`` in [0, 1] (0.5 = scale-neutral). This
+  bounded form is used instead of ``coarse / fine``, which divides two small
+  numbers and is ill-conditioned exactly when images are smooth. It ranks
+  puffy cumulus high and wispy cirrus low.
 - autocorrelation half-width: typical feature size in pixels. The 2-D
   autocorrelation (FFT-based, mean-subtracted) is normalised by its central
   value, radially averaged, and the first radius where the radial profile
@@ -44,19 +46,12 @@ FEATURE_NAMES = (
 )
 
 DEFINITIONS = {
-    "mean_gradient_magnitude": (
-        "Overall roughness: mean magnitude of the image gradient."
-    ),
+    "mean_gradient_magnitude": ("Overall roughness: mean magnitude of the image gradient."),
     "edge_density": (
-        "Fraction of 'edgy' pixels: gradient at least half the image's own "
-        "p99 gradient (adaptive)."
+        "Fraction of 'edgy' pixels: gradient at least half the image's own p99 gradient (adaptive)."
     ),
-    "fine_texture": (
-        "Small-scale lumpiness: mean local standard deviation over 5x5 windows."
-    ),
-    "coarse_texture": (
-        "Big lumps vs. uniform: variance of the 16x16 block means."
-    ),
+    "fine_texture": ("Small-scale lumpiness: mean local standard deviation over 5x5 windows."),
+    "coarse_texture": ("Big lumps vs. uniform: variance of the 16x16 block means."),
     "coarse_to_fine_texture_ratio": (
         "Where the texture lives: coarse texture as a fraction of total "
         "texture (coarse/(coarse+fine), [0,1], 0.5 = scale-neutral); puffy "

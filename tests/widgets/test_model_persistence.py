@@ -1,4 +1,4 @@
-"""Widget-level model persistence (task: save/load UI for §4.5 artifacts).
+"""Widget-level model persistence: save/load UI for model artifacts.
 
 One slow test covering the classroom loop: train in LM Trainer → Save model →
 load in LM Generator → generate. Plus the LoRA fp16 guard and dispatch checks.
@@ -6,7 +6,6 @@ load in LM Generator → generate. Plus the LoRA fp16 guard and dispatch checks.
 
 import importlib.util
 import json
-import shutil
 from pathlib import Path
 
 import numpy as np
@@ -47,7 +46,8 @@ def test_train_save_load_generate_round_trip(qapp, capture, monkeypatch, tmp_pat
     # 2. Save model (dialog patched)
     model_dir = tmp_path / "gibbon-lm-demo"
     monkeypatch.setattr(
-        QFileDialog, "getSaveFileName",
+        QFileDialog,
+        "getSaveFileName",
         staticmethod(lambda *a, **k: (str(model_dir), "")),
     )
     trainer.save_model()
@@ -58,7 +58,8 @@ def test_train_save_load_generate_round_trip(qapp, capture, monkeypatch, tmp_pat
     generator = OWLMGenerator()
     generator.show()
     monkeypatch.setattr(
-        QFileDialog, "getExistingDirectory",
+        QFileDialog,
+        "getExistingDirectory",
         staticmethod(lambda *a, **k: str(model_dir)),
     )
     generator.load_model()
@@ -74,10 +75,11 @@ def test_generator_load_rejects_plain_directory(qapp, capture, monkeypatch, tmp_
     plain = tmp_path / "not-a-model"
     plain.mkdir()
     monkeypatch.setattr(
-        QFileDialog, "getExistingDirectory",
+        QFileDialog,
+        "getExistingDirectory",
         staticmethod(lambda *a, **k: str(plain)),
     )
-    sent = capture(generator.Outputs.generations)
+    capture(generator.Outputs.generations)
     generator.load_model()
     assert generator.Warning.not_generative.is_shown()
 
@@ -116,7 +118,8 @@ def test_lora_save_adapter(qapp, capture, monkeypatch, tmp_path):
     w.model = LoRAModel("some/base", None)  # raw base artifact shell
     dest = tmp_path / "adapter-out"
     monkeypatch.setattr(
-        QFileDialog, "getSaveFileName",
+        QFileDialog,
+        "getSaveFileName",
         staticmethod(lambda *a, **k: (str(dest), "")),
     )
     w.save_adapter()

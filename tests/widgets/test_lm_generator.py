@@ -1,7 +1,5 @@
 """LM Generator widget: prompt/temperature controls, generations as a Table."""
 
-import numpy as np
-import pytest
 from Orange.data import Table
 
 from nn_suite.widgets.ow_lm_generator import OWLMGenerator

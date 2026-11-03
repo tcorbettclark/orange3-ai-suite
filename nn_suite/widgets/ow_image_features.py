@@ -1,20 +1,9 @@
 """Image Feature Extractor: interpretable features for image classification.
 
-A thin shell over nn_kernel.features (groups A-F, 36 features; spec
-image-feature-extractor-widget.md §3-4). The widget adds: options
-(preprocessing parameters, feature-group toggles for ablation experiments),
-a preview showing the selected image's luminance with its row/column
-projection profiles ("makes the feature visible, not just a number"), and
-the Orange signal adapters.
-
-Output: one row per image, one column per feature, the input's class
-columns inherited, and the input metas (including the image path) kept so
-any suspicious row traces back to its source image — debuggability IS the
-point of the exercise.
-
-Extraction runs in the GUI thread with a progress bar (feature extraction at
-the working size is milliseconds per image — teaching scale); training-scale
-background threads are the LM Trainer's pattern.
+A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
+group options, a luminance/profile preview, and the Orange signal adapters.
+Extraction runs in the GUI thread with a progress bar: at teaching scale it
+takes milliseconds per image.
 """
 
 from __future__ import annotations
@@ -22,13 +11,13 @@ from __future__ import annotations
 import importlib.util
 
 import numpy as np
-from Orange.data import ContinuousVariable, Domain, Table
-from Orange.widgets import gui
-from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Input, Msg, OWWidget, Output
 from AnyQt.QtCore import Qt
 from AnyQt.QtGui import QImage, QPixmap
 from AnyQt.QtWidgets import QCheckBox, QHBoxLayout, QLabel
+from Orange.data import ContinuousVariable, Domain, Table
+from Orange.widgets import gui
+from Orange.widgets.settings import Setting
+from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from nn_suite.adapters import image_paths
 
@@ -39,11 +28,25 @@ GROUP_LABELS = (
     ("D", "D: texture"),
     ("E", "E: topology"),
     ("F", "F: symmetry"),
-    ("G", "G: colour — the shortcut trap (default off, spec §2)"),
+    ("G", "G: colour - the shortcut trap (off by default)"),
 )
 
 
 class OWImageFeatureExtractor(OWWidget):
+    """Extract human-interpretable features from images.
+
+    Input is an Import Images table (image paths in a meta column). Output is
+    one row per readable image, one column per selected feature, with the
+    input's class variables and metas kept so any row can be traced back to its
+    source image.
+
+    The controls select preprocessing (working size, centre crop, contrast
+    normalisation, optional denoising), peak and edge parameters, and feature
+    groups. Toggling groups is the ablation experiment; group G (colour) is
+    the opt-in shortcut demonstration. The preview shows the selected image's
+    preprocessed luminance together with its row and column projections.
+    """
+
     name = "Image Feature Extractor"
     description = "Extract interpretable image features (groups A-F) for classifiers."
     icon = "icons/image_features.svg"
@@ -57,16 +60,12 @@ class OWImageFeatureExtractor(OWWidget):
         features = Output("Features", Table)
 
     class Warning(OWWidget.Warning):
-        no_image_column = Msg(
-            "No image column found — connect the Images output of Import Images."
-        )
+        no_image_column = Msg("No image column found - connect the Images output of Import Images.")
         rows_skipped = Msg("{} row(s) skipped ({} unreadable, {} without a path).")
         all_groups_off = Msg("All feature groups are switched off.")
 
     class Error(OWWidget.Error):
-        imageanalytics_missing = Msg(
-            "Orange3-ImageAnalytics is required (Options > Add-ons)."
-        )
+        imageanalytics_missing = Msg("Orange3-ImageAnalytics is required (Options > Add-ons).")
         opencv_missing = Msg(
             "OpenCV is not available. Install the [image] extra: "
             "pip install orange3-nn-suite[image]"
@@ -92,17 +91,55 @@ class OWImageFeatureExtractor(OWWidget):
         self._paths: list[str] = []
 
         prep_box = gui.widgetBox(self.controlArea, "Preprocessing")
-        gui.spin(prep_box, self, "working_size", 32, 512, label="Working size (square)")
-        gui.checkBox(prep_box, self, "centre_crop", "Centre-crop to square")
-        gui.checkBox(prep_box, self, "contrast_normalise", "Contrast-normalise")
-        gui.checkBox(prep_box, self, "denoise", "Denoise (median filter)")
-        gui.spin(prep_box, self, "denoise_ksize", 3, 5, label="Denoise strength")
+        gui.spin(
+            prep_box,
+            self,
+            "working_size",
+            32,
+            512,
+            label="Working size (square)",
+            callback=self._defer_commit,
+        )
+        gui.checkBox(
+            prep_box, self, "centre_crop", "Centre-crop to square", callback=self._defer_commit
+        )
+        gui.checkBox(
+            prep_box, self, "contrast_normalise", "Contrast-normalise", callback=self._defer_commit
+        )
+        gui.checkBox(
+            prep_box, self, "denoise", "Denoise (median filter)", callback=self._defer_commit
+        )
+        gui.spin(
+            prep_box,
+            self,
+            "denoise_ksize",
+            3,
+            5,
+            label="Denoise strength",
+            callback=self._defer_commit,
+        )
 
         param_box = gui.widgetBox(self.controlArea, "Feature parameters")
-        gui.doubleSpin(param_box, self, "peak_prominence_frac", 0.01, 0.5, 0.01,
-                       label="Peak prominence (of range)")
-        gui.doubleSpin(param_box, self, "edge_density_frac", 0.1, 1.0, 0.05,
-                       label="Edge density (of gradient p99)")
+        gui.doubleSpin(
+            param_box,
+            self,
+            "peak_prominence_frac",
+            0.01,
+            0.5,
+            0.01,
+            label="Peak prominence (of range)",
+            callback=self._defer_commit,
+        )
+        gui.doubleSpin(
+            param_box,
+            self,
+            "edge_density_frac",
+            0.1,
+            1.0,
+            0.05,
+            label="Edge density (of gradient p99)",
+            callback=self._defer_commit,
+        )
 
         group_box = gui.widgetBox(self.controlArea, "Feature groups (ablation)")
         self._group_checks: dict[str, QCheckBox] = {}
@@ -113,23 +150,29 @@ class OWImageFeatureExtractor(OWWidget):
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
 
-        gui.auto_commit(self.controlArea, self, "auto_apply", "Extract features",
-                        commit=self.commit)
-        gui.checkBox(self.controlArea, self, "scale_features",
-                     "Scale features (z-score, whole-batch; measured +0.03 CA on "
-                     "the cloud demo — note: stats come from the whole table, "
-                     "so keep Test & Score's folds in mind)")
+        gui.auto_commit(
+            self.controlArea, self, "auto_apply", "Extract features", commit=self.commit
+        )
+        gui.checkBox(
+            self.controlArea,
+            self,
+            "scale_features",
+            "Scale features (z-score, whole-batch; statistics come from the "
+            "whole table, so keep Test & Score's folds in mind)",
+            callback=self._defer_commit,
+        )
 
         self._setup_preview()
         self.resize(950, 700)
+
+    def _defer_commit(self):
+        self.commit.deferred()
 
     def _sync_group_settings(self):
         self.groups_enabled = "".join(
             letter for letter, _ in GROUP_LABELS if self._group_checks[letter].isChecked()
         )
-
-    def _selected_groups(self) -> str:
-        return self.groups_enabled
+        self._defer_commit()
 
     # ---- preview -----------------------------------------------------------
 
@@ -143,12 +186,13 @@ class OWImageFeatureExtractor(OWWidget):
         self._preview_label.setFixedSize(200, 200)
         self._preview_label.setAlignment(Qt.AlignCenter)
         top.addWidget(self._preview_label)
-        self._preview_spin = gui.spin(container, self, "preview_index", 0, 0,
-                                      label="Image #", callback=self._update_preview)
+        self._preview_spin = gui.spin(
+            container, self, "preview_index", 0, 0, label="Image #", callback=self._update_preview
+        )
         self._profiles = pg.PlotWidget(background="w")
         self._profiles.addLegend(offset=(10, 10))
         self._profiles.setLabel("bottom", "normalised position across the image")
-        self._profiles.setLabel("left", "mean luminance (row ->, column ^)")
+        self._profiles.setLabel("left", "mean luminance")
         self._row_curve = self._profiles.plot(pen="#1f77b4", name="row profile")
         self._col_curve = self._profiles.plot(pen="#d62728", name="column profile")
         container.layout().addWidget(self._profiles)
@@ -174,6 +218,7 @@ class OWImageFeatureExtractor(OWWidget):
             return
         try:
             import cv2
+
             from nn_kernel.features import preprocess
 
             idx = min(int(self.preview_index), len(self._paths) - 1)
@@ -181,20 +226,18 @@ class OWImageFeatureExtractor(OWWidget):
             if bgr is None:
                 self._preview_label.setText("Preview unavailable.")
                 return
-            lum = preprocess(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB),
-                             self._feature_options())
+            lum = preprocess(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), self._feature_options())
         except ImportError:
             return  # preview is a nicety; extraction errors carry the install hint
         h, w = lum.shape
-        image = QImage(lum.tobytes(), w, h, w, QImage.Format_Grayscale8)
+        grayscale = np.ascontiguousarray(np.clip(lum * 255.0, 0, 255).round().astype(np.uint8))
+        image = QImage(grayscale.tobytes(), w, h, w, QImage.Format_Grayscale8)
         self._preview_label.setPixmap(
-            QPixmap.fromImage(image).scaled(
-                196, 196, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
+            QPixmap.fromImage(image).scaled(196, 196, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         )
         row_profile = lum.mean(axis=1)
         col_profile = lum.mean(axis=0)
-        self._row_curve.setData(np.linspace(0, 1, len(col_profile)), row_profile)
+        self._row_curve.setData(np.linspace(0, 1, len(row_profile)), row_profile)
         self._col_curve.setData(np.linspace(0, 1, len(col_profile)), col_profile)
 
     @Inputs.images
@@ -235,22 +278,19 @@ class OWImageFeatureExtractor(OWWidget):
 
     def _extract_and_send(self):
         if importlib.util.find_spec("cv2") is None:
-            raise ValueError("OpenCV not available — install the [image] extra")
-        groups = self._selected_groups()
-        if not groups:
+            raise ValueError("OpenCV not available - install the [image] extra")
+        if not self.groups_enabled:
             self.Warning.all_groups_off()
             self.Outputs.features.send(None)
             return
-        try:
-            _, paths = image_paths(self.data)
-        except ImportError as exc:
-            raise ValueError(f"Orange3-ImageAnalytics required ({exc.name})") from exc
+        _, paths = image_paths(self.data)
 
         kept = [(i, p) for i, p in enumerate(paths) if p]
         skipped_no_path = len(paths) - len(kept)
 
         import cv2
-        from nn_kernel.features import extract_features
+
+        from nn_kernel.features import extract_features, group_names
 
         rows, readable = [], []
         n_unreadable = 0
@@ -263,13 +303,17 @@ class OWImageFeatureExtractor(OWWidget):
                     n_unreadable += 1
                     continue
                 rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                rows.append(extract_features(rgb, self._feature_options(), groups=groups))
+                rows.append(
+                    extract_features(rgb, self._feature_options(), groups=self.groups_enabled)
+                )
                 readable.append(i)
         finally:
             self.progressBarFinished()
 
         self.Warning.rows_skipped(
-            n_unreadable + skipped_no_path, n_unreadable, skipped_no_path,
+            n_unreadable + skipped_no_path,
+            n_unreadable,
+            skipped_no_path,
             shown=bool(n_unreadable or skipped_no_path),
         )
         self._paths = [path for _, path in kept]
@@ -282,12 +326,10 @@ class OWImageFeatureExtractor(OWWidget):
         ordered = [
             name
             for letter, _ in GROUP_LABELS
-            if letter in groups
-            for name in self._registry_group_names(letter)
+            if letter in self.groups_enabled
+            for name in group_names(letter)
         ]
-        values = np.asarray(
-            [[vec[name] for name in ordered] for vec in rows], dtype=np.float64
-        )
+        values = np.asarray([[vec[name] for name in ordered] for vec in rows], dtype=np.float64)
         if self.scale_features and len(values) > 1:
             stds = values.std(axis=0)
             values = (values - values.mean(axis=0)) / np.where(stds < 1e-12, 1.0, stds)
@@ -307,19 +349,13 @@ class OWImageFeatureExtractor(OWWidget):
         self.Outputs.features.send(out)
         self._update_preview()
 
-    @staticmethod
-    def _registry_group_names(letter):
-        from nn_kernel.features import group_names
-
-        return group_names(letter)
-
     def _clamp_preview(self):
         n = len(self._paths)
         self.preview_index = min(self.preview_index, max(n - 1, 0))
         self._preview_spin.setMaximum(max(n - 1, 0))
 
 
-if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
     WidgetPreview(OWImageFeatureExtractor).run()

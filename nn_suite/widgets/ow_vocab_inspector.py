@@ -1,21 +1,21 @@
-"""Vocab Inspector: a read-only window into a tokenizer (spec §4.4).
+"""Vocab Inspector: a read-only window into a tokenizer.
 
-Inputs: a model (preferred — its embedded tokenizer is shown) or data with
-text columns (then char-level and word-level tokenizers are built to run
-side by side, the Trainer's tokenizer-dropdown hypothesis made visible).
+Input is a model (preferred: its embedded tokenizer is shown) or data with text
+columns (then character-level and word-level tokenizers are built side by side,
+making the Trainer's tokenizer choice visible). There are deliberately no
+outputs: the inspector never feeds back into training or generation, so
+vocabulary-mismatch bugs are impossible by construction.
 
-There are deliberately NO outputs: the inspector never feeds back into
-training or generation, which makes vocabulary-mismatch bugs impossible by
-construction. The inspector shows the tokenizer's token->id table, corpus
-frequency counts (Zipf's law), and its longest tokens.
+The inspector shows the token-to-id table, corpus frequency counts (a Zipf's
+law side lesson) and its longest tokens.
 """
 
 from __future__ import annotations
 
+from AnyQt.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QTabWidget
 from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.widget import Input, Msg, OWWidget
-from AnyQt.QtWidgets import QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QTabWidget
 
 from nn_suite.adapters import table_texts
 
@@ -28,6 +28,17 @@ def _fill_table(table_widget: QTableWidget, rows: list[tuple]) -> None:
 
 
 class OWVocabInspector(OWWidget):
+    """Inspect a tokenizer: tokens, ids and frequencies.
+
+    Connect a model to see the vocabulary embedded in it, or connect text data
+    to compare a character-level and a word-level tokenizer built from that
+    data. The summary line reports vocabulary size, mean token length and the
+    fraction of tokens seen only once; the tabs list the full vocabulary for
+    each tokenizer.
+
+    Read-only by design: there are no output signals.
+    """
+
     name = "Vocab Inspector"
     description = "Inspect a model's tokenizer: tokens, ids, frequencies."
     icon = "icons/vocab_inspector.svg"
@@ -40,7 +51,7 @@ class OWVocabInspector(OWWidget):
 
     class Warning(OWWidget.Warning):
         no_tokenizer = Msg("The connected model does not expose a tokenizer.")
-        text_not_supported = Msg("Data carries no string (text) columns.")
+        text_not_supported = Msg("{}")
         model_preferred = Msg("Model connected; the data input is ignored.")
 
     def __init__(self):
@@ -77,16 +88,18 @@ class OWVocabInspector(OWWidget):
     @Inputs.model
     def set_model(self, model):
         self._model_tokenizer = getattr(model, "tokenizer", None)
-        self.Warning.no_tokenizer(
-            shown=model is not None and self._model_tokenizer is None
+        self.Warning.no_tokenizer(shown=model is not None and self._model_tokenizer is None)
+        self.Warning.model_preferred(
+            shown=self._model_tokenizer is not None and self._data is not None
         )
-        self.Warning.model_preferred(shown=model is not None and self._data is not None)
         self.refresh()
 
     @Inputs.data
     def set_data(self, table):
         self._data = table
         self._char_tokenizer = self._word_tokenizer = None
+        self.Warning.text_not_supported.clear()
+        self.Warning.model_preferred(shown=self._model_tokenizer is not None and table is not None)
         if table is not None:
             try:
                 texts = table_texts(table)
@@ -95,16 +108,16 @@ class OWVocabInspector(OWWidget):
                 self._char_tokenizer = Tokenizer.from_corpus(texts, "char")
                 self._word_tokenizer = Tokenizer.from_corpus(texts, "word")
             except ValueError as exc:
-                self.Warning.text_not_supported(exc.args[0] if exc.args else str(exc))
+                self.Warning.text_not_supported(str(exc))
         self.refresh()
 
     # ---- rendering ---------------------------------------------------------
 
     def refresh(self):
         if self._model_tokenizer is not None:
-            self._show_tokenizer(self._model_tokenizer, self.model_table)
             from nn_kernel.lm import vocab_stats
 
+            self._show_tokenizer(self._model_tokenizer, self.model_table)
             stats = vocab_stats(self._model_tokenizer)
             self.summary_label.setText(
                 f"{stats['level']}-level, vocab {stats['vocab_size']} "
@@ -122,6 +135,8 @@ class OWVocabInspector(OWWidget):
             )
             self._tabs.setCurrentWidget(self.char_table)
         else:
+            for table in (self.model_table, self.char_table, self.word_table):
+                _fill_table(table, [])
             self.summary_label.setText("No input.")
             self._tabs.setCurrentIndex(0)
 
@@ -129,14 +144,11 @@ class OWVocabInspector(OWWidget):
     def _show_tokenizer(tokenizer, table: QTableWidget) -> None:
         _fill_table(
             table,
-            [
-                (tokenizer.token(i), i, tokenizer.counts[i])
-                for i in range(tokenizer.vocab_size)
-            ],
+            [(tokenizer.token(i), i, tokenizer.counts[i]) for i in range(tokenizer.vocab_size)],
         )
 
 
-if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
     WidgetPreview(OWVocabInspector).run()

@@ -1,6 +1,6 @@
-"""Group A — global photometry (6 features). NumPy only.
+"""Group A: global photometry (6 features).
 
-Overall brightness/contrast character of the image. All operate on the
+Overall brightness and contrast character of the image. All operate on the
 preprocessed [0, 1] luminance image (see preprocess.py).
 """
 
@@ -31,9 +31,7 @@ DEFINITIONS = {
         "Bright blobs on dark background (>0) vs. dark blobs on bright (<0); "
         "0 when the intensity distribution is symmetric or flat."
     ),
-    "kurtosis": (
-        "Intensity-distribution shape: >0 peaky, <0 flat-topped, ~0 Gaussian-like."
-    ),
+    "kurtosis": ("Intensity-distribution shape: >0 peaky, <0 flat-topped, ~0 Gaussian-like."),
     "bright_fraction": (
         "Fraction of pixels brighter than the image's own median + "
         "robust_contrast/2 — adaptive 'how much bright stuff'."

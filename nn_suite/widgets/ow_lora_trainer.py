@@ -1,40 +1,39 @@
-"""LoRA Trainer: fine-tune a real LLM with 4-bit QLoRA (spec §4.3).
+"""LoRA Trainer: fine-tune a real LLM with 4-bit QLoRA (Apple Silicon).
 
-The Stage-3 widget. A thin shell over nn_kernel.lora, which wraps the
-documented `python -m mlx_lm lora` command in a stopped-streamable
-subprocess — the widget adds the QThread + live-loss pattern, the model
-selector, the two data formats (raw corpus = continued pre-training;
-prompt–response pairs = true SFT with prompt masking), and the output
-artifact (adapter + base model as one unit).
+A thin shell over :mod:`nn_kernel.lora`. The widget adds the QThread and live
+loss curve, the base-model selector, the two data formats and the output
+artifact (adapter + base-model reference as one unit).
 
-Two teaching beats are exposed as data format choice in the GUI:
-- "Raw corpus (continued pre-training)" — self-supervised;
-- "Prompt–response pairs (SFT)" — supervised, prompt-masked loss.
+The data-format choice is a teaching beat:
 
-Apple-only: MLX is required (macOS/Apple Silicon); other machines get the
-standard graceful-degradation message.
+- "Raw corpus" - continued pre-training, still self-supervised;
+- "Prompt-response pairs" - supervised fine-tuning, with the prompt masked
+  out of the loss.
+
+MLX is required (macOS on Apple Silicon); other machines get the standard
+graceful-degradation message.
 """
 
 from __future__ import annotations
 
 import traceback
 
-import numpy as np
+from AnyQt.QtCore import QThread, pyqtSignal
 from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Input, Msg, OWWidget, Output
-from AnyQt.QtCore import QThread, pyqtSignal
+from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from nn_suite.adapters import table_pairs, table_texts
 
-DATA_FORMATS = ("Raw corpus (continued pre-training)", "Prompt–response pairs (SFT)")
+DATA_FORMATS = ("Raw corpus (continued pre-training)", "Prompt-response pairs (SFT)")
 DEFAULT_BASE_MODEL = "britllm/britllm-3b-v0.1"
 
 
 class LoraWorker(QThread):
+    """Runs kernel LoRA training off the GUI thread; metrics stream via signals."""
+
     metric_signal = pyqtSignal(dict)
-    line_signal = pyqtSignal(str)
     finished_ok = pyqtSignal(object)
     failed = pyqtSignal(str)
 
@@ -49,16 +48,29 @@ class LoraWorker(QThread):
 
             adapter = train_lora(
                 on_metric=self.metric_signal.emit,
-                on_line=None,
                 stop_requested=lambda: self.request_stop_flag,
                 **self.request,
             )
             self.finished_ok.emit(adapter)
-        except Exception:  # noqa: BLE001 — surfaced as a widget message
+        except Exception:
             self.failed.emit(traceback.format_exc())
 
 
 class OWLoRATrainer(OWWidget):
+    """Fine-tune a pretrained model with 4-bit QLoRA.
+
+    Input is a Table of raw text (one document per row) or prompt-response
+    pairs. Output is a ``LoRAModel``: the base model plus the trained adapter,
+    ready for the LM Generator.
+
+    The "Data format" choice is the lesson. A raw corpus trains with the same
+    next-token loss as pre-training (continued pre-training). Prompt-response
+    pairs are supervised fine-tuning: the completion tokens carry the loss and
+    the prompt is masked out. The live curve shows loss per iteration; the
+    adapter's trainable-parameter share is a small fraction of the base
+    model's parameters.
+    """
+
     name = "LoRA Trainer"
     description = "Fine-tune a real LLM with 4-bit QLoRA (Apple Silicon)."
     icon = "icons/lora_trainer.svg"
@@ -72,11 +84,11 @@ class OWLoRATrainer(OWWidget):
         model = Output("Model", object, auto_summary=False)
 
     class Warning(OWWidget.Warning):
-        no_text = Msg("Connect data with text columns (or prompt/completion pairs).")
+        no_text = Msg("No usable training data: {}")
         nothing_to_train = Msg("Press Train once data is connected.")
         fp16_model = Msg(
-            "The base model is not 4-bit quantised. The spec allows 4-bit "
-            "QLoRA only — convert it first: uv run python demo/fetch_britllm.py"
+            "The base model is not 4-bit quantised. Convert it first: "
+            "uv run python demo/fetch_britllm.py"
         )
 
     class Error(OWWidget.Error):
@@ -90,14 +102,9 @@ class OWLoRATrainer(OWWidget):
         training = Msg("Training in progress; press Stop to end early.")
         saved = Msg("Adapter artifact saved to {}.")
 
-    class Information(OWWidget.Information):
-        training = Msg("Training in progress; press Stop to end early.")
-        saved = Msg("Adapter artifact saved to {}.")
-
     # settings
-    auto_apply = Setting(True)
     base_model = Setting(DEFAULT_BASE_MODEL)
-    data_format_index = Setting(0)  # raw corpus (the classroom default beat)
+    data_format_index = Setting(0)  # raw corpus is the classroom default
     iters = Setting(300)
     learning_rate = Setting(1e-4)
     num_layers = Setting(16)
@@ -113,19 +120,22 @@ class OWLoRATrainer(OWWidget):
         self._losses: list[tuple[int, float, str]] = []  # (iter, loss, kind)
 
         model_box = gui.widgetBox(self.controlArea, "Model")
-        gui.lineEdit(model_box, self, "base_model",
-                     label="Base model (path or HF id)",
-                     tooltip="Path to a local MLX model dir (demo/fetch_britllm.py "
-                             "converts britllm) or a Hugging Face repo id")
+        gui.lineEdit(
+            model_box,
+            self,
+            "base_model",
+            label="Base model (path or HF id)",
+            tooltip="Path to a local MLX model directory or a Hugging "
+            "Face repo id. QLoRA requires a 4-bit quantised "
+            "model; demo/fetch_britllm.py produces one.",
+        )
 
         data_box = gui.widgetBox(self.controlArea, "Data format (the lesson)")
-        gui.comboBox(data_box, self, "data_format_index",
-                     items=list(DATA_FORMATS))
+        gui.comboBox(data_box, self, "data_format_index", items=list(DATA_FORMATS))
 
         train_box = gui.widgetBox(self.controlArea, "Training")
         gui.spin(train_box, self, "iters", 1, 5000, label="Iterations")
-        gui.doubleSpin(train_box, self, "learning_rate", 1e-6, 0.01, 1e-5,
-                       label="Learning rate")
+        gui.doubleSpin(train_box, self, "learning_rate", 1e-6, 0.01, 1e-5, label="Learning rate")
         gui.spin(train_box, self, "num_layers", 2, 32, label="Fine-tuned layers")
         gui.spin(train_box, self, "batch_size", 1, 32, label="Batch size")
         gui.spin(train_box, self, "max_seq_length", 64, 4096, label="Max seq length")
@@ -143,23 +153,25 @@ class OWLoRATrainer(OWWidget):
         self._plot.setLabel("bottom", "Iteration")
         self._plot.setLabel("left", "Loss")
         self._train_curve = self._plot.plot(pen="#1f77b4", width=2, name="train loss")
-        self._val_curve = self._plot.plot(pen="#d62728", width=2, name="val loss",
-                                          symbol="o", symbolSize=6, symbolPen="w")
+        self._val_curve = self._plot.plot(
+            pen="#d62728", width=2, name="val loss", symbol="o", symbolSize=6, symbolPen="w"
+        )
         self.mainArea.layout().addWidget(self._plot)
         self.resize(1000, 700)
 
     @Inputs.data
     def set_data(self, table):
         self.data = table
+        self.Warning.no_text.clear()
         self.Warning.nothing_to_train(shown=table is None)
-        self._request = None  # collected at Train time
+
+    # ---- lifecycle ---------------------------------------------------------
 
     def _collect_request(self, tmp_dir) -> dict:
         from nn_kernel.lora import LoraData, LoraOptions
 
         if self.data_format_index == 1:
-            pairs = table_pairs(self.data)
-            data_obj = LoraData.from_pairs(pairs)
+            data_obj = LoraData.from_pairs(table_pairs(self.data))
         else:
             data_obj = LoraData.from_texts(table_texts(self.data))
         options = LoraOptions(
@@ -187,34 +199,63 @@ class OWLoRATrainer(OWWidget):
             and importlib.util.find_spec("mlx_lm") is not None
         )
 
-    def start_training(self):
+    def _build_request(self):
+        """Validate state and stage data; None (with a message) when unusable."""
+        self.Warning.nothing_to_train.clear()
+        self.Warning.no_text.clear()
+        self.Warning.fp16_model.clear()
+        self.Error.mlx_missing.clear()
+        self.Error.training_failed.clear()
         if self.data is None:
             self.Warning.nothing_to_train()
-            return
+            return None
         if not self._mlx_available():
             self.Error.mlx_missing()
-            return
-        if not self._model_is_quantised(self.base_model):
+            return None
+        base_model = self.base_model or DEFAULT_BASE_MODEL
+        if not self._model_is_quantised(base_model):
             self.Warning.fp16_model()
-            return  # spec: no full-precision option exposed
+            return None  # only 4-bit QLoRA is offered
+
+        import tempfile
+        from pathlib import Path
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="lora_"))
+        try:
+            return self._collect_request(tmp_dir)
+        except ValueError as exc:
+            self.Warning.no_text(str(exc))
+            return None
+
+    def _run(self, blocking: bool):
+        request = self._build_request()
+        if request is None:
+            return
         self.Outputs.model.send(None)
         self.model = None
         self._losses = []
         self._train_curve.setData([], [])
         self._val_curve.setData([], [])
 
-        import tempfile
-        from pathlib import Path
+        worker = LoraWorker(request)
+        worker.metric_signal.connect(self._on_metric)
+        worker.finished_ok.connect(self._on_done)
+        worker.failed.connect(self._on_failed)
+        self.worker = worker
+        if blocking:
+            worker.run()
+        else:
+            worker.start()
+            self.Information.training()
 
-        tmp_dir = Path(tempfile.mkdtemp(prefix="lora_"))
-        request = self._collect_request(tmp_dir)
+    def start_training(self):
+        if self.worker is not None and self.worker.isRunning():
+            return
+        self._run(blocking=False)
 
-        self.worker = LoraWorker(request)
-        self.worker.metric_signal.connect(self._on_metric)
-        self.worker.finished_ok.connect(self._on_done)
-        self.worker.failed.connect(self._on_failed)
-        self.worker.start()
-        self.Information.training()
+    def run_training_blocking(self):
+        """Same-thread variant for tests/debugging."""
+        self._run(blocking=True)
 
     def stop_training(self):
         if self.worker is not None:
@@ -222,65 +263,34 @@ class OWLoRATrainer(OWWidget):
 
     @staticmethod
     def _model_is_quantised(base_model: str) -> bool:
-        """Local dirs: inspect config.json's 'quantization'. HF ids may still
-        be quantised on the Hub, but we cannot know without downloading the
-        card: treat them as unquantised (the spec's 4-bit-only rule then
-        points the classroom at the locally converted model)."""
-        from pathlib import Path
+        """Local directories: inspect config.json's quantization settings.
+
+        A Hugging Face id may be quantised on the Hub, but that cannot be known
+        without downloading the model card, so it is treated as unquantised.
+        The 4-bit-only rule then points the classroom at the locally converted
+        model.
+        """
         import json
+        from pathlib import Path
 
         candidate = Path(base_model)
         if not candidate.is_dir():
-            return False  # HF id or missing path — not verifiably quantised
+            return False  # HF id or missing path - not verifiably quantised
         config = candidate / "config.json"
         if not config.exists():
             return False
         return bool(json.loads(config.read_text()).get("quantization"))
 
-    def save_adapter(self):
-        from AnyQt.QtWidgets import QFileDialog
-
-        if self.model is None:
-            self.Warning.nothing_to_train()
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save adapter artifact", "lora-adapter"
-        )
-        if not path:
-            return
-        saved = self.model.save(path)
-        self.Information.saved(str(saved))
-
-    def run_training_blocking(self):
-        """Same-thread variant for tests/debugging."""
-        if self.data is None or not self._mlx_available():
-            return
-        if not self._model_is_quantised(self.base_model):
-            self.Warning.fp16_model()
-            return
-        import tempfile
-        from pathlib import Path
-
-        tmp_dir = Path(tempfile.mkdtemp(prefix="lora_"))
-        self.Outputs.model.send(None)
-        self.model = None
-        self._losses = []
-        request = self._collect_request(tmp_dir)
-        self.worker = LoraWorker(request)
-        self.worker.metric_signal.connect(self._on_metric)
-        self.worker.finished_ok.connect(self._on_done)
-        self.worker.failed.connect(self._on_failed)
-        self.worker.run()
+    # ---- live feedback -------------------------------------------------------
 
     def _on_metric(self, metric: dict):
         self._losses.append((metric["iter"], metric["loss"], metric["kind"]))
-        iters = [i for i, _, _ in self._losses]
-        train = [(i, l) for i, l, k in self._losses if k == "train"]
-        val = [(i, l) for i, l, k in self._losses if k == "val"]
+        train = [(i, loss) for i, loss, kind in self._losses if kind == "train"]
+        val = [(i, loss) for i, loss, kind in self._losses if kind == "val"]
         if train:
-            self._train_curve.setData(*zip(*train))
+            self._train_curve.setData(*zip(*train, strict=True))
         if val:
-            self._val_curve.setData(*zip(*val))
+            self._val_curve.setData(*zip(*val, strict=True))
         self.status_label.setText(
             f"iter {metric['iter']}: loss {metric['loss']:.3f}"
             + (f", {metric.get('tok_s')} tok/s" if metric.get("tok_s") else "")
@@ -290,23 +300,43 @@ class OWLoRATrainer(OWWidget):
         self.Information.training.clear()
         from nn_kernel.lora import LoRAModel
 
-        self.model = LoRAModel(adapter.base_model, adapter.adapter_path)
+        self.model = LoRAModel(
+            adapter.base_model,
+            adapter.adapter_path,
+            adapter.hyperparameters,
+            adapter.name,
+        )
         self.Outputs.model.send(self.model)
         self.status_label.setText(
-            f"Done: adapter saved ({adapter.name or 'adapter'}); "
-            "connect the Model output to LM Generator for the before/after "
-            "comparison (toggle the adapter)."
+            f"Done: adapter trained ({adapter.name or 'adapter'}); use Save "
+            "adapter to keep it, or connect the Model output to LM Generator "
+            "for the before/after comparison."
         )
 
     def _on_failed(self, tb: str):
         self.Information.training.clear()
+        self.Error.mlx_missing.clear()
+        self.Error.training_failed.clear()
         clean = tb.strip()
         last = clean.splitlines()[-1] if clean else "unknown error"
-        if ("No module named" in last and ("mlx" in last or "mlx_lm" in last)) or \
-                "Apple Silicon" in clean:
+        if (
+            "No module named" in last and ("mlx" in last or "mlx_lm" in last)
+        ) or "Apple Silicon" in clean:
             self.Error.mlx_missing()
         else:
             self.Error.training_failed(last)
+
+    def save_adapter(self):
+        from AnyQt.QtWidgets import QFileDialog
+
+        if self.model is None:
+            self.Warning.nothing_to_train()
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save adapter artifact", "lora-adapter")
+        if not path:
+            return
+        saved = self.model.save(path)
+        self.Information.saved(str(saved))
 
     def onDeleteWidget(self):
         if self.worker is not None:
@@ -315,7 +345,7 @@ class OWLoRATrainer(OWWidget):
         super().onDeleteWidget()
 
 
-if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
     WidgetPreview(OWLoRATrainer).run()

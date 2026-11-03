@@ -1,11 +1,10 @@
 """Image Feature Extractor widget tests: synthetic PNGs on disk."""
 
 import numpy as np
-import pytest
-from Orange.data import Domain, DiscreteVariable, StringVariable, Table
+from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
 from nn_suite.adapters import image_paths
+from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
 
 rng = np.random.default_rng(0)
 
@@ -35,7 +34,7 @@ def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
     assert len(out) == 5
     assert [v.name for v in out.domain.attributes] == expected
     assert out.domain.class_var.name == "class"  # class inherited
-    assert out.domain.metas[0].name == "image"   # traceability kept
+    assert out.domain.metas[0].name == "image"  # traceability kept
     assert np.isfinite(out.X).all()
     # sanity: textured images have far more gradient than the flat ones,
     # and the disc's bright topology is captured somewhere in its row
@@ -55,7 +54,9 @@ def test_group_ablation_via_settings(qapp, capture, images_table):
     w.commit.now()
     out = features_sent[-1]
     assert [v.name for v in out.domain.attributes] == [
-        "hole_count", "foreground_area_fraction", "stroke_crossings_median_level",
+        "hole_count",
+        "foreground_area_fraction",
+        "stroke_crossings_median_level",
     ]
     # topology: the disc has no enclosed background -> hole_count 0; area sane
     assert out[4, "foreground_area_fraction"] > 0.05
@@ -65,8 +66,9 @@ def test_no_image_column_warning(qapp):
     w = OWImageFeatureExtractor()
     w.show()
     domain = Domain([], metas=[StringVariable("text")])
-    table = Table.from_numpy(domain, np.empty((2, 0)), None,
-                             np.asarray(["a", "b"], dtype=object).reshape(-1, 1))
+    table = Table.from_numpy(
+        domain, np.empty((2, 0)), None, np.asarray(["a", "b"], dtype=object).reshape(-1, 1)
+    )
     w.set_data(table)
     w.commit.now()
     assert w.Warning.no_image_column.is_shown()
@@ -114,6 +116,21 @@ def test_preview_populated_after_apply(qapp, images_table):
     w._update_preview()
     pixmap = w._preview_label.pixmap()
     assert pixmap is not None and not pixmap.isNull()
+    # the disc is bright at the centre; a float/uint8 channel mix-up would not be
+    assert pixmap.toImage().pixelColor(98, 98).lightness() > 200
     # profiles carry data for the selected image, at the preprocessing
     # working size (128 by default), not the source resolution (64)
     assert w._row_curve.xData is not None and len(w._row_curve.xData) == 128
+
+
+def test_group_toggle_auto_applies(qapp, capture, images_table):
+    """The controls are wired to the commit, not just to their settings."""
+    w = OWImageFeatureExtractor()
+    w.show()
+    sent = capture(w.Outputs.features)
+    w.set_data(images_table)
+    w.commit.now()
+    assert "bluish_fraction" not in [v.name for v in sent[-1].domain.attributes]
+
+    w._group_checks["G"].setChecked(True)  # toggles -> settings -> commit
+    assert "bluish_fraction" in [v.name for v in sent[-1].domain.attributes]

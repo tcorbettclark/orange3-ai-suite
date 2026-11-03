@@ -12,13 +12,13 @@ def test_hover_fills_nodes_and_tints_labels(widget, make_model, fire_hover):
     edge = _edges(widget)[0]
     node, labels = edge._ends[0]
     node_rect = node.rect()
-    base_colours = [l.brush().color().name() for l in labels]
+    base_colours = [label.brush().color().name() for label in labels]
     edge_colour = edge._base_pen.color().name()
 
     fire_hover(edge.hoverEnterEvent)
     assert node.rect() == node_rect
     assert node.brush().color().name() == edge_colour
-    for label, was in zip(labels, base_colours):
+    for label, _base in zip(labels, base_colours, strict=True):
         assert label.brush().color().name() == edge_colour
         # Hover must tint but never restyle the text itself.
         assert not label.font().bold()
@@ -26,6 +26,6 @@ def test_hover_fills_nodes_and_tints_labels(widget, make_model, fire_hover):
 
     fire_hover(edge.hoverLeaveEvent)
     assert node.brush().color().name() == "#ffffff"
-    for label, was in zip(labels, base_colours):
-        assert label.brush().color().name() == was
+    for label, base in zip(labels, base_colours, strict=True):
+        assert label.brush().color().name() == base
         assert not label.font().bold()

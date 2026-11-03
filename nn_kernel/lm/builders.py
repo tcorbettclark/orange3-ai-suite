@@ -1,25 +1,20 @@
-"""Keras model builders for the Stage-1 architecture ladder.
+"""Keras model builders for the architecture ladder.
 
-Spec commitments (tiny-lm-suite-design.md §3): bigram -> MLP-over-window
-(flagship) -> LSTM. No tiny-GPT anywhere in v1 — the transformer lesson is
-delivered by Stages 2-3 with a real model. All architectures take the same
-input contract: a (context_size,) int32 token-id window, and emit *logits*
-over the vocabulary (softmax lives in the loss / the sampling loop).
+The ladder is bigram -> MLP-over-window -> LSTM. All architectures take the
+same input contract, a ``(context_size,)`` int32 token-id window, and emit
+logits over the vocabulary; softmax lives in the loss and in the sampling loop.
+Only stock Keras layers are used: Embedding, Dense and LSTM.
 
-Layer choices are exactly Keras "levels 1-3": Embedding, Dense (tanh), LSTM —
-stock layers only.
+No transformer is offered here. At classroom scale an LSTM is at least as
+accurate and far cheaper to train on CPU; the transformer lesson is delivered
+by adapting a real pretrained model with LoRA instead.
 """
 
 from __future__ import annotations
 
 import keras
 
-from .tokenizer import Tokenizer  # noqa: F401  (re-exported typing clarity)
-
 ARCHITECTURES = ("bigram", "mlp_window", "lstm")
-
-# A module-level compiled Keras model must be serialised the normal way; the
-# LanguageModel wrapper (models.py) owns persistence.
 
 
 def build_model(
@@ -41,13 +36,13 @@ def build_model(
     if context_size < 1:
         raise ValueError("context_size must be >= 1")
     if architecture == "lstm" and lstm_layers not in (1, 2):
-        raise ValueError("lstm_layers must be 1 or 2 (spec: 1-2 layers, 128-256 units)")
+        raise ValueError("lstm_layers must be 1 or 2")
     keras.utils.set_random_seed(seed)
 
     if architecture == "bigram":
-        # Context of 1: the model consumes ONLY the last token of a window
+        # Context of 1: the model consumes only the last token of a window
         # (LanguageModel/training slice `[:, -1:]`). Row i of the embedding
-        # matrix IS the next-token logit vector given token i — the bigram
+        # matrix is the next-token logit vector given token i - the bigram
         # count table, learned by gradient descent. Flattened to (vocab,).
         inputs = keras.Input(shape=(1,), dtype="int32", name="token_ids")
         logits = keras.layers.Flatten(name="next_token_logits")(
@@ -64,9 +59,7 @@ def build_model(
     else:  # lstm
         x = keras.layers.Embedding(vocab_size, embedding_dim, name="token_embeddings")(inputs)
         for i in range(1, lstm_layers):
-            x = keras.layers.LSTM(
-                lstm_units, return_sequences=True, name=f"lstm_{i}"
-            )(x)
+            x = keras.layers.LSTM(lstm_units, return_sequences=True, name=f"lstm_{i}")(x)
         x = keras.layers.LSTM(lstm_units, name="lstm_final")(x)
         logits = keras.layers.Dense(vocab_size, name="logits")(x)
 
@@ -74,7 +67,7 @@ def build_model(
 
 
 def compile_model(model: keras.Model, learning_rate: float = 1e-3) -> keras.Model:
-    """Adam (spec's fixed optimizer), sparse cross-entropy over raw logits."""
+    """Compile with Adam and sparse cross-entropy over raw logits."""
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
         loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),

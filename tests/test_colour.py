@@ -2,9 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, extract_features
-from nn_kernel.features import colour
-from synth import cloud_image
+from nn_kernel.features import FeatureOptions, colour, extract_features
 
 OPTS = FeatureOptions()
 
@@ -65,7 +63,7 @@ def test_extraction_includes_colour_only_when_asked():
     assert with_colour.group_of("bluish_fraction") == "G"
 
 
-def test_colour_group_off_by_default_is_the_spec():
+def test_colour_group_off_by_default():
     from nn_kernel.features import DEFAULT_GROUPS
 
     assert "G" not in DEFAULT_GROUPS

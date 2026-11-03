@@ -1,4 +1,4 @@
-"""Tokenizer tests — the spec's named highest-value kernel edge cases
+"""Tokenizer edge cases: special ids, levels, encode/decode round trips.
 (BOS/padding, unknowns, sentence boundaries) start here.
 
 Expected ids are always derived via ``tok.index(...)`` — no hardcoded id
@@ -73,9 +73,9 @@ def test_deterministic_and_order_independent():
     a = Tokenizer.from_corpus(CORPUS, "char")
     b = Tokenizer.from_corpus(reversed(CORPUS), "char")
     assert a.tokens == b.tokens and a.counts == b.counts
-    assert Tokenizer.from_corpus(CORPUS, "word").tokens == Tokenizer.from_corpus(
-        CORPUS, "word"
-    ).tokens
+    assert (
+        Tokenizer.from_corpus(CORPUS, "word").tokens == Tokenizer.from_corpus(CORPUS, "word").tokens
+    )
 
 
 def test_counts_aligned_with_tokens():

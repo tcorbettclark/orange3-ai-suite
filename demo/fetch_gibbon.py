@@ -1,83 +1,120 @@
-"""Prepare the teaching corpus: Gibbon, Decline and Fall, Volume One.
+"""Prepare the language-model teaching corpus: Gibbon, Volume One.
 
-The LM teaching corpus (spec/tiny-lm-suite-design.md §7): single-domain,
-prose, instantly recognisable ("the Roman Empire book"), **531 KB** — the
-spec's sweet spot for CPU-minute training.
+Downloads the public-domain text of *The History of the Decline and Fall of the
+Roman Empire* from Project Gutenberg and keeps the prose of Volume One. The
+result is a single-domain corpus with an instantly recognisable style: ideal
+for watching a small model move from gibberish to period pastiche.
 
-Derived from the CCEL plain-text edition of Gibbon (public domain), via the
-already-cleaned Volume-One prose (headers/page furniture/footnote *text*
-removed upstream). The residual artefacts removed here, with the regexes
-recorded for reproduction:
+The cleaner removes the Project Gutenberg header and footer, the table of
+contents, footnotes and editor notes, and reflows the wrapped lines into
+paragraphs. It is deterministic, so re-running reproduces the same file.
 
-- footnote reference digits attached to sentence-final punctuation
-  ("Crassus.1" -> "Crassus.") — the digit was an inline note pointer, not prose;
-- standalone enumerative roman markers ("II. The spirit ..." -> "The spirit ..."),
-  Gibbon's ordered-list section labels inside paragraphs;
-- digits immediately attached to words ("number347" -> "number").
-
-Usage (the derivation is one-command reproducible from the cleaned source
-file; the committed demo/gibbon_corpus.txt is the artifact):
-
-    uv run python demo/fetch_gibbon.py [--src <decline_vol1_clean.txt>]
+    uv run python demo/fetch_gibbon.py
+    uv run python demo/fetch_gibbon.py --src ~/Downloads/gibbon.txt
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import urllib.request
 from pathlib import Path
 
+SOURCE_URL = "https://www.gutenberg.org/ebooks/25717.txt.utf-8"
+SOURCE_LABEL = "Project Gutenberg eBook #25717"
+
 BASE = Path(__file__).resolve().parent
-DEFAULT_SRC = BASE.parent.parent / "lionel" / "epq" / "limerick-app" / "decline_vol1_clean.txt"
 TARGET = BASE / "gibbon_corpus.txt"
 
-_FOOTNOTE_AFTER_PERIOD = re.compile(r"\.(\d+)")
-_ROMAN_MARKERS = re.compile(r"\b(?:II|III|IV|VI{0,2}|V{1,2}I{0,2}|IX|XI{1,2})\. (?=[A-Z])")
-_ATTACHED_DIGITS = re.compile(r"(?<=[a-z]{2})\d{1,4}\b(?=|[,.;:?!])")
-_MULTI_BLANK = re.compile(r"\n{3,}")
+_PG_START = "*** START OF THE PROJECT GUTENBERG EBOOK"
+_PG_END = "*** END OF THE PROJECT GUTENBERG EBOOK"
+# Volume One prose starts at the Introduction and stops where Volume Two
+# begins. Both markers carry the book's six-space paragraph indent, which
+# distinguishes them from the table-of-contents entries.
+_VOLUME_ONE_START = "\n      Introduction.\n"
+_VOLUME_TWO_START = "\n      VOLUME TWO\n"
+
+# A footnote or editor note paragraph: "[ ... ]" or "12 (return) [ ... ]",
+# possibly with the bracket on the following line.
+_FOOTNOTE_START = re.compile(r"^\s*(?:\d+[a-z]?\s*\]?\s*)?\(\s*return\s*\)")
+_NOTE_START = re.compile(r"^\s*\[\s")
 
 
-def clean(text: str) -> str:
-    text = _FOOTNOTE_AFTER_PERIOD.sub(".", text)
-    text = _ROMAN_MARKERS.sub("", text)
-    text = _ATTACHED_DIGITS.sub("", text)
-    # paragraphs separated by blank lines; single newlines inside a paragraph
-    # are joined (the source is one-paragraph-per-line, so nothing to do,
-    # but normalise stray double spaces)
-    text = re.sub(r"[ \t]{2,}", " ", text)
-    text = _MULTI_BLANK.sub("\n\n", text)
-    return text.strip() + "\n"
+def download(url: str = SOURCE_URL) -> str:
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "orange3-nn-suite teaching-corpus fetcher"}
+    )
+    with urllib.request.urlopen(request, timeout=120) as response:
+        return response.read().decode("utf-8")
 
 
-def stats(text: str) -> str:
-    from nn_kernel.lm import Tokenizer
+def _strip_notes(text: str) -> str:
+    """Drop footnote and editor-note paragraphs."""
+    kept: list[str] = []
+    skipping = False
+    for line in text.splitlines():
+        if not skipping and (_FOOTNOTE_START.match(line) or _NOTE_START.match(line)):
+            skipping = True
+            continue
+        if skipping:
+            if line.rstrip().endswith("]"):
+                skipping = False
+            continue
+        kept.append(line)
+    if skipping:
+        raise ValueError("unterminated footnote or editor note in the source text")
+    return "\n".join(kept)
 
-    char_tok = Tokenizer.from_corpus([text], "char")
-    word_tok = Tokenizer.from_corpus([text], "word")
-    sentences = len(re.findall(r"[.!?…]", text))
-    return (f"{len(text):,} chars | sentences ~{sentences:,} | "
-            f"char vocab {char_tok.vocab_size} | word vocab {word_tok.vocab_size}")
+
+def _paragraphs(text: str) -> str:
+    """Reflow wrapped lines into paragraphs and repair end-of-line hyphens."""
+    paragraphs: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+        paragraph = " ".join(lines)
+        paragraph = re.sub(r"(\w)-\s+(\w)", r"\1\2", paragraph)
+        paragraph = re.sub(r"[ \t]{2,}", " ", paragraph).strip()
+        if paragraph:
+            paragraphs.append(paragraph)
+    return "\n\n".join(paragraphs) + "\n"
+
+
+def clean(raw: str) -> str:
+    """Turn the Gutenberg text into the Volume One teaching corpus."""
+    raw = raw.replace("\r\n", "\n")
+    try:
+        start = raw.index(_PG_START)
+        end = raw.index(_PG_END)
+    except ValueError as exc:
+        raise ValueError("not a Project Gutenberg text: header/footer not found") from exc
+    text = raw[start:end]
+    try:
+        first = text.index(_VOLUME_ONE_START)
+        last = text.index(_VOLUME_TWO_START)
+    except ValueError as exc:
+        raise ValueError("Volume One markers not found in the Gutenberg text") from exc
+    if last <= first:
+        raise ValueError("Volume One markers are out of order")
+    return _paragraphs(_strip_notes(text[first:last]))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--src", default=str(DEFAULT_SRC))
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--src", help="use a local copy of the Gutenberg text")
+    parser.add_argument("--out", default=str(TARGET), help="output corpus path")
     args = parser.parse_args()
-    src = Path(args.src)
-    if not src.exists():
-        raise SystemExit(
-            f"source not found: {src}\n"
-            "(derive decline_vol1_clean.txt first, or point --src elsewhere)"
-        )
-    raw = src.read_text(encoding="utf-8")
-    text = clean(raw)
-    TARGET.write_text(text, encoding="utf-8")
-    print(f"wrote {TARGET}")
-    print("before:", len(raw), "chars; after:", len(text), "chars")
-    try:
-        print("corpus stats:", stats(text))
-    except Exception as exc:  # kernel absent in bare envs — stats are optional
-        print("(kernel stats skipped:", exc, ")")
+
+    raw = Path(args.src).read_text(encoding="utf-8") if args.src else download()
+    corpus = clean(raw)
+    out = Path(args.out)
+    out.write_text(corpus, encoding="utf-8")
+
+    print(f"source: {SOURCE_LABEL}")
+    print(
+        f"wrote {out} ({len(corpus):,} chars, {corpus.count(chr(10) + chr(10)) + 1:,} paragraphs)"
+    )
 
 
 if __name__ == "__main__":

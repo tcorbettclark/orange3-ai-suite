@@ -127,7 +127,7 @@ def test_split_is_sentence_disjoint_deterministic_and_complete():
 
     # complete partition: as multisets, (context, target) rows are preserved
     def multiset(w):
-        pairs = [tuple(r) + (int(t),) for r, t in zip(w.contexts, w.targets)]
+        pairs = [tuple(r) + (int(t),) for r, t in zip(w.contexts, w.targets, strict=True)]
         return sorted(pairs)
 
     assert multiset(windows) == sorted(multiset(train) + multiset(val))
@@ -155,3 +155,12 @@ def test_windows_consistency_guard():
             context_size=2,
             sentence_lengths=(3, 3),
         )
+
+
+def test_split_caps_validation_to_leave_training_rows():
+    tok = Tokenizer.from_corpus(["ab.", "cd."], "char")
+    windows = make_windows(tok, ["ab.", "cd."], context_size=1)
+    train, val = windows.split(val_fraction=0.99)
+    assert len(train.sentence_lengths) == 1
+    assert len(val.sentence_lengths) == 1
+    assert len(train) > 0

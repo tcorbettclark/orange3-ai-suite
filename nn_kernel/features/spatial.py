@@ -1,4 +1,4 @@
-"""Group C — spatial mass distribution (6 features): where the bright matter sits.
+"""Group C: spatial mass distribution (6 features), where the bright matter sits.
 
 All mass statistics are intensity-weighted and normalised by image size, so
 they live in [0, 1] and are comparable across images.
@@ -38,23 +38,16 @@ FEATURE_NAMES = (
 )
 
 DEFINITIONS = {
-    "centre_of_mass_x": (
-        "Left/right placement of the bright mass in [0, 1]; 0.5 = centred."
-    ),
-    "centre_of_mass_y": (
-        "Top/bottom placement of the bright mass in [0, 1]; 0.5 = centred."
-    ),
+    "centre_of_mass_x": ("Left/right placement of the bright mass in [0, 1]; 0.5 = centred."),
+    "centre_of_mass_y": ("Top/bottom placement of the bright mass in [0, 1]; 0.5 = centred."),
     "horizontal_spread": (
-        "Wide vs. narrow bright mass: intensity-weighted std along x, "
-        "divided by image width."
+        "Wide vs. narrow bright mass: intensity-weighted std along x, divided by image width."
     ),
     "vertical_spread": (
-        "Tall vs. squat bright mass: intensity-weighted std along y, "
-        "divided by image height."
+        "Tall vs. squat bright mass: intensity-weighted std along y, divided by image height."
     ),
     "elongation": (
-        "Streak (>1) vs. blob (~1): eigenvalue ratio of the intensity "
-        "second-moment matrix."
+        "Streak (>1) vs. blob (~1): eigenvalue ratio of the intensity second-moment matrix."
     ),
     "radial_gradient": (
         "Mass concentrated at the centre (negative) vs. at the edges (positive): "
@@ -107,9 +100,7 @@ def compute(img: np.ndarray, opts: FeatureOptions) -> dict[str, float]:
 
 def _radial_gradient(img: np.ndarray, comx: float, comy: float) -> float:
     h, w = img.shape
-    yy, xx = np.meshgrid(
-        np.linspace(0.0, 1.0, h), np.linspace(0.0, 1.0, w), indexing="ij"
-    )
+    yy, xx = np.meshgrid(np.linspace(0.0, 1.0, h), np.linspace(0.0, 1.0, w), indexing="ij")
     r = np.hypot(xx - comx, yy - comy)
     if r.max() < _EPS:
         return 0.0

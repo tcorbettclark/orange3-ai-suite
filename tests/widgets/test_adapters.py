@@ -36,14 +36,30 @@ def test_generations_table_round_trip():
 
 def test_checkpoint_table_columns_and_sample():
     rows = [
-        {"epoch": 1, "loss": 3.0, "val_loss": 3.1, "perplexity": 20.1,
-         "val_perplexity": 22.2, "sample": "gibberish"},
-        {"epoch": 2, "loss": 2.0, "val_loss": 2.1, "perplexity": 7.4,
-         "val_perplexity": 8.2, "sample": "less gibberish"},
+        {
+            "epoch": 1,
+            "loss": 3.0,
+            "val_loss": 3.1,
+            "perplexity": 20.1,
+            "val_perplexity": 22.2,
+            "sample": "gibberish",
+        },
+        {
+            "epoch": 2,
+            "loss": 2.0,
+            "val_loss": 2.1,
+            "perplexity": 7.4,
+            "val_perplexity": 8.2,
+            "sample": "less gibberish",
+        },
     ]
     table = checkpoint_table(rows)
     assert [v.name for v in table.domain.attributes] == [
-        "epoch", "loss", "val_loss", "perplexity", "val_perplexity",
+        "epoch",
+        "loss",
+        "val_loss",
+        "perplexity",
+        "val_perplexity",
     ]
     assert table.domain.metas[0].name == "sample"
     assert table.metas[1, 0] == "less gibberish"
@@ -51,8 +67,7 @@ def test_checkpoint_table_columns_and_sample():
 
 
 def test_checkpoint_table_tolerates_missing_sample():
-    rows = [{"epoch": 1, "loss": 3.0, "val_loss": 3.1, "perplexity": 20.1,
-             "val_perplexity": 22.2}]
+    rows = [{"epoch": 1, "loss": 3.0, "val_loss": 3.1, "perplexity": 20.1, "val_perplexity": 22.2}]
     table = checkpoint_table(rows)
     assert not np.isnan(table[0, "perplexity"])
     assert str(table.metas[0, 0]) == ""

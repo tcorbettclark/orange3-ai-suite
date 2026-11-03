@@ -1,26 +1,24 @@
-"""Tokenizer — the vocabulary is a constituent part of the model.
+"""Tokenizer: a fixed vocabulary with corpus frequencies.
 
-Design commitments (spec/tiny-lm-suite-design.md §4.5): the Trainer builds the
-tokenizer from the corpus and embeds it in the emitted model object; a
-separate tokenizer in the pipeline would enable exactly the vocab-mismatch
-bug it seems to guard against. This module defines the vocabulary
-datastructure; the sampling loop and builders consume it via
-``encode``/``decode``.
+The tokenizer is a constituent part of a model, not a sibling of it: embedding
+row *i* means token *i* only because this vocabulary says so. Trainers build
+the tokenizer from the corpus and embed it in the emitted model object, so
+vocabulary-mismatch bugs are unrepresentable.
 
 Levels
 ------
-- ``"char"``: every character is a token (spaces included — word boundaries
+- ``"char"``: every character is a token (spaces included - word boundaries
   matter at char level).
-- ``"word"``: dependency-free regex tokens — words with internal apostrophes
+- ``"word"``: dependency-free regex tokens - words with internal apostrophes
   ("don't", Shakespeare's "o'er", both quote styles) plus every non-word
   non-space character as its own token. Whitespace is dropped. Case is
-  preserved (no silent normalisation for students to discover later).
+  preserved (no silent normalisation).
 
 Special tokens (ids fixed across levels)
 ----------------------------------------
-- id 0 = ``<bos>``: sentence-start marker, *and* the context-window pad —
-  early positions with short context become trainable. Windowing places it
-  (windowing.py); the tokenizer only owns the mapping.
+- id 0 = ``<bos>``: sentence-start marker, and the context-window pad, so
+  early positions with short context are trainable. Windowing places it; the
+  tokenizer only owns the mapping.
 - id 1 = ``<unk>``: out-of-vocabulary input (unknown words at word level,
   unknown characters at char level, or tokens removed by ``max_vocab``).
 
@@ -31,8 +29,8 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
 
 BOS = "<bos>"
 UNK = "<unk>"
@@ -54,7 +52,7 @@ class Tokenizer:
     """A fixed vocabulary with corpus frequencies.
 
     Created via :meth:`from_corpus`. Treat instances as read-only: the
-    vocabulary travels with the model (spec §4.5).
+    vocabulary travels with the model.
     """
 
     level: str
@@ -75,7 +73,7 @@ class Tokenizer:
         texts: Iterable[str],
         level: str,
         max_vocab: int | None = None,
-    ) -> "Tokenizer":
+    ) -> Tokenizer:
         """Build the vocabulary from documents.
 
         ``max_vocab`` (if set) is the total vocabulary size *including* the
@@ -89,9 +87,8 @@ class Tokenizer:
             counts.update(_segment_tokens(text, level))
         if not counts:
             raise ValueError("corpus produced no tokens (empty or whitespace-only)")
-        if max_vocab is not None:
-            if max_vocab < len(SPECIAL_TOKENS):
-                raise ValueError(f"max_vocab must be >= {len(SPECIAL_TOKENS)}")
+        if max_vocab is not None and max_vocab < len(SPECIAL_TOKENS):
+            raise ValueError(f"max_vocab must be >= {len(SPECIAL_TOKENS)}")
         ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
         if max_vocab is not None:
             ordered = ordered[: max_vocab - len(SPECIAL_TOKENS)]
@@ -142,10 +139,10 @@ class Tokenizer:
                 pieces.append(" " + token)
         return "".join(pieces)
 
-    # ---- serialisation (with the model, later phases) ---------------------
+    # ---- serialisation -----------------------------------------------------
 
     def to_dict(self) -> dict:
-        """Plain-Python view for JSON/pickle serialisation next to weights."""
+        """Plain-Python view for JSON serialisation next to the weights."""
         return {
             "level": self.level,
             "tokens": list(self.tokens),
@@ -153,7 +150,7 @@ class Tokenizer:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Tokenizer":
+    def from_dict(cls, data: dict) -> Tokenizer:
         return cls(
             level=data["level"],
             tokens=tuple(data["tokens"]),

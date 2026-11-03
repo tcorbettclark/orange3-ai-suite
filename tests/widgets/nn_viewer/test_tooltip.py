@@ -33,6 +33,6 @@ def test_labels_are_inert(widget, make_model):
         for i in widget.scene.items()
         if type(i).__name__ in ("BoxedTextItem", "QGraphicsSimpleTextItem")
     ]
-    assert all(not l.toolTip() for l in labels)
-    assert all(not l.acceptHoverEvents() for l in labels)
-    assert all(not l.hasCursor() for l in labels)
+    assert all(not label.toolTip() for label in labels)
+    assert all(not label.acceptHoverEvents() for label in labels)
+    assert all(not label.hasCursor() for label in labels)

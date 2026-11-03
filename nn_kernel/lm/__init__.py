@@ -1,24 +1,22 @@
-"""Language-model kernel: tokenizer, windowing, vocab inspector, Keras ladder.
+"""Language-model kernel: tokenizers, windowing, vocab statistics and the
+Keras model ladder.
 
-Implemented: char/word tokenizers, BOS/padding, sentence-aware window
-construction, vocab-inspector statistics, the Stage-1 architecture ladder
-(bigram / MLP-over-window / LSTM) with Adam training, the autoregressive
-sampling loop and the LanguageModel object whose tokenizer travels with it.
-Pending: the MLX/LoRA side (nn_kernel.lora).
+The Keras-dependent names (builders, training, ``LanguageModel``) resolve
+lazily, so importing the tokenizer or the vocab-inspector logic never pulls in
+TensorFlow. That keeps the widget layer's optional ``[lm]`` extra genuinely
+optional.
 """
 
-from .tokenizer import BOS, UNK, BOS_ID, UNK_ID, Tokenizer
-from .windowing import Windows, make_windows, split_sentences
+from .tokenizer import BOS, BOS_ID, UNK, UNK_ID, Tokenizer
 from .vocab import (
     frequency_table,
     side_by_side,
     vocab_stats,
     zipf_summary,
 )
+from .windowing import Windows, make_windows, split_sentences
 
-# Keras-dependent names resolve lazily (PEP 562) so importing the Tokenizer or
-# the Vocab Inspector logic NEVER pulls in TensorFlow — a hard requirement for
-# the widget layer's dependency hygiene (arch doc: the kernel is import-light).
+# Keras-dependent names resolve lazily (PEP 562).
 _KERAS_NAMES = {
     "ARCHITECTURES": "builders",
     "build_model": "builders",
@@ -38,21 +36,21 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    "ARCHITECTURES",
+    "BOS",
+    "BOS_ID",
+    "UNK",
+    "UNK_ID",
+    "LanguageModel",
     "Tokenizer",
     "Windows",
-    "make_windows",
-    "split_sentences",
-    "BOS",
-    "UNK",
-    "BOS_ID",
-    "UNK_ID",
-    "vocab_stats",
-    "frequency_table",
-    "zipf_summary",
-    "side_by_side",
-    "ARCHITECTURES",
     "build_model",
     "compile_model",
-    "LanguageModel",
+    "frequency_table",
+    "make_windows",
+    "side_by_side",
+    "split_sentences",
     "train_language_model",
+    "vocab_stats",
+    "zipf_summary",
 ]

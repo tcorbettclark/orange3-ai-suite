@@ -1,21 +1,20 @@
 """Sentence-aware window construction for next-token training pairs.
 
-Spec commitments (tiny-lm-suite-design.md §3/§4.2):
-- windows must **not** cross sentence/document boundaries — the model must
-  not learn to continue across unrelated sentences;
-- BOS doubles as the context pad, so early tokens with short context are
-  trainable (tokenizer docstring: the semantics).
+Windows never cross sentence or document boundaries: the model must not learn
+to continue across unrelated sentences. BOS doubles as the context pad, so
+early tokens with short context are trainable.
 
-Windows per sentence with ids s1..sm and context k: sequence is
-``[BOS, s1..sm]``; the window for target s_i is the last k tokens before it,
-left-padded with BOS. So window i=1 is all-BOS, i=k+1 is fully real tokens.
+For a sentence with ids s1..sm and context size k, the sequence is
+``[BOS, s1..sm]``. The window for target s_i is the last k tokens before it,
+left-padded with BOS: window 1 is all-BOS, and only from window k+1 onwards is
+the context fully real tokens.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 import numpy as np
 
@@ -23,13 +22,13 @@ from .tokenizer import BOS_ID, Tokenizer
 
 # Split after terminal punctuation followed by whitespace ("What?! No." keeps
 # "?!" together). Newlines are hard breaks; lines without terminal punctuation
-# are sentences of their own. Known limitation (accepted, teaching corpora):
-# abbreviations like "Mr." split.
+# are sentences of their own. Known limitation for teaching corpora:
+# abbreviations such as "Mr." split.
 _TERMINATOR = re.compile(r"(?<=[.!?…])\s+")
 
 
 def split_sentences(text: str) -> list[str]:
-    """Split a document into sentences; newline = hard break."""
+    """Split a document into sentences; a newline is a hard break."""
     out: list[str] = []
     for line in text.splitlines():
         line = line.strip()
@@ -46,9 +45,9 @@ def split_sentences(text: str) -> list[str]:
 class Windows:
     """All (context, target) training pairs of a corpus, sentence-disjoint.
 
-    Sentence provenance is kept via ``sentence_lengths`` (windows contributed
-    per sentence, in corpus order) so the train/val split can be done at the
-    sentence level: no sentence ever contributes windows to both sets.
+    ``sentence_lengths`` records how many windows each sentence contributed,
+    in corpus order, so the train/validation split can happen at sentence
+    level: no sentence contributes windows to both sets.
     """
 
     contexts: np.ndarray  # (N, k) int32
@@ -63,23 +62,18 @@ class Windows:
         if len(self.sentence_lengths) and sum(self.sentence_lengths) != len(self):
             raise ValueError("sentence_lengths do not sum to the number of windows")
 
-    def split(
-        self, val_fraction: float = 0.1, seed: int = 0
-    ) -> tuple["Windows", "Windows"]:
-        """Sentence-level train/val split (spec §4.1: ~10% mandatory).
-
-        Deterministic under a fixed seed.
-        """
+    def split(self, val_fraction: float = 0.1, seed: int = 0) -> tuple[Windows, Windows]:
+        """Sentence-level train/validation split, deterministic under a seed."""
         if not 0.0 < val_fraction < 1.0:
             raise ValueError("val_fraction must be strictly between 0 and 1")
         n = len(self.sentence_lengths)
         if n < 2:
             raise ValueError("need at least 2 sentences to split")
         order = np.random.default_rng(seed).permutation(n)
-        n_val = max(1, int(round(n * val_fraction)))
+        n_val = min(max(1, round(n * val_fraction)), n - 1)
         offsets = np.concatenate([[0], np.cumsum(self.sentence_lengths)])
 
-        def gather(indices: np.ndarray) -> "Windows":
+        def gather(indices: np.ndarray) -> Windows:
             if len(indices) == 0:
                 return Windows(
                     contexts=np.empty((0, self.context_size), dtype=np.int32),
@@ -92,10 +86,10 @@ class Windows:
             lengths = (ends - starts).astype(int)
             return Windows(
                 contexts=np.concatenate(
-                    [self.contexts[s:e] for s, e in zip(starts, ends)]
+                    [self.contexts[s:e] for s, e in zip(starts, ends, strict=True)]
                 ),
                 targets=np.concatenate(
-                    [self.targets[s:e] for s, e in zip(starts, ends)]
+                    [self.targets[s:e] for s, e in zip(starts, ends, strict=True)]
                 ),
                 context_size=self.context_size,
                 sentence_lengths=tuple(int(v) for v in lengths),
@@ -112,8 +106,8 @@ def make_windows(
     """Tokenize documents and build all next-token windows.
 
     Sentences are split internally (:func:`split_sentences`); windows never
-    span sentences. Empty sentences (no tokens after tokenization) are
-    skipped and contribute no windows.
+    span sentences. Empty sentences (no tokens after tokenization) are skipped
+    and contribute no windows.
     """
     if int(context_size) < 1:
         raise ValueError("context_size must be >= 1")

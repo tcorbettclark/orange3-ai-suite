@@ -15,9 +15,6 @@ descriptions here only need faithful channel names/ids — extracted
 programmatically from the real widget classes.
 
     uv run python demo/make_workflows.py
-
-Regenerate when the widget signal signatures change or the Import Images
-path must follow another machine.
 """
 
 from __future__ import annotations
@@ -32,9 +29,8 @@ from orangecanvas.registry.description import (
 from orangecanvas.scheme import Scheme, SchemeLink, SchemeNode
 
 BASE = Path(__file__).resolve().parent
-DATA = BASE.parent / "data"
 
-# (label, qualified_name, inputs to declare, outputs to declare)
+
 def make_descriptions() -> dict[str, WidgetDescription]:
     """Widget descriptions with channel names/ids taken from the real classes."""
     from Orange.widgets.data.owfeaturestatistics import OWFeatureStatistics
@@ -42,8 +38,9 @@ def make_descriptions() -> dict[str, WidgetDescription]:
     from Orange.widgets.evaluate.owconfusionmatrix import OWConfusionMatrix
     from Orange.widgets.evaluate.owtestandscore import OWTestAndScore
     from Orange.widgets.model.owneuralnetwork import OWNNLearner
-    from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
     from orangecontrib.imageanalytics.widgets.owimageimport import OWImportImages
+
+    from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
 
     classes = {
         "Import Images": OWImportImages,
@@ -55,9 +52,15 @@ def make_descriptions() -> dict[str, WidgetDescription]:
         "Confusion Matrix": OWConfusionMatrix,
     }
     descriptions = {}
-    for label in ("Import Images", "Data Table", "Column Statistics",
-                  "Confusion Matrix", "Test & Score", "Neural Network",
-                  "Image Feature Extractor"):
+    for label in (
+        "Import Images",
+        "Data Table",
+        "Column Statistics",
+        "Confusion Matrix",
+        "Test & Score",
+        "Neural Network",
+        "Image Feature Extractor",
+    ):
         cls = classes[label]
         inputs = [
             InputSignal(i.name, _type_str(i.type), None, 18, i.id)
@@ -97,13 +100,13 @@ def image_import_path_properties(directory: Path):
 FEATURE_PROPS = "Image Feature Extractor"
 
 
-def build_workflow(title: str, description: str, image_dir: Path,
-                   feature_options: dict, dest: Path) -> None:
+def build_workflow(
+    title: str, description: str, image_dir: Path, feature_options: dict, dest: Path
+) -> None:
     d = make_descriptions()
 
     scheme = Scheme(title=title, description=description)
-    columns = ["Import Images", "Image Feature Extractor", "Test & Score",
-               "Confusion Matrix"]
+    columns = ["Import Images", "Image Feature Extractor", "Test & Score", "Confusion Matrix"]
 
     nodes = {}
     x = 60
@@ -118,13 +121,15 @@ def build_workflow(title: str, description: str, image_dir: Path,
         nodes[label] = node
 
     # viewers + learner row below the main flow
-    nodes["Data Table"] = SchemeNode(d["Data Table"], title="Data Table",
-                                     position=(780, 260), properties={})
-    nodes["Column Statistics"] = SchemeNode(d["Column Statistics"],
-                                            title="Column Statistics",
-                                            position=(540, 260), properties={})
-    nodes["Neural Network"] = SchemeNode(d["Neural Network"], title="Neural Network",
-                                         position=(300, 260), properties={})
+    nodes["Data Table"] = SchemeNode(
+        d["Data Table"], title="Data Table", position=(780, 260), properties={}
+    )
+    nodes["Column Statistics"] = SchemeNode(
+        d["Column Statistics"], title="Column Statistics", position=(540, 260), properties={}
+    )
+    nodes["Neural Network"] = SchemeNode(
+        d["Neural Network"], title="Neural Network", position=(300, 260), properties={}
+    )
     for label in ("Data Table", "Column Statistics", "Neural Network"):
         scheme.add_node(nodes[label])
 
@@ -134,9 +139,7 @@ def build_workflow(title: str, description: str, image_dir: Path,
     def link(source: str, out: str, sink: str, inp: str) -> None:
         source_channel = next(c for c in nodes[source].description.outputs if c.name == out)
         sink_channel = next(c for c in nodes[sink].description.inputs if c.name == inp)
-        scheme.add_link(
-            SchemeLink(nodes[source], source_channel, nodes[sink], sink_channel)
-        )
+        scheme.add_link(SchemeLink(nodes[source], source_channel, nodes[sink], sink_channel))
 
     link("Import Images", "Data", FEATURE_PROPS, "Images")
     link(FEATURE_PROPS, "Features", "Test & Score", "Data")

@@ -1,8 +1,5 @@
 """NN Viewer: draw a trained MLP with its weights annotated.
 
-Part of the orange3-nn-suite add-on (architecture doc §5): folded in from the
-standalone MIT orange3-nnviewer repository.
-
 Takes the *Model* output of Orange's Neural Network widget (which wraps
 scikit-learn's MLPClassifier / MLPRegressor) and renders the network on
 a native Qt graphics scene: one column of nodes per layer, edges whose
@@ -76,9 +73,7 @@ def _tint(item, color=None):
 
 
 def _fmt(value, spec):
-    """Format a float, rendering NaN/inf explicitly instead of letting
-    the format spec emit them cryptically (e.g. 'nan'/'inf' are fine,
-    but we want the raw value visible, unclamped)."""
+    """Format a float, spelling NaN and infinities out explicitly."""
     value = float(value)
     if not np.isfinite(value):
         return "nan" if np.isnan(value) else ("+inf" if value > 0 else "-inf")
@@ -177,6 +172,20 @@ class NNView(QGraphicsView):
 
 
 class OWNeuralNetworkViewer(OWWidget):
+    """Draw a trained neural network with weights on the edges.
+
+    Input is the Model output of Orange's Neural Network widget (a
+    scikit-learn MLP). Nodes are arranged one column per layer; edge width
+    encodes |weight| and colour its sign. For small networks the numeric
+    weight is printed on each edge; hovering any edge reveals exact values and
+    highlights its endpoints. Biases appear under the neurons they feed and in
+    tooltips.
+
+    The view scales to fit the window. Weights that are NaN or infinite are
+    drawn as zero-weight edges and flagged, and a model without recognisable
+    weight matrices shows a waiting message instead of crashing.
+    """
+
     name = "NN Viewer"
     description = "Displays a trained neural network with weights on edges."
     icon = "icons/nnviewer.svg"
@@ -195,9 +204,7 @@ class OWNeuralNetworkViewer(OWWidget):
             "Connected model does not expose network weights. "
             "Connect the Model output of a Neural Network widget."
         )
-        too_many_edges = Msg(
-            "Too many edges ({}) for numbers; hover edges for values instead."
-        )
+        too_many_edges = Msg("Too many edges ({}) for numbers; hover edges for values instead.")
         save_failed = Msg("Could not write the PNG to {}.")
         non_finite = Msg(
             "Model weights contain NaN/inf values; they are drawn as zero-weight edges."
@@ -208,9 +215,7 @@ class OWNeuralNetworkViewer(OWWidget):
         self.model = None
 
         box = gui.widgetBox(self.controlArea, "Display")
-        gui.checkBox(
-            box, self, "show_labels", "Show weight numbers", callback=self.redraw
-        )
+        gui.checkBox(box, self, "show_labels", "Show weight numbers", callback=self.redraw)
         gui.button(box, self, "Save as PNG", callback=self.save_png)
         gui.rubber(self.controlArea)
 
@@ -286,7 +291,7 @@ class OWNeuralNetworkViewer(OWWidget):
         # non-finite weight is clamped to zero below so the diagram is
         # never drawn with NaN geometry.
         finite_layers = [w[np.isfinite(w)] for w in coefs]
-        if any(w.size != f.size for w, f in zip(coefs, finite_layers)):
+        if any(w.size != f.size for w, f in zip(coefs, finite_layers, strict=True)):
             self.Warning.non_finite()
         finite = np.concatenate(finite_layers)
         max_abs = float(np.abs(finite).max()) if finite.size else 0.0
@@ -326,23 +331,17 @@ class OWNeuralNetworkViewer(OWWidget):
                 labels = []
                 if i == 0:
                     labels.append(
-                        self._add_text(
-                            in_labels[j], x - r - 0.012 * S, y, size=8, align="right"
-                        )
+                        self._add_text(in_labels[j], x - r - 0.012 * S, y, size=8, align="right")
                     )
                 elif i == n_layers - 1:
                     labels.append(
-                        self._add_text(
-                            out_labels[j], x + r + 0.012 * S, y, size=8, align="left"
-                        )
+                        self._add_text(out_labels[j], x + r + 0.012 * S, y, size=8, align="left")
                     )
                 else:
                     # Number hidden neurons, but only if the circle is
                     # large enough to fit the text.
                     if r >= 0.03 * S:
-                        labels.append(
-                            self._add_text(str(j + 1), x, y, size=6, z=Z_NODE_TEXT)
-                        )
+                        labels.append(self._add_text(str(j + 1), x, y, size=6, z=Z_NODE_TEXT))
                 if i > 0 and self.show_labels:
                     labels.append(
                         self._add_text(
@@ -470,21 +469,16 @@ class OWNeuralNetworkViewer(OWWidget):
             in_labels = [v.name for v in domain.attributes]
             class_var = domain.class_var
             if class_var is not None:
-                out_labels = (
-                    list(class_var.values)
-                    if class_var.is_discrete
-                    else [class_var.name]
-                )
+                out_labels = list(class_var.values) if class_var.is_discrete else [class_var.name]
         in_labels += [f"x{j}" for j in range(len(in_labels), n_in)]
         out_labels += [f"y{j}" for j in range(len(out_labels), n_out)]
         return in_labels[:n_in], out_labels[:n_out]
 
 
-if __name__ == "__main__":  # pragma: no cover
-    # Standalone test, outside Orange Canvas.
+if __name__ == "__main__":  # pragma: no cover - dev preview
     from Orange.data import Table
     from Orange.regression.neural_network import NNRegressionLearner
-    from Orange.widgets.utils.widgetpreview import WidgetPreview
+    from orangewidget.utils.widgetpreview import WidgetPreview
 
     data = Table("housing")
     model = NNRegressionLearner(hidden_layer_sizes=(4,))(data)

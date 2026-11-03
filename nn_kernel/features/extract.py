@@ -1,21 +1,24 @@
-"""Feature extraction front door: FeatureVector and extract_features."""
+"""Feature extraction front door: :class:`FeatureVector` and
+:func:`extract_features`."""
 
 from __future__ import annotations
+
+from collections.abc import Iterable
 
 import numpy as np
 
 from .options import FeatureOptions
 from .preprocess import preprocess, preprocess_colour
-from .registry import DEFAULT_GROUPS, GROUP_ORDER, FEATURES, _MODULES
+from .registry import _MODULES, DEFAULT_GROUPS, FEATURES, GROUP_ORDER
 
 
 class FeatureVector:
-    """Result of feature extraction: ordered name -> value mapping.
+    """Result of feature extraction: an ordered name -> value mapping.
 
-    Behaves like a read-only dict (``vec["hole_count"]``, ``vec.items()``)
-    and can produce the plain float array the Orange adapter will wrap in a
-    Table column by column. Feature metadata (group, definition sentence)
-    lives in the registry: ``registry.get_feature(name)``.
+    Behaves like a read-only dict (``vec["hole_count"]``, ``vec.items()``) and
+    can produce the plain float array used for one Table row. Feature metadata
+    (group, definition sentence) lives in the registry:
+    ``registry.get_feature(name)``.
     """
 
     def __init__(self, values: dict[str, float], group_of: dict[str, str]):
@@ -44,7 +47,7 @@ class FeatureVector:
         return np.asarray([self._values[n] for n in self._values], dtype=np.float64)
 
     def group_of(self, name: str) -> str:
-        """Group letter ('A'..'F') the named feature belongs to."""
+        """Group letter ("A".."G") the named feature belongs to."""
         return self._group_of[name]
 
     def by_group(self) -> dict[str, dict[str, float]]:
@@ -58,32 +61,29 @@ def extract_features(
     image: np.ndarray,
     options: FeatureOptions | None = None,
     groups: str | None = None,
-    exclude: str | None = None,
+    exclude: Iterable[str] | None = None,
 ) -> FeatureVector:
     """Extract features from one image.
 
     Parameters
     ----------
     image:
-        RGB(A) or grayscale array; channel order is RGB (convert cv2's BGR
+        RGB(A) or grayscale array; channel order is RGB (convert OpenCV's BGR
         in the widget adapter before calling).
     options:
-        FeatureOptions; defaults applied when None.
+        :class:`FeatureOptions`; defaults applied when None.
     groups:
-        None (all non-trap groups, ``ABCDEF``) or a subset string such as
-        ``"AD"`` for group ablation experiments (domain doc §5); the colour
-        trap group G is opt-in only.
+        None (all luminance groups, ``"ABCDEF"``) or a subset string such as
+        ``"AD"``. The colour shortcut group G is opt-in only.
     exclude:
-        None, or an iterable of feature names to drop — per-feature
-        switching on top of group selection.
+        None, or an iterable of feature names to drop - per-feature switching
+        on top of group selection.
     """
     opts = options or FeatureOptions()
     selected = DEFAULT_GROUPS if groups is None else tuple(groups)
     unknown_groups = set(selected) - set(GROUP_ORDER)
     if unknown_groups:
-        raise ValueError(
-            f"unknown feature groups {sorted(unknown_groups)}; valid: {GROUP_ORDER}"
-        )
+        raise ValueError(f"unknown feature groups {sorted(unknown_groups)}; valid: {GROUP_ORDER}")
 
     excluded = frozenset(exclude or ())
     unknown_features = excluded - set(FEATURES)
@@ -95,7 +95,7 @@ def extract_features(
     group_of: dict[str, str] = {}
     for letter in selected:
         module = _MODULES[letter]
-        # the colour trap group computes on absolute colours, not luminance
+        # group G reads absolute colours, not the luminance image
         input_image = preprocess_colour(image, opts) if letter == "G" else preprocessed
         for name, value in module.compute(input_image, opts).items():
             if name in excluded:

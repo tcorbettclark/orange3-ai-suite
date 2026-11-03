@@ -1,15 +1,12 @@
-"""LM Trainer: pre-train a tiny language model on text data (spec §4.1).
+"""LM Trainer: pre-train a tiny language model on text data.
 
-A thin shell over the kernel: options, a live loss/perplexity plot, and the
-checkpoint table. All substance (tokenizer, windowing, Keras builders,
-sampling) lives in nn-kernel; the widget runs training in a background
-QThread and streams per-epoch stats into a live pyqtgraph plot — the
-established QThread + callback pattern (orange3-imagenets precedent,
-pattern only, its CC-BY-NC-SA code never touched).
+A thin shell over :mod:`nn_kernel.lm`: options, a live loss plot and the
+checkpoint table. Training runs in a background QThread and streams per-epoch
+stats into pyqtgraph; all substance (tokenizer, windowing, Keras builders,
+sampling) lives in the kernel.
 
-The kernel is imported lazily: without the [lm] extra (Keras), the widget
-shows a clear install hint instead of crashing (graceful degradation,
-spec §3).
+The kernel is imported lazily, so a missing ``[lm]`` extra shows an install
+hint instead of crashing the canvas.
 """
 
 from __future__ import annotations
@@ -17,11 +14,11 @@ from __future__ import annotations
 import traceback
 
 import numpy as np
+from AnyQt.QtCore import QThread, pyqtSignal
 from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Input, Msg, OWWidget, Output
-from AnyQt.QtCore import QThread, pyqtSignal
+from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from nn_suite.adapters import checkpoint_table, table_texts
 
@@ -45,7 +42,7 @@ class TrainingWorker(QThread):
         self.options = options
         self.request_stop = False
 
-    def run(self):  # noqa: D102 — called off-thread
+    def run(self):
         try:
             from nn_kernel.lm import train_language_model  # lazy: Keras heavy
 
@@ -76,6 +73,21 @@ class TrainingWorker(QThread):
 
 
 class OWLMTrainer(OWWidget):
+    """Pre-train a small language model and stream its learning curve.
+
+    Input is a Table with text columns (or an Orange3-Text Corpus). Outputs are
+    the trained model object (with its tokenizer embedded) and a checkpoint
+    table: one row per epoch with loss, perplexity and, optionally, a sample of
+    generated text.
+
+    The architecture dropdown selects the bigram, MLP-over-window or LSTM
+    model; the tokenizer dropdown switches between character and word level.
+    Running several architectures on one corpus is the central experiment:
+    the bigram plateaus, the MLP has a fixed visible memory, and the LSTM
+    trains smoothly at a higher cost. Training/validation loss is plotted live
+    so overfitting on a tiny corpus is visible rather than asserted.
+    """
+
     name = "LM Trainer"
     description = "Pre-train a tiny language model (bigram / MLP / LSTM) on text data."
     icon = "icons/lm_trainer.svg"
@@ -95,8 +107,7 @@ class OWLMTrainer(OWWidget):
 
     class Error(OWWidget.Error):
         keras_missing = Msg(
-            "Keras is not available. "
-            "Install the [lm] extra: pip install orange3-nn-suite[lm]"
+            "Keras is not available. Install the [lm] extra: pip install orange3-nn-suite[lm]"
         )
         training_failed = Msg("Training failed:\n{}")
 
@@ -105,8 +116,8 @@ class OWLMTrainer(OWWidget):
         saved = Msg("Model saved (tokenizer + weights, one unit): {}.")
 
     # settings
-    architecture_index = Setting(1)  # MLP-over-window (spec: flagship default)
-    tokenizer_level_index = Setting(0)  # char (small vocab, the visible experiment)
+    architecture_index = Setting(1)  # MLP-over-window is the default
+    tokenizer_level_index = Setting(0)  # char level: small vocab, long sequences
     context_size = Setting(16)
     embedding_dim = Setting(32)
     hidden_units = Setting(128)
@@ -131,10 +142,10 @@ class OWLMTrainer(OWWidget):
         self.epoch_stats: list[dict] = []
 
         arch_box = gui.widgetBox(self.controlArea, "Architecture")
-        gui.comboBox(arch_box, self, "architecture_index",
-                     items=ARCHITECTURE_LABELS, label="Architecture")
-        gui.comboBox(arch_box, self, "tokenizer_level_index",
-                     items=LEVEL_LABELS, label="Tokenizer")
+        gui.comboBox(
+            arch_box, self, "architecture_index", items=ARCHITECTURE_LABELS, label="Architecture"
+        )
+        gui.comboBox(arch_box, self, "tokenizer_level_index", items=LEVEL_LABELS, label="Tokenizer")
         gui.spin(arch_box, self, "context_size", 1, 64, label="Context window")
         gui.spin(arch_box, self, "embedding_dim", 2, 512, label="Embedding dim")
         gui.spin(arch_box, self, "hidden_units", 8, 1024, label="Hidden units (MLP)")
@@ -146,37 +157,35 @@ class OWLMTrainer(OWWidget):
         train_box = gui.widgetBox(self.controlArea, "Training")
         gui.spin(train_box, self, "epochs", 1, 500, label="Epochs")
         gui.spin(train_box, self, "batch_size", 1, 4096, label="Batch size")
-        gui.doubleSpin(train_box, self, "learning_rate", 1e-5, 0.1, 1e-4,
-                       label="Learning rate")
-        gui.doubleSpin(train_box, self, "validation_fraction", 0.01, 0.5, 0.01,
-                       label="Validation fraction")
+        gui.doubleSpin(train_box, self, "learning_rate", 1e-5, 0.1, 1e-4, label="Learning rate")
+        gui.doubleSpin(
+            train_box, self, "validation_fraction", 0.01, 0.5, 0.01, label="Validation fraction"
+        )
         gui.spin(train_box, self, "max_vocab", 0, 200000, label="Max vocab (0 = all)")
 
         sample_box = gui.widgetBox(self.controlArea, "Checkpoint samples")
         gui.checkBox(sample_box, self, "store_samples", "Record a sample each epoch")
         gui.lineEdit(sample_box, self, "sample_prompt", label="Sample prompt")
-        gui.doubleSpin(sample_box, self, "sample_temperature", 0.0, 3.0, 0.1,
-                       label="Sample temperature")
-        gui.spin(sample_box, self, "sample_max_new_tokens", 1, 128,
-                 label="Sample length")
+        gui.doubleSpin(
+            sample_box, self, "sample_temperature", 0.0, 3.0, 0.1, label="Sample temperature"
+        )
+        gui.spin(sample_box, self, "sample_max_new_tokens", 1, 128, label="Sample length")
 
         gui.button(self.controlArea, self, "Train", callback=self.start_training)
         gui.button(self.controlArea, self, "Stop", callback=self.stop_training)
         gui.button(self.controlArea, self, "Save model", callback=self.save_model)
         self.status_label = gui.label(self.controlArea, self, "")
 
-        # live plot: train and validation loss (perplexity lives in the
-        # checkpoint table and status text; e^loss is the interpretable number)
+        # live plot: train and validation loss (perplexity is in the checkpoint
+        # table and the status text; e^loss is the interpretable number)
         import pyqtgraph as pg
 
         self._plot = pg.PlotWidget(background="w")
         self._plot.addLegend(offset=(10, 10))
         self._plot.setLabel("bottom", "Epoch")
         self._plot.setLabel("left", "Loss")
-        self._train_curve = self._plot.plot(pen=pg.mkPen("#1f77b4", width=2),
-                                            name="train loss")
-        self._val_curve = self._plot.plot(pen=pg.mkPen("#d62728", width=2),
-                                          name="val loss (dashed)")
+        self._train_curve = self._plot.plot(pen=pg.mkPen("#1f77b4", width=2), name="train loss")
+        self._val_curve = self._plot.plot(pen=pg.mkPen("#d62728", width=2), name="val loss")
         self.mainArea.layout().addWidget(self._plot)
         self.resize(1000, 700)
 
@@ -188,7 +197,7 @@ class OWLMTrainer(OWWidget):
         if table is not None:
             try:
                 self.texts = table_texts(table)
-            except ValueError as exc:
+            except ValueError:
                 self.Warning.no_text()
         self.Warning.nothing_to_train(shown=self.texts is None)
 
@@ -215,24 +224,42 @@ class OWLMTrainer(OWWidget):
             "sample_seed": 0,
         }
 
-    def start_training(self):
+    def _prepare_worker(self) -> TrainingWorker | None:
+        self.Warning.nothing_to_train.clear()
+        self.Error.keras_missing.clear()
+        self.Error.training_failed.clear()
         if self.texts is None:
-            self.Warning.nothing_to_train()
-            return
+            return None
         self.Outputs.model.send(None)
         self.Outputs.checkpoint.send(None)
         self.model = None
         self.epoch_stats = []
+        self._train_curve.setData([], [])
+        self._val_curve.setData([], [])
+        self.status_label.setText("")
         from nn_kernel.lm import Tokenizer  # pure Python; never imports Keras
 
         options = self._collect_options()
-        tokenizer = Tokenizer.from_corpus(self.texts, options.pop("tokenizer_level"),
-                                          max_vocab=options["max_vocab"])
-        self.worker = TrainingWorker(self.texts, tokenizer, options)
-        self.worker.epoch_signal.connect(self._on_epoch)
-        self.worker.finished_ok.connect(self._on_done)
-        self.worker.failed.connect(self._on_failed)
-        self.worker.start()
+        tokenizer = Tokenizer.from_corpus(
+            self.texts,
+            options.pop("tokenizer_level"),
+            max_vocab=options["max_vocab"],
+        )
+        worker = TrainingWorker(self.texts, tokenizer, options)
+        worker.epoch_signal.connect(self._on_epoch)
+        worker.finished_ok.connect(self._on_done)
+        worker.failed.connect(self._on_failed)
+        return worker
+
+    def start_training(self):
+        if self.worker is not None and self.worker.isRunning():
+            return
+        worker = self._prepare_worker()
+        if worker is None:
+            self.Warning.nothing_to_train()
+            return
+        self.worker = worker
+        worker.start()
         self.Information.training()
 
     def stop_training(self):
@@ -241,22 +268,11 @@ class OWLMTrainer(OWWidget):
 
     def run_training_blocking(self):
         """Run the worker in the calling thread (used by tests / debugging)."""
-        if self.texts is None:
+        worker = self._prepare_worker()
+        if worker is None:
             return
-        self.Outputs.model.send(None)
-        self.Outputs.checkpoint.send(None)
-        self.model = None
-        self.epoch_stats = []
-        from nn_kernel.lm import Tokenizer
-
-        options = self._collect_options()
-        tokenizer = Tokenizer.from_corpus(self.texts, options.pop("tokenizer_level"),
-                                          max_vocab=options["max_vocab"])
-        self.worker = TrainingWorker(self.texts, tokenizer, options)
-        self.worker.epoch_signal.connect(self._on_epoch)
-        self.worker.finished_ok.connect(self._on_done)
-        self.worker.failed.connect(self._on_failed)
-        self.worker.run()
+        self.worker = worker
+        worker.run()
 
     # ---- live feedback -------------------------------------------------------
 
@@ -264,10 +280,11 @@ class OWLMTrainer(OWWidget):
         self.epoch_stats.append(stats)
         epochs = [s["epoch"] for s in self.epoch_stats]
         self._train_curve.setData(epochs, [s["loss"] for s in self.epoch_stats])
-        finite_val = [(s["epoch"], s["val_loss"]) for s in self.epoch_stats
-                      if np.isfinite(s["val_loss"])]
+        finite_val = [
+            (s["epoch"], s["val_loss"]) for s in self.epoch_stats if np.isfinite(s["val_loss"])
+        ]
         if finite_val:
-            self._val_curve.setData(*zip(*finite_val))
+            self._val_curve.setData(*zip(*finite_val, strict=True))
         self.status_label.setText(
             f"epoch {stats['epoch']}: loss {stats['loss']:.3f}, "
             f"val {stats['val_loss']:.3f}, perplexity {stats['perplexity']:.1f}"
@@ -281,30 +298,30 @@ class OWLMTrainer(OWWidget):
         hp = model.hyperparameters
         self.status_label.setText(
             f"Done: {hp['architecture']}, {hp['n_train_windows']} train windows "
-            f"({hp['n_val_windows']} val), "
-            f"final val perplexity {hp['final_val_loss']:.3f} -> "
-            f"{np.exp(hp['final_val_loss']):.1f}"
+            f"({hp['n_val_windows']} val), final val loss "
+            f"{hp['final_val_loss']:.3f} (perplexity "
+            f"{np.exp(hp['final_val_loss']):.1f})"
         )
 
     def _on_failed(self, tb: str):
         self.Information.training.clear()
+        self.Error.keras_missing.clear()
+        self.Error.training_failed.clear()
         last = tb.strip().splitlines()[-1] if tb.strip() else "unknown error"
-        broken_import = "ModuleNotFoundError" in tb or (
-            "ImportError" in tb and "halted" in tb
-        )
+        broken_import = "ModuleNotFoundError" in tb or ("ImportError" in tb and "halted" in tb)
         if broken_import and ("keras" in tb or "tensorflow" in tb):
             self.Error.keras_missing()
         else:
             self.Error.training_failed(last)
 
     def save_model(self):
-        """The §4.5 one-unit serialisation, exposed: tokenizer + weights."""
+        """Save tokenizer + weights as one unit."""
         from AnyQt.QtWidgets import QFileDialog
 
         if self.model is None:
             self.Warning.nothing_to_train()
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Save model", "gibbon-lm")
+        path, _ = QFileDialog.getSaveFileName(self, "Save model", "language-model")
         if not path:
             return
         saved = self.model.save(path)
@@ -317,7 +334,7 @@ class OWLMTrainer(OWWidget):
         super().onDeleteWidget()
 
 
-if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
     WidgetPreview(OWLMTrainer).run()

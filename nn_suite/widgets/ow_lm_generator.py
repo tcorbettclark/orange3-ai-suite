@@ -1,13 +1,12 @@
-"""LM Generator: generate text with any kernel-convention model (spec §4.2).
+"""LM Generator: generate text with any kernel-convention model.
 
-Input: any model object exposing the kernel convention
-``generate(prompt, temperature, max_new_tokens, seed)`` — the Keras
-``LanguageModel`` today, MLX/LoRA models of Stages 2-3 later (identical
-interface, by design).
+The input is any object exposing ``generate(prompt, temperature,
+max_new_tokens, seed)``: the kernel's Keras ``LanguageModel``, a
+``LoRAModel``, or a saved artifact loaded from disk. The output is a
+one-column Table of generations.
 
-Output: the generations as a one-column text Table.
-Temperature is the most instructive knob in LM demos: low = repetitive,
-high = word salad.
+Temperature is the most instructive knob in language-model demos: low values
+repeat, high values dissolve into word salad.
 """
 
 from __future__ import annotations
@@ -15,14 +14,24 @@ from __future__ import annotations
 from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Input, Msg, OWWidget, Output
+from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from nn_suite.adapters import generations_table
 
 
-# ``object`` inputs auto_summarize=None keeps Orange from registering a
-# summarizer for arbitrary model objects (a cosmetic warning otherwise).
 class OWLMGenerator(OWWidget):
+    """Generate text from a trained kernel-convention model.
+
+    Input is a model object (Keras, MLX/LoRA, or compatible). The controls set
+    the prompt, temperature, maximum new tokens, number of generations and
+    seed. Generations are emitted as a one-column Table, ready for Corpus
+    Viewer and the Orange3-Text analysis widgets.
+
+    ``Load model...`` opens a saved artifact directory: a Keras LM
+    (``meta.json``) or a LoRA adapter (``lora_meta.json``). The loaded model
+    stays active until the input signal replaces it.
+    """
+
     name = "LM Generator"
     description = "Generate text with a trained language model."
     icon = "icons/lm_generator.svg"
@@ -38,8 +47,11 @@ class OWLMGenerator(OWWidget):
     class Warning(OWWidget.Warning):
         not_generative = Msg("The connected model does not expose generate().")
 
+    class Error(OWWidget.Error):
+        load_failed = Msg("Could not load the model: {}")
+        generation_failed = Msg("Generation failed: {}")
+
     class Information(OWWidget.Information):
-        hint = Msg("Set a prompt, then press Generate.")
         loaded = Msg("Loaded {} model: {}.")
 
     prompt = Setting("the")
@@ -54,32 +66,39 @@ class OWLMGenerator(OWWidget):
 
         box = gui.widgetBox(self.controlArea, "Prompt")
         gui.lineEdit(box, self, "prompt", label="Prompt text")
-        gui.hSlider(box, self, "temperature", label="Temperature",
-                    minValue=0.0, maxValue=3.0, step=0.1, intOnly=False,
-                    labelFormat=" %.1f")
+        gui.hSlider(
+            box,
+            self,
+            "temperature",
+            label="Temperature",
+            minValue=0.0,
+            maxValue=3.0,
+            step=0.1,
+            intOnly=False,
+            labelFormat=" %.1f",
+        )
         gui.spin(box, self, "max_new_tokens", 1, 512, label="Max new tokens")
         gui.spin(box, self, "n_generations", 1, 50, label="Number of generations")
         gui.spin(box, self, "seed", -1, 2**31 - 1, label="Seed (-1 = random)")
-        gui.button(self.controlArea, self, "Load model…", callback=self.load_model)
+        gui.button(self.controlArea, self, "Load model...", callback=self.load_model)
         gui.button(self.controlArea, self, "Generate", callback=self.generate)
         gui.rubber(self.controlArea)
 
     @Inputs.model
     def set_model(self, model):
         self.model = model
+        self.Error.load_failed.clear()
         self.Warning.not_generative(
             shown=model is not None and not callable(getattr(model, "generate", None))
         )
 
     def load_model(self):
-        """Load a saved model artifact (tokenizer+weights as ONE unit).
-
-        Dispatches on the artifact kind: LanguageModel (Keras, 'meta.json')
-        or LoRAModel (MLX adapter, 'lora_meta.json'). The loaded model is
-        used until the next input signal replaces it.
-        """
-        from AnyQt.QtWidgets import QFileDialog
+        """Load a saved model artifact directory."""
         from pathlib import Path
+
+        self.Error.load_failed.clear()
+
+        from AnyQt.QtWidgets import QFileDialog
 
         src_dir = QFileDialog.getExistingDirectory(
             self, "Select a saved model/adapter artifact directory"
@@ -87,40 +106,47 @@ class OWLMGenerator(OWWidget):
         if not src_dir:
             return
         src = Path(src_dir)
-        if (src / "lora_meta.json").exists():
-            from nn_kernel.lora import LoRAModel
+        try:
+            if (src / "lora_meta.json").exists():
+                from nn_kernel.lora import LoRAModel
 
-            model, kind = LoRAModel.from_artifact(src), "MLX LoRA"
-        elif (src / "meta.json").exists():
-            from nn_kernel.lm import LanguageModel
+                model, kind = LoRAModel.from_artifact(src), "MLX LoRA"
+            elif (src / "meta.json").exists():
+                from nn_kernel.lm import LanguageModel
 
-            model, kind = LanguageModel.load(src), "Keras LM"
-        else:
-            self.Warning.not_generative()
+                model, kind = LanguageModel.load(src), "Keras LM"
+            else:
+                self.Warning.not_generative()
+                return
+        except Exception as exc:
+            self.Error.load_failed(f"{type(exc).__name__}: {exc}")
             return
         self.set_model(model)
         self.Information.loaded(kind, src.name)
 
     def generate(self):
         self.Outputs.generations.send(None)
+        self.Error.generation_failed.clear()
         if self.model is None or not callable(getattr(self.model, "generate", None)):
             return
         seed = self.seed
-        outcomes = []
-        for i in range(self.n_generations):
-            use_seed = None if seed < 0 else seed + i
-            # The kernel convention: generate(prompt, temperature,
-            # max_new_tokens, seed) — positionally, so MLX models adhere too.
-            outcomes.append(
+        try:
+            outcomes = [
                 self.model.generate(
-                    self.prompt, self.temperature, self.max_new_tokens, use_seed
+                    self.prompt,
+                    self.temperature,
+                    self.max_new_tokens,
+                    None if seed < 0 else seed + i,
                 )
-            )
+                for i in range(self.n_generations)
+            ]
+        except Exception as exc:
+            self.Error.generation_failed(f"{type(exc).__name__}: {exc}")
+            return
         self.Outputs.generations.send(generations_table(outcomes))
-        self.Information.hint(shown=False)
 
 
-if __name__ == "__main__":  # pragma: no cover — dev preview (REPO-CONTEXT §4)
+if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
     WidgetPreview(OWLMGenerator).run()

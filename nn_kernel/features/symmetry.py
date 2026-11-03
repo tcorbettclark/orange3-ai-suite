@@ -1,4 +1,4 @@
-"""Group F — symmetry (3 features): cheap, powerful, very visual.
+"""Group F: symmetry (3 features), cheap, powerful and very visual.
 
 Mirror symmetry features correlate one half of the image with the mirrored
 other half (Pearson correlation of pixel values); the middle row/column is
@@ -30,16 +30,13 @@ FEATURE_NAMES = (
 
 DEFINITIONS = {
     "left_right_symmetry": (
-        "Bilateral symmetry: correlation of the left half with the mirrored "
-        "right half."
+        "Bilateral symmetry: correlation of the left half with the mirrored right half."
     ),
     "top_bottom_symmetry": (
-        "Vertical mirror symmetry: correlation of the top half with the "
-        "mirrored bottom half."
+        "Vertical mirror symmetry: correlation of the top half with the mirrored bottom half."
     ),
     "quadrant_self_similarity": (
-        "Uniform vs. localised structure: mean of the six pairwise "
-        "inter-quadrant correlations."
+        "Uniform vs. localised structure: mean of the six pairwise inter-quadrant correlations."
     ),
 }
 
@@ -77,6 +74,8 @@ def _mirror_symmetry(img: np.ndarray, axis: int) -> float:
     else:
         half = img.shape[0] // 2
         a, b = img[:half, :], img[img.shape[0] - half :, :][::-1, :]
+    if half == 0:
+        return 1.0  # a single line is trivially symmetric with itself
     return _safe_corr(a, b)
 
 

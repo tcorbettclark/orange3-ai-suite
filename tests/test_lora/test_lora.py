@@ -7,16 +7,15 @@ elsewhere. They must run in plain Python without Orange/Qt (kernel rule).
 
 import json
 import subprocess  # noqa: F401
-import sys
 from pathlib import Path
 
 import pytest
 
 from nn_kernel.lora import (
-    LoraData,
-    LoraOptions,
     LoRAAdapter,
+    LoraData,
     LoRAModel,
+    LoraOptions,
     stream_metrics,
     train_lora,
 )
@@ -101,11 +100,9 @@ def test_adapter_artifact_round_trip(tmp_path):
 
 def test_adapter_without_adapters_loads_fine(tmp_path):
     # a copy of only the meta (adapter weights omitted) still loads as the
-    # base model with adapter off — the Stage-2 comparison shape
+    # base model with adapter off: the raw-model comparison
     (tmp_path / "a").mkdir()
-    LoRAAdapter(base_model="b/x", adapter_path=None, hyperparameters={}).save(
-        tmp_path / "a"
-    )
+    LoRAAdapter(base_model="b/x", adapter_path=None, hyperparameters={}).save(tmp_path / "a")
     loaded = LoRAAdapter.load(tmp_path / "a")
     assert loaded.adapter_path is None
 
@@ -136,11 +133,11 @@ def test_train_lora_tiny_run(tmp_path):
     generates, save/load round trip reproduces identical greedy output."""
     from nn_kernel.lora import train_lora
 
-    data = LoraData.from_texts(
-        [f"the quick brown fox jumped over fence {i}" for i in range(8)]
-    )
+    data = LoraData.from_texts([f"the quick brown fox jumped over fence {i}" for i in range(8)])
     adapter = train_lora(
-        MODEL_DIR, data, tmp_path / "adapter",
+        MODEL_DIR,
+        data,
+        tmp_path / "adapter",
         options=LoraOptions(iters=2, batch_size=1, max_seq_length=128, num_layers=4),
     )
     assert (Path(adapter.adapter_path) / "adapters.safetensors").exists()
@@ -151,7 +148,7 @@ def test_train_lora_tiny_run(tmp_path):
     out_on = model.generate(prompt, temperature=0, max_new_tokens=8, seed=0)
     assert isinstance(out_on, str) and out_on.startswith(prompt)
 
-    # adapter OFF = the raw base model (the Stage-2 comparison), deterministic
+    # adapter OFF = the raw base model, deterministic
     model.adapter_enabled = False
     out_off = model.generate(prompt, temperature=0, max_new_tokens=8, seed=0)
     assert isinstance(out_off, str)
@@ -170,12 +167,27 @@ def test_train_lora_tiny_run(tmp_path):
 def test_train_lora_greedy_determinism(tmp_path):
     data = LoraData.from_texts(["alpha beta gamma delta." for _ in range(6)])
     a = train_lora(
-        MODEL_DIR, data, tmp_path / "a1",
-        options=LoraOptions(iters=2, batch_size=1, max_seq_length=64, num_layers=2,
-                            seed=7),
+        MODEL_DIR,
+        data,
+        tmp_path / "a1",
+        options=LoraOptions(iters=2, batch_size=1, max_seq_length=64, num_layers=2, seed=7),
     )
     m1 = LoRAModel(a.base_model, a.adapter_path)
     prompt, kwargs = "alpha", {"temperature": 1.0, "max_new_tokens": 10, "seed": 3}
     first = m1.generate(prompt, **kwargs)
     second = m1.generate(prompt, **kwargs)
     assert first == second  # seeded sampling is deterministic
+
+
+def test_valid_fraction_guards():
+    texts = [f"document {i}" for i in range(5)]
+    pairs = [(f"question {i}?", f"answer {i}.") for i in range(5)]
+    with pytest.raises(ValueError, match="valid_fraction"):
+        LoraData.from_texts(texts, valid_fraction=1.0)
+    with pytest.raises(ValueError, match="valid_fraction"):
+        LoraData.from_pairs(pairs, valid_fraction=-0.1)
+    # even an extreme fraction leaves at least one training row
+    data = LoraData.from_texts(texts, valid_fraction=0.99)
+    assert len(data.train) == 1 and len(data.valid) == 4
+    # zero means no validation split
+    assert LoraData.from_texts(texts, valid_fraction=0.0).valid == []

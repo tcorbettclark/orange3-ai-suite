@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions
-from nn_kernel.features import topology
+from nn_kernel.features import FeatureOptions, topology
 from synth import digit8_image, ring_image, vertical_bar_image
 
 OPTS = FeatureOptions()

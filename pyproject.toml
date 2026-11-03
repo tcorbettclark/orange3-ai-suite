@@ -1,13 +1,10 @@
 # orange3-nn-suite packaging.
 #
-# Dependency-pin policy (REPO-CONTEXT.md §5): the *runtime floors below with
-# caps are the development set, proven in the closest packaging precedent
-# (orange3-imagenets v0.0.3, verified 2025-11). At release the Keras-in-Orange
-# and MLX surfaces are pinned to exact versions.
+# Dependency floors are the versions used for development. The MLX extra is
+# pinned exactly: the tuner internals are less stable than Keras's fit.
 #
-# Layout decision (recorded in spec/nn-suite-architecture.md): nn_kernel is a
-# plain in-repo package *bundled in this single distribution* — not a separate
-# pip-installable. There is exactly one wheel, one install, one category.
+# Layout: nn_kernel is a plain in-repo package bundled in this single
+# distribution - one wheel, one install, one "Neural Networks" category.
 
 [build-system]
 requires = ["hatchling>=1.26"]
@@ -21,37 +18,27 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 
-# Base: what the pure-Python kernel needs regardless of course stage.
-# numpy/scipy are also pulled in by Orange itself, so this costs nothing in
-# the Orange environment and keeps plain-Python kernel tests runnable.
-# Base: what the pure-Python kernel needs regardless of course stage.
-# Deliberately NOT a dependency: Orange3 — the Orange environment already
-# provides it (and is installed with --no-deps per REPO-CONTEXT §4, so a
-# dependency line would never even be resolved there); and the Python-only
-# teaching stream must be able to install the kernel headless. The Orange
-# floor is Orange3>=3.39.0 (orange-canvas-core>=0.1.28, orange-widget-base
-# >=4.20.0, the orange3-imagenets-proven set); if exact add-on metadata
-# wants Orange3 listed at release, revisit then.
+# Base: what the pure-Python kernel needs. numpy/scipy are also pulled in by
+# Orange itself, so this costs nothing there and keeps plain-Python kernel
+# tests runnable. Orange3 is deliberately absent: the Orange environment
+# already provides it, and the kernel must be installable headless.
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
 ]
 
 [project.optional-dependencies]
-# One extra per course stage (architecture doc §3); the add-on widgets degrade
-# gracefully with a "install orange3-nn-suite[image]" style message.
+# One extra per capability; widgets degrade gracefully with an "install
+# orange3-nn-suite[image]" style message.
 image = [
     "opencv-python-headless>=4.12,<5",
 ]
-# Proven-in-widget combo (orange3-imagenets v0.0.3); no explicit tensorflow —
-# tf-keras brings it. Pin exact at release.
 lm = [
     "keras>=3.10.0",
     "tf-keras>=2.19.0",
 ]
 lora = [
-    # Apple-silicon-only (mlx is not portable); EXACT pin per REPO-CONTEXT §5 —
-    # recorded at the first successful BritLLM dry run (§8.3, resolved).
+    # Apple-silicon-only: mlx is not portable.
     'mlx-lm[train]==0.32.2; platform_machine == "arm64" and sys_platform == "darwin"',
 ]
 
@@ -64,14 +51,8 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["nn_kernel", "nn_suite"]
-# nn_suite is a NEW-STYLE Orange add-on: a plain top-level package, no
-# 'orangecontrib' namespace. Orange >= 3.38 discovers add-ons purely via the
-# entry points above (verified against canvas-core 0.2.7 / Orange 3.40:
-# pkgmeta has zero orangecontrib references). The old namespace has a real
-# operational hazard: any add-on wheel shipping a pip nspkg.pth
-# (Orange3-ImageAnalytics does) pre-imports a fake 'orangecontrib' pinned to
-# site-packages at interpreter startup, shadowing every pkgutil-style
-# colleague — abandon that class of bug entirely.
+# nn_suite is a plain top-level package (no 'orangecontrib' namespace). Orange
+# >= 3.38 discovers add-ons through entry points.
 
 [project.entry-points."orange.widgets"]
 "Neural Networks" = "nn_suite.widgets"
@@ -83,17 +64,24 @@ packages = ["nn_kernel", "nn_suite"]
 testpaths = ["tests"]
 addopts = "-q -m 'not slow'"
 markers = [
-    "slow: end-to-end runs needing converted-model loads (~1 min each; run with '-m slow')",
+    "slow: end-to-end runs needing converted-model loads (run with '-m slow')",
 ]
 filterwarnings = [
-    # keras 3.15 (<3.16?) predates numpy 2's __array__ copy-keyword protocol;
-    # the warning is emitted inside keras.src.backend.tensorflow.core. This is
-    # a third-party bug that numpy will eventually turn into an error —
-    # revisit the [lm] pin (spec: exact pins at release) when Keras fixes it.
+    # Keras emits a DeprecationWarning about numpy 2's __array__ copy protocol
+    # from third-party code, not from this project.
     "ignore::DeprecationWarning:keras.*",
-    # orange-canvas-core 0.2.x warns about its own legacy localization module
-    # path (orangecanvas.utils.localization -> orangecanvas.localization).
-    # Emitted only inside orangecanvas; revisit when the installed
-    # canvas-core no longer emits it (nothing to do in our code).
+    # orange-canvas-core warns about its own legacy localization module path;
+    # nothing to do in this codebase.
     "ignore::DeprecationWarning:orangecanvas.*",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
+ignore = ["RUF001", "RUF003", "RUF005"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["nn_kernel", "nn_suite", "synth"]

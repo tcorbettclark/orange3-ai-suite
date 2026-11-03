@@ -41,8 +41,7 @@ def test_preprocess_squares_and_resizes():
 
 def test_preprocess_native_when_working_size_none():
     img = np.zeros((100, 200), dtype=np.float32)
-    opts = FeatureOptions(working_size=None, centre_crop=False,
-                          contrast_normalise=False)
+    opts = FeatureOptions(working_size=None, centre_crop=False, contrast_normalise=False)
     assert preprocess(img, opts).shape == (100, 200)
 
 
@@ -53,6 +52,7 @@ def test_preprocess_flat_image_is_zeroed():
 
 def test_preprocess_contrast_normalise_uses_full_range():
     from synth import slope_image
+
     out = preprocess(slope_image(128), FeatureOptions(working_size=None))
     assert out.min() <= 0.05
     assert out.max() >= 0.95
@@ -62,7 +62,7 @@ def test_preprocess_denoise_removes_isolated_spikes():
     img = np.zeros((128, 128), dtype=np.float32)
     rng = np.random.default_rng(0)
     for y, x in rng.integers(5, 123, size=(200, 2)):  # >1% of pixels so the
-        img[y, x] = 1.0                               # p99 clip keeps them bright
+        img[y, x] = 1.0  # p99 clip keeps them bright
     noisy = preprocess(img, FeatureOptions(working_size=None))
     clean = preprocess(img, FeatureOptions(working_size=None, denoise=True))
     assert noisy.max() > 0.9  # spikes survive normalisation

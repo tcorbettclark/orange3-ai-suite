@@ -2,16 +2,16 @@
 
 The full-training test only runs when Keras is importable in *this* Orange
 environment (the [lm] extra). Without it, the degradation-path test asserts
-the clear 'install' message instead of a crash (spec §3).
+the clear 'install' message instead of a crash.
 """
 
 import importlib.util
 
 import numpy as np
 import pytest
-from Orange.data import Domain, ContinuousVariable, Table
+from Orange.data import ContinuousVariable, Domain, Table
 
-from nn_suite.adapters import checkpoint_table, table_texts
+from nn_suite.adapters import table_texts
 from nn_suite.widgets.ow_lm_trainer import OWLMTrainer, TrainingWorker
 
 KERAS_AVAILABLE = importlib.util.find_spec("keras") is not None
@@ -76,7 +76,7 @@ def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
     calls = {"n": 0}
 
     def on_epoch(stats):  # the button handler runs outside the worker; the
-        original(stats)    # hook is the only mid-run injection point here
+        original(stats)  # hook is the only mid-run injection point here
         calls["n"] += 1
         if calls["n"] >= 3:
             w.stop_training()
@@ -114,7 +114,7 @@ def test_missing_keras_message_routing(qapp):
     reason="exercises the degradation path, which only exists without Keras",
 )
 def test_start_training_without_keras_shows_install_hint(qapp, text_table):
-    """The spec's graceful-degradation contract: no crash, a clear hint.
+    """Graceful degradation: no crash, a clear install hint.
 
     Uses the blocking variant: same lazy-import path as the threaded one,
     without a live QThread (offscreen teardown of threads is fragile).

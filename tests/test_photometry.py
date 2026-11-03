@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions
-from nn_kernel.features import photometry
+from nn_kernel.features import FeatureOptions, photometry
 from synth import uniform_image
 
 OPTS = FeatureOptions()
@@ -32,7 +31,7 @@ def test_bright_blobs_on_dark_positive_skew():
 def test_bright_fraction_two_level_image():
     img = np.zeros((128, 128), dtype=np.float32)
     img[..., :] = 0.2
-    img[: 26, :] = 0.8  # 80% dark (0.2), 20% bright (0.8)
+    img[:26, :] = 0.8  # 80% dark (0.2), 20% bright (0.8)
     f = _compute(img)
     # median 0.2, p10 0.2, p90 0.8 -> threshold 0.5 -> fraction ~0.2
     assert abs(f["bright_fraction"] - 0.2) < 0.02

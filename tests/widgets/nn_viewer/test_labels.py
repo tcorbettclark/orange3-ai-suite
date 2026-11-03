@@ -1,5 +1,6 @@
 """Labels sit on their edges, staggered 40%/60% along the line."""
 
+import itertools
 from collections import defaultdict
 
 import numpy as np
@@ -26,6 +27,6 @@ def test_labels_on_line_staggered(widget, make_model):
     for fan in fans.values():
         fan.sort()
         positions = [along for _, along in fan]
-        assert all(a != b for a, b in zip(positions, positions[1:])), (
+        assert all(a != b for a, b in itertools.pairwise(positions)), (
             "adjacent fan labels do not alternate"
         )

@@ -1,4 +1,4 @@
-"""Group E — topology (3 features): the classic digit killers.
+"""Group E: topology (3 features), the classic digit features.
 
 Definitions
 -----------
@@ -72,14 +72,9 @@ def compute(img: np.ndarray, opts: FeatureOptions) -> dict[str, float]:
     bg = (~fg).astype(np.uint8)
     n_labels, labels = cv2.connectedComponents(bg, connectivity=4)
     border_labels = {
-        int(v)
-        for v in np.concatenate(
-            [labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]]
-        )
+        int(v) for v in np.concatenate([labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]])
     }
-    holes = sum(
-        1 for label in range(1, n_labels) if label not in border_labels
-    )
+    holes = sum(1 for label in range(1, n_labels) if label not in border_labels)
 
     below = img <= np.median(img)  # below-or-equal vs. above: robust when the
     # median coincides with the background level (minority bright object)

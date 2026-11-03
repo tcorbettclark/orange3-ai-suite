@@ -1,4 +1,4 @@
-"""Vocab Inspector statistics tests (read-only logic, spec §4.4)."""
+"""Vocab Inspector statistics tests (read-only logic)."""
 
 import pytest
 
@@ -50,9 +50,7 @@ def test_vocab_stats(word_tok):
     assert s["vocab_size"] == word_tok.vocab_size
     assert s["special_tokens"] == ("<bos>", "<unk>")
     longest = s["longest_tokens"]
-    assert all(
-        len(longest[i][0]) >= len(longest[i + 1][0]) for i in range(len(longest) - 1)
-    )
+    assert all(len(longest[i][0]) >= len(longest[i + 1][0]) for i in range(len(longest) - 1))
     assert 0.0 <= s["single_occurrence_fraction"] <= 1.0
     assert s["mean_token_length"] > 0
 

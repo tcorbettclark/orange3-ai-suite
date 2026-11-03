@@ -1,11 +1,11 @@
-"""The LoRA model object: adapter travels with its base model.
+"""The LoRA model object: an adapter travels with its base model.
 
-The artifact convention (§4.3): an adapter is meaningless without the exact
-base model it was trained against — "adapter serialized with base model" as
-one unit. A `LoRAAdapter` is a directory containing the adapter weights, its
-config, and a meta.json carrying the base-model identity + hyperparameters;
-loading it reproduces the *trained setup*, and the on/off switch gives the
-Stage-2/Stage-3 before/after comparison on the identical base model.
+An adapter is meaningless without the exact base model it was trained against,
+so a :class:`LoRAAdapter` is a directory containing the adapter weights, its
+config, and a ``lora_meta.json`` with the base-model identity and
+hyperparameters. Loading the artifact reproduces the trained setup, and the
+adapter on/off switch gives the before/after comparison on the identical base
+model.
 """
 
 from __future__ import annotations
@@ -13,22 +13,23 @@ from __future__ import annotations
 import json
 import shutil
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 _MLX_IMPORT_ERROR = (
-    "MLX not available — nn-kernel[lora] requires macOS on Apple "
-    "Silicon (pip install orange3-nn-suite[lora])"
+    "MLX not available - orange3-nn-suite[lora] requires macOS on Apple Silicon "
+    "(pip install orange3-nn-suite[lora])"
 )
 
-_ADAPTORS = ("adapters.safetensors", "adapter_config.json")
+_ADAPTER_FILES = ("adapters.safetensors", "adapter_config.json")
 _META_FILE = "lora_meta.json"
+_MAX_SEQ_LEN = 512
 
 
-def _require_mlx():
+def _require_mlx() -> None:
     try:
-        from mlx_lm import generate, load  # noqa: F401
+        import mlx_lm  # noqa: F401
     except ImportError as exc:
         raise ImportError(_MLX_IMPORT_ERROR) from exc
 
@@ -49,21 +50,26 @@ class LoRAAdapter:
         out.mkdir(parents=True, exist_ok=True)
         if self.adapter_path is not None:
             src = Path(self.adapter_path)
-            for fname in _ADAPTORS:
+            for fname in _ADAPTER_FILES:
                 if (src / fname).exists():
                     shutil.copy2(src / fname, out / fname)
-        (out / _META_FILE).write_text(json.dumps({
-            "base_model": self.base_model,
-            "adapter_path": None,  # the copy *is* the adapter now
-            "hyperparameters": self.hyperparameters,
-            "name": self.name,
-            "saved_epoch": time.strftime("%Y-%m-%d %H:%M"),
-        }, indent=1))
+        (out / _META_FILE).write_text(
+            json.dumps(
+                {
+                    "base_model": self.base_model,
+                    "adapter_path": None,  # the copy is the adapter now
+                    "hyperparameters": self.hyperparameters,
+                    "name": self.name,
+                    "saved_at": time.strftime("%Y-%m-%d %H:%M"),
+                },
+                indent=1,
+            )
+        )
         return out
 
     @classmethod
-    def load(cls, path: str | Path) -> "LoRAAdapter":
-        _require_mlx()  # also validates platform before touching the artifact
+    def load(cls, path: str | Path) -> LoRAAdapter:
+        _require_mlx()  # also validates the platform before touching the artifact
         src = Path(path)
         if (src / _META_FILE).exists():
             meta = json.loads((src / _META_FILE).read_text())
@@ -77,28 +83,38 @@ class LoRAAdapter:
         return cls(base_model=str(src), adapter_path=None, hyperparameters={})
 
     def __repr__(self):  # pragma: no cover - cosmetic
-        return (f"LoRAAdapter(base={self.base_model}, "
-                f"adapter={'yes' if self.adapter_path else 'off'})")
+        return (
+            f"LoRAAdapter(base={self.base_model}, adapter={'yes' if self.adapter_path else 'off'})"
+        )
 
 
 class LoRAModel:
-    """Stage-2/3 model: the base model with an optional adapter, exposing the
-    kernel convention ``generate(prompt, temperature, max_new_tokens, seed)``.
+    """A base model with an optional LoRA adapter.
 
-    ``adapter_enabled`` switches between the raw base model and the
-    adapter-fitted one — the identical model, before/after, no confound.
-    Both variants are loaded lazily and cached (1.5 GB 4-bit each).
+    Exposes the kernel convention
+    ``generate(prompt, temperature, max_new_tokens, seed)``. The
+    ``adapter_enabled`` switch selects the raw base model or the
+    adapter-fitted one: the identical model, before and after, with no
+    confound. Both variants are loaded lazily and cached.
     """
 
-    def __init__(self, base_model: str, adapter_path: str | None = None):
+    def __init__(
+        self,
+        base_model: str,
+        adapter_path: str | None = None,
+        hyperparameters: dict | None = None,
+        name: str = "",
+    ):
         _require_mlx()
         self.base_model = base_model
         self.adapter_path = adapter_path
         self.adapter_enabled = adapter_path is not None
+        self.hyperparameters = dict(hyperparameters or {})
+        self.name = name
         self._models: dict[bool, Any] = {}  # variant -> (model, tokenizer)
 
     def _variant(self, with_adapter: bool):
-        from mlx_lm.utils import load
+        from mlx_lm import load
 
         if with_adapter not in self._models:
             self._models[with_adapter] = load(
@@ -109,7 +125,7 @@ class LoRAModel:
 
     @property
     def tokenizer(self):
-        """Travels with the model (kernel convention; shared by variants)."""
+        """Travels with the model (kernel convention; shared by both variants)."""
         return self._variant(self.adapter_enabled)[1]
 
     def generate(
@@ -119,12 +135,11 @@ class LoRAModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ) -> str:
-        """Kernel sampling convention; temperature <= 0 = greedy.
+        """Temperature sampling; temperature <= 0 means greedy.
 
-        The MLX generation loop lives inside mlx_lm (unlike the Keras models,
-        where the ~20-line loop is kernel-owned); the convention surface is
-        identical either way. mlx-lm 0.32 exposes temperature through a
-        sampler object rather than a kwarg.
+        The sampling loop lives inside ``mlx_lm`` rather than in the kernel,
+        but the convention surface is identical to the Keras models. mlx-lm
+        exposes temperature through a sampler object rather than a kwarg.
         """
         from mlx.core import random as mx_random
         from mlx_lm.generate import generate
@@ -142,35 +157,31 @@ class LoRAModel:
             verbose=False,
         )
         # mlx-lm returns the completion only; the kernel convention is the
-        # full text (prompt echoed — matching the Keras LanguageModel)
-        sep = (
-            " "
-            if prompt and output and not prompt[-1:].isspace()
-            and output[0].isalnum()
-            else ""
-        )
+        # full text (prompt echoed), matching the Keras LanguageModel.
+        sep = " " if prompt and output and not prompt[-1:].isspace() and output[0].isalnum() else ""
         return prompt + sep + output
 
-    def perplexity(self, text: str, max_tokens: int = 4000, batch: int = 8) -> dict:
-        """Exponential mean cross-entropy over the text's next-token predictions
-        — the same convention as the Keras LanguageModel.perplexity, feeding
-        the spec §6 in-domain / out-of-domain tables. Chunks by ``batch``
-        windows of ``max_seq_length``; returns {'loss', 'perplexity'}.
+    def perplexity(self, text: str, max_tokens: int = 4000) -> dict:
+        """Exponential mean cross-entropy over the text's next-token predictions.
+
+        Returns ``{'loss', 'perplexity'}`` on the same convention as the Keras
+        ``LanguageModel.perplexity``, for in-domain / out-of-domain tables.
+        Chunks long text into non-overlapping windows.
         """
         import math
 
-        import mlx.nn as nn
         import mlx.core as mx
+        import mlx.nn as nn
 
         model, tokenizer = self._variant(self.adapter_enabled)
         ids = tokenizer.encode(text)
         if len(ids) < 2:
             return {"loss": float("nan"), "perplexity": float("nan")}
         nll_sum, n_tokens = 0.0, 0
-        step = self._seq_len() - batch
-        step = max(step, 1)
-        for start in range(0, min(len(ids), max_tokens) - 1, step):
-            window = ids[start : start + self._seq_len()]
+        step = _MAX_SEQ_LEN - 1  # no overlap between windows
+        limit = min(len(ids), max_tokens)
+        for start in range(0, limit - 1, step):
+            window = ids[start : min(start + _MAX_SEQ_LEN, limit)]
             if len(window) < 2:
                 continue
             x = mx.array([window[:-1]])
@@ -183,21 +194,23 @@ class LoRAModel:
         loss = nll_sum / max(n_tokens, 1)
         return {"loss": float(loss), "perplexity": float(math.exp(loss))}
 
-    def _seq_len(self) -> int:
-        # inference window; short windows keep the 32000-vocab logits small
-        return 512
-
     def artifact(self) -> LoRAAdapter:
         return LoRAAdapter(
             base_model=self.base_model,
             adapter_path=self.adapter_path,
-            hyperparameters={},
+            hyperparameters=self.hyperparameters,
+            name=self.name,
         )
 
     @classmethod
-    def from_artifact(cls, path: str | Path) -> "LoRAModel":
+    def from_artifact(cls, path: str | Path) -> LoRAModel:
         adapter = LoRAAdapter.load(path)
-        return cls(adapter.base_model, adapter.adapter_path)
+        return cls(
+            adapter.base_model,
+            adapter.adapter_path,
+            adapter.hyperparameters,
+            adapter.name,
+        )
 
     def save(self, dest: str | Path) -> Path:
         return self.artifact().save(dest)

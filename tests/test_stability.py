@@ -1,12 +1,8 @@
-"""Stability tests — a first-class requirement of the domain spec (§2, §5):
-
-"small affine jitter and varying denoising strength must not flip feature
-categories (e.g. 'two peaks' -> 'one peak'); if they do, the feature is
-noise."
+"""Feature stability under small shifts and noise.
 
 Category features (peak/hole/median-crossing counts) must be *identical*
 under 1-pixel shifts and small additive noise; continuous features must stay
-within tolerance.
+within tolerance. A feature whose category flips on a 5-pixel shift is noise.
 """
 
 import numpy as np
@@ -15,14 +11,16 @@ import pytest
 from nn_kernel.features import FeatureOptions, extract_features
 from synth import cloud_image, crop_shift, digit8_image, ring_image, shift_image
 
-COUNT_FEATURES = frozenset({
-    "row_profile_peaks",
-    "column_profile_peaks",
-    "diagonal_profile_peaks",
-    "anti_diagonal_profile_peaks",
-    "median_upcrossing_count",
-    "hole_count",
-})
+COUNT_FEATURES = frozenset(
+    {
+        "row_profile_peaks",
+        "column_profile_peaks",
+        "diagonal_profile_peaks",
+        "anti_diagonal_profile_peaks",
+        "median_upcrossing_count",
+        "hole_count",
+    }
+)
 TOL_CONTINUOUS = 0.05  # relative to max(1, |value|)
 TOL_NOISY = 0.20  # additive noise genuinely adds fine texture; looser bar
 
@@ -33,9 +31,7 @@ def _assert_stable(base: dict, other: dict, tol=TOL_CONTINUOUS):
         if name in COUNT_FEATURES:
             assert a == b, f"{name} flipped: {a} -> {b} (category feature)"
         else:
-            assert abs(a - b) <= tol * max(1.0, abs(a)), (
-                f"{name} moved {a:.4f} -> {b:.4f}"
-            )
+            assert abs(a - b) <= tol * max(1.0, abs(a)), f"{name} moved {a:.4f} -> {b:.4f}"
 
 
 @pytest.fixture(scope="module")
@@ -58,7 +54,8 @@ def test_small_noise_jitter_texture(cloud_base):
     for _ in range(3):
         jittered = np.clip(
             img + rng.normal(0.0, 0.02, size=img.shape).astype(np.float32),
-            0.0, 1.0,
+            0.0,
+            1.0,
         )
         _assert_stable(
             cloud_base,

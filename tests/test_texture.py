@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions
-from nn_kernel.features import texture
+from nn_kernel.features import FeatureOptions, texture
 from synth import cloud_image, uniform_image
 
 OPTS = FeatureOptions()
@@ -15,9 +14,14 @@ def _compute(img):
 
 def test_flat_image_all_zero():
     f = _compute(uniform_image())
-    for name in ("mean_gradient_magnitude", "edge_density", "fine_texture",
-                 "coarse_texture", "coarse_to_fine_texture_ratio",
-                 "autocorrelation_half_width"):
+    for name in (
+        "mean_gradient_magnitude",
+        "edge_density",
+        "fine_texture",
+        "coarse_texture",
+        "coarse_to_fine_texture_ratio",
+        "autocorrelation_half_width",
+    ):
         assert f[name] == 0.0, name
 
 
@@ -39,7 +43,7 @@ def test_smooth_cloud_is_coarse_not_fine():
 
 
 def test_edge_density_adaptive_and_non_degenerate():
-    # Two different edge contents must give different densities (the spec's
+    # Two different edge contents must give different densities (a fixed
     # fixed-percentile version would return the same value for both).
     rng = np.random.default_rng(3)
     noise = rng.uniform(0.0, 1.0, size=(128, 128)).astype(np.float32)

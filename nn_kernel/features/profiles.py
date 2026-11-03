@@ -1,28 +1,29 @@
-"""Group B — profile summaries (12 features): dense generalised line probes.
+"""Group B: profile summaries (12 features), dense generalised line probes.
 
 The full row projection (mean intensity per row) and column projection are
-built and summarised, so every line contributes — sparse probes are
-position-sensitive (spec §2 weakness table).
+built and summarised, so every line contributes. Sparse probes would be
+position-sensitive.
 
 Definitions
 -----------
 - trend: linear-fit slope over the whole profile, scaled by its length =
   net intensity change from one side to the other, in intensity units
-  (bounded roughly [-1, 1]). Sign carries "brighter at the bottom/top".
+  (bounded roughly [-1, 1]). The sign says "brighter at the bottom/top".
 - roughness: total variation / mean level (dimensionless lumpiness).
-- peaks: number of interior maxima with prominence >=
-  ``peak_prominence_frac`` x dynamic range (agreed Q1). Profiles are padded
-  with their minimum on both ends so a maximum sitting at the image border
-  still counts as a peak; such padding can never create a false peak.
+- peaks: number of interior maxima with prominence of at least
+  ``peak_prominence_frac`` x dynamic range. Profiles are padded with their
+  minimum on both ends so a maximum at the image border still counts; the
+  padding can never create a false peak.
 - centre of mass: intensity-weighted mean position, normalised to [0, 1]
   across the profile.
 - diagonal / anti-diagonal profiles: dense projections along diagonal bands
-  via ``ndarray.diagonal`` (agreed Q2, option b) — exact, no interpolation.
+  via ``ndarray.diagonal`` - exact, no interpolation.
 - profile correlation: Pearson correlation of the row and column profiles;
   0.0 if either is flat (no structure to agree or disagree).
 - median up-crossing count: for every line (row, then column), count
-  up-crossings of that line's own median level; take the median over lines;
-  average the row and column medians. Parameter-free cousin of peak counting.
+  up-crossings of that line's own median level; take the median over lines
+  and average the row and column medians. Parameter-free cousin of peak
+  counting.
 """
 
 from __future__ import annotations
@@ -131,8 +132,10 @@ def _peak_count(prof: np.ndarray, opts: FeatureOptions) -> float:
 def _centre_of_mass(prof: np.ndarray) -> float:
     w = np.clip(prof.astype(np.float64), 0.0, None)
     n = len(prof)
+    if n < 2:
+        return 0.5
     if w.sum() < _EPS:
-        return (n - 1) / 2.0 / max(n - 1, 1)
+        return 0.5
     return float(np.average(np.arange(n), weights=w) / (n - 1))
 
 
@@ -193,9 +196,7 @@ def compute(img: np.ndarray, opts: FeatureOptions) -> dict[str, float]:
         "column_profile_peaks": _peak_count(col, opts),
         "column_profile_centre_of_mass": _centre_of_mass(col),
         "diagonal_profile_peaks": _peak_count(_diagonal_profile(img, anti=False), opts),
-        "anti_diagonal_profile_peaks": _peak_count(
-            _diagonal_profile(img, anti=True), opts
-        ),
+        "anti_diagonal_profile_peaks": _peak_count(_diagonal_profile(img, anti=True), opts),
         "profile_row_column_correlation": _safe_corr(row, col),
         "median_upcrossing_count": _median_upcrossing(img),
     }

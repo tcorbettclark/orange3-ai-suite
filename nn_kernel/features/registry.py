@@ -1,14 +1,13 @@
-"""The single index of features.
+"""The single index of image features.
 
-Each feature is a first-class ``Feature`` object carrying its name, group
-letter, column order and its human-auditable definition sentence (the spec's
-requirement: "every feature is a human-auditable sentence"). One module per
+Each feature is a first-class :class:`Feature` carrying its name, group letter,
+stable column order and human-auditable definition sentence. One module per
 group provides the computation (``compute``) and the declarative metadata
-(``FEATURE_NAMES``, ``DEFINITIONS``); this registry stitches them together
-and validates consistency at import time.
+(``FEATURE_NAMES``, ``DEFINITIONS``); the registry stitches them together and
+validates consistency at import time.
 
-Ablation experiments toggle at the group level (``extract_features(...,
-groups="AD")``) or the individual-feature level (``exclude={...}``).
+Selection happens at group level (``extract_features(..., groups="AD")``) or at
+individual-feature level (``exclude={...}``).
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ from dataclasses import dataclass
 from . import colour, photometry, profiles, spatial, symmetry, texture, topology
 
 GROUP_ORDER = ("A", "B", "C", "D", "E", "F", "G")
-DEFAULT_GROUPS = "ABCDEF"  # the colour trap group is opt-in (spec §2)
+DEFAULT_GROUPS = "ABCDEF"  # the colour shortcut group is opt-in
 
 _MODULES = {
     "A": photometry,
@@ -33,10 +32,10 @@ _MODULES = {
 
 @dataclass(frozen=True)
 class Feature:
-    """One image feature: identity, provenance, order, and definition."""
+    """One image feature: identity, group, column order and definition."""
 
     name: str
-    group: str  # "A".."F"
+    group: str  # "A".."G"
     definition: str  # the human-auditable sentence
     index: int  # stable column order across the whole suite
 
@@ -93,6 +92,5 @@ def get_feature(name: str) -> Feature:
         return FEATURES[name]
     except KeyError:
         raise ValueError(
-            f"unknown feature {name!r}; see all_feature_names() "
-            f"({len(FEATURES)} available)"
+            f"unknown feature {name!r}; see all_feature_names() ({len(FEATURES)} available)"
         ) from None

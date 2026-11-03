@@ -2,9 +2,8 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions
-from nn_kernel.features import profiles
-from synth import band_image, slope_image, uniform_image, vertical_bar_image
+from nn_kernel.features import FeatureOptions, profiles
+from synth import band_image, uniform_image, vertical_bar_image
 
 OPTS = FeatureOptions()
 
@@ -31,7 +30,7 @@ def test_vertical_bands_two_column_peaks():
 def test_prominence_threshold_rejects_shallow_ripples():
     # Two bands plus a shallow bump of height 0.05 on a dynamic range of 1.0:
     # a 0.05 prominence shoulder must not count as a third peak, but raising
-    # the sensitivity override must surface it (the spec's "one peak with
+    # the sensitivity override must surface it (the "one peak with
     # shoulder vs two peaks" scale-space concern, kept as continuous policy).
     prof = np.zeros((128, 128), dtype=np.float32)
     prof[20:40] = 1.0

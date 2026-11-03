@@ -1,7 +1,5 @@
 """Vocab Inspector widget: read-only, model-or-data input, NO outputs."""
 
-import pytest
-
 from nn_suite.widgets.ow_vocab_inspector import OWVocabInspector
 
 
@@ -46,7 +44,7 @@ def test_model_without_tokenizer_warns(qapp):
 
 
 def test_inspector_declares_no_outputs(qapp):
-    # spec §4.4: the inspector never enters the pipeline — no output signals
+    # the inspector never enters the pipeline: no output signals
     from orangewidget.widget import Output
 
     outputs = getattr(OWVocabInspector, "Outputs", None)
@@ -57,8 +55,8 @@ def test_inspector_declares_no_outputs(qapp):
 
 
 def test_textless_data_warns(qapp):
-    from Orange.data import Domain, ContinuousVariable, Table
     import numpy as np
+    from Orange.data import ContinuousVariable, Domain, Table
 
     dom = Domain([ContinuousVariable("x")])
     table = Table.from_numpy(dom, np.arange(4.0).reshape(-1, 1))

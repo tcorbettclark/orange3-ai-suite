@@ -1,26 +1,22 @@
-"""Training entry point: corpus + options -> LanguageModel with embedded tokenizer.
+"""Training entry point: corpus + options -> a :class:`LanguageModel`.
 
-Spec commitments (tiny-lm-suite-design.md §4.1):
-- train/val split (~10%) is mandatory — train/val divergence IS the
-  overfitting lesson on a tiny corpus (enforced here, not left to the widget);
-- optimizer is Adam;
-- live feedback: the kernel accepts a plain per-epoch hook (dict of epoch,
-  loss, val_loss, perplexities) — the widget wraps it in a Keras callback;
-  the kernel itself never sees Qt.
+Training always uses a sentence-level train/validation split; train/validation
+divergence is the overfitting lesson on a tiny corpus. The optimizer is Adam.
+The kernel accepts a plain per-epoch hook, so the widget layer can stream
+loss/perplexity without the kernel ever seeing Qt.
 """
 
 from __future__ import annotations
 
 import math
 from collections.abc import Callable, Iterable
-from typing import Any
 
 from .builders import ARCHITECTURES, build_model, compile_model
 from .models import LanguageModel
 from .tokenizer import Tokenizer
 from .windowing import make_windows
 
-EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity}
+EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity[, sample]}
 
 
 def train_language_model(
@@ -46,13 +42,12 @@ def train_language_model(
 ) -> LanguageModel:
     """Build windows, split by sentence, train, and return a LanguageModel.
 
-    ``stop_requested``: checked after every epoch; when it returns True the
-    Keras training loop stops cleanly (the widget's Stop button).
+    ``stop_requested`` is checked after every epoch; when it returns True the
+    Keras loop stops cleanly (the widget's Stop button).
 
-    When ``sample_temperature`` is not None, the hook's stats dict also
-    carries ``"sample"`` — text generated from ``sample_prompt`` with the
-    in-training model at each epoch (the checkpoint table: gibberish ->
-    domain pastiche). The sampling loop lives here, in the kernel.
+    When ``sample_temperature`` is not None, the hook's stats dict also carries
+    ``"sample"`` - text generated from ``sample_prompt`` with the in-training
+    model at each epoch (the checkpoint table).
     """
     if architecture not in ARCHITECTURES:
         raise ValueError(f"architecture must be one of {ARCHITECTURES}, got {architecture!r}")
@@ -80,18 +75,7 @@ def train_language_model(
 
     callbacks = []
     if on_epoch is not None or stop_requested is not None:
-        import keras  # local: callback subclassing needs the real keras type
-
-        class _EpochCallback(keras.callbacks.Callback):
-            def __init__(self, emit, stop_requested):
-                super().__init__()
-                self._emit = emit
-                self._stop_requested = stop_requested
-
-            def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
-                if self._stop_requested is not None and self._stop_requested():
-                    self.model.stop_training = True  # clean Keras early stop
-                self._emit(epoch, logs or {})
+        import keras  # local: callback subclassing needs the real Keras type
 
         def _emit(epoch: int, logs: dict) -> None:
             loss = logs.get("loss")
@@ -101,40 +85,38 @@ def train_language_model(
                 "loss": float(loss) if loss is not None else float("nan"),
                 "val_loss": float(val_loss) if val_loss is not None else float("nan"),
                 "perplexity": math.exp(loss) if loss is not None else float("nan"),
-                "val_perplexity": (
-                    math.exp(val_loss) if val_loss is not None else float("nan")
-                ),
+                "val_perplexity": (math.exp(val_loss) if val_loss is not None else float("nan")),
             }
             if sample_temperature is not None:
-                transient = LanguageModel(
-                    architecture, tokenizer, context_size, keras_model, {}
-                )
+                transient = LanguageModel(architecture, tokenizer, context_size, keras_model, {})
                 stats["sample"] = transient.generate(
                     sample_prompt, sample_temperature, sample_max_new_tokens, sample_seed
                 )
             on_epoch(stats)
 
-        callbacks.append(_EpochCallback(_emit, stop_requested))
+        class _EpochCallback(keras.callbacks.Callback):
+            def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
+                if stop_requested is not None and stop_requested():
+                    self.model.stop_training = True  # clean Keras early stop
+                if on_epoch is not None:
+                    _emit(epoch, logs or {})
+
+        callbacks.append(_EpochCallback())
 
     # Bigram honours "context of 1": only the last token of a window enters
     # the model (builders.py documents this).
-    if architecture == "bigram":
-        def model_input(win):
-            return win.contexts[:, -1:]
-    else:
-        def model_input(win):
-            return win.contexts
+    def model_input(win):
+        return win.contexts[:, -1:] if architecture == "bigram" else win.contexts
 
-    history = keras_fit(
-        keras_model,
+    history = keras_model.fit(
         model_input(train),
         train.targets,
-        (model_input(val), val.targets),
+        validation_data=(model_input(val), val.targets),
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
         verbose=0,
-    )
+    ).history
 
     return LanguageModel(
         architecture=architecture,
@@ -161,18 +143,3 @@ def train_language_model(
             "final_val_loss": float(history["val_loss"][-1]),
         },
     )
-
-
-def keras_fit(keras_model: Any, x, y, validation_data, *, epochs, batch_size, callbacks, verbose):
-    """Thin Keras call kept in one place so the widget layer never reimplements it."""
-    import keras  # local import, consistent with models.py
-
-    return keras_model.fit(
-        x,
-        y,
-        validation_data=validation_data,
-        epochs=epochs,
-        batch_size=batch_size,
-        callbacks=callbacks,
-        verbose=verbose,
-    ).history

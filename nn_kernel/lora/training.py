@@ -1,18 +1,17 @@
-"""LoRA training: data preparation (the two teaching formats) + streaming run.
+"""LoRA training: the two data formats and the streaming run.
 
-Two data formats, two distinct lessons, one mechanism (spec §4.3):
-1. **Raw domain corpus** → *continued pre-training*: self-supervised
+Two data formats teach two distinct lessons through one mechanism:
+
+1. **Raw domain corpus -> continued pre-training.** Self-supervised
    next-token loss; rows are ``{"text": ...}``.
-2. **Prompt–response pairs** → *true SFT*: supervised because a human
-   authored x and y to encode intent. Rows ``{"prompt": ..., "completion":
-   ...}``; **prompt masking** (loss on completion tokens only) is native in
-   mlx-lm for exactly this format — the loss is the same cross-entropy, the
-   supervision lives in the data format.
+2. **Prompt-response pairs -> supervised fine-tuning.** The supervision lives
+   in the data format, not in the loss: a human authored the prompt and the
+   completion. Rows are ``{"prompt": ..., "completion": ...}`` and mlx-lm
+   masks the prompt tokens, so loss is computed on the completion only.
 
-Training drives the documented `python -m mlx_lm lora` command in a
-subprocess whose stdout streams parsed metrics through ``on_metric`` (the
-widget's live-loss callback); ``stop_requested`` terminates the child
-cleanly (the widget's Stop button).
+Training runs ``python -m mlx_lm lora`` in a subprocess. Its stdout is parsed
+into metric dicts for the widget's live loss curve, and ``stop_requested``
+terminates the child process cleanly (the widget's Stop button).
 """
 
 from __future__ import annotations
@@ -24,9 +23,9 @@ import signal
 import subprocess
 import sys
 import threading
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable
 
 from .model import LoRAAdapter
 
@@ -38,7 +37,7 @@ _VAL_ROW = re.compile(r"^\s*(\d+)\s+val\s+([\d.]+)\s+([\d.]+s)\s*$")
 
 @dataclass
 class LoraOptions:
-    """Defaults = the reference run recipe (dry run measured; see README)."""
+    """Hyperparameters for a classroom-sized 4-bit QLoRA run."""
 
     iters: int = 300
     learning_rate: float = 1e-4
@@ -49,6 +48,15 @@ class LoraOptions:
     steps_per_eval: int = 50
     seed: int = 42
     fine_tune_type: str = "lora"
+
+
+def _n_valid(n: int, valid_fraction: float) -> int:
+    """Validation rows for a fraction in [0, 1); always leave at least one train row."""
+    if not 0.0 <= valid_fraction < 1.0:
+        raise ValueError("valid_fraction must be in [0, 1)")
+    if valid_fraction == 0.0 or n < 2:
+        return 0
+    return min(max(1, round(n * valid_fraction)), n - 1)
 
 
 @dataclass
@@ -63,20 +71,16 @@ class LoraData:
     def from_texts(cls, texts: Iterable[str], valid_fraction: float = 0.1):
         texts = [t for t in texts if t and t.strip()]
         if len(texts) < 2:
-            raise ValueError("need at least 2 texts (train+valid)")
-        if not 0.0 <= valid_fraction < 1.0:
-            raise ValueError("valid_fraction in [0, 1)")
-        n_valid = min(max(1, round(len(texts) * valid_fraction)), len(texts) - 1)
-        # train first, valid from the tail — deterministic, and the majority
-        # of the corpus must be train
+            raise ValueError("need at least 2 texts (train + valid)")
+        n_valid = _n_valid(len(texts), valid_fraction)
         return cls("text", texts[: len(texts) - n_valid], texts[len(texts) - n_valid :])
 
     @classmethod
     def from_pairs(cls, pairs: Iterable[tuple[str, str]], valid_fraction: float = 0.1):
         pairs = [(str(p), str(c)) for p, c in pairs if p.strip() and c.strip()]
         if len(pairs) < 4:
-            raise ValueError("need at least 4 prompt–completion pairs (SFT)")
-        n_valid = max(1, round(len(pairs) * valid_fraction))
+            raise ValueError("need at least 4 prompt-completion pairs (SFT)")
+        n_valid = _n_valid(len(pairs), valid_fraction)
         return cls("pairs", pairs[: len(pairs) - n_valid], pairs[len(pairs) - n_valid :])
 
     def stage(self, directory: str | Path) -> Path:
@@ -91,10 +95,7 @@ class LoraData:
                         f.write(json.dumps({"text": row}) + "\n")
                     else:
                         prompt, completion = row
-                        f.write(
-                            json.dumps({"prompt": prompt, "completion": completion})
-                            + "\n"
-                        )
+                        f.write(json.dumps({"prompt": prompt, "completion": completion}) + "\n")
         return directory
 
 
@@ -103,8 +104,12 @@ def stream_metrics(line: str) -> dict | None:
     line = _ANSI.sub("", line.rstrip("\n"))
     m = _TRAIN_ROW.match(line)
     if m:
-        return {"iter": int(m.group(1)), "loss": float(m.group(2)),
-                "tok_s": int(m.group(3)), "kind": "train"}
+        return {
+            "iter": int(m.group(1)),
+            "loss": float(m.group(2)),
+            "tok_s": int(m.group(3)),
+            "kind": "train",
+        }
     m = _VAL_ROW.match(line)
     if m:
         return {"iter": int(m.group(1)), "loss": float(m.group(2)), "kind": "val"}
@@ -120,7 +125,6 @@ def train_lora(
     on_line: Callable[[str], None] | None = None,
     stop_requested: Callable[[], bool] | None = None,
     data_dir: str | Path | None = None,
-    report_iterable: int | None = None,  # placeholder; CLI covers reporting cadence
 ) -> LoRAAdapter:
     """Run QLoRA training; stream metrics; return the adapter artifact.
 
@@ -131,37 +135,54 @@ def train_lora(
     if len(data.valid) < opts.batch_size and opts.iters > 0:
         raise ValueError(
             f"valid split has {len(data.valid)} rows but batch_size is "
-            f"{opts.batch_size} — mlx-lm requires the valid split to hold at "
+            f"{opts.batch_size} - mlx-lm requires the valid split to hold at "
             "least one full batch; add data or reduce batch_size"
         )
-    staged = data.stage(
-        data_dir or Path(adapter_dir).with_suffix(".data")
-    )
+    staged = data.stage(data_dir or Path(adapter_dir).with_suffix(".data"))
     adapter_dir = Path(adapter_dir)
     adapter_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        sys.executable, "-m", "mlx_lm", "lora",
-        "--model", str(base_model),
+        sys.executable,
+        "-m",
+        "mlx_lm",
+        "lora",
+        "--model",
+        str(base_model),
         "--train",
-        "--data", str(staged),
-        "--adapter-path", str(adapter_dir),
-        "--iters", str(opts.iters),
-        "--learning-rate", str(opts.learning_rate),
-        "--num-layers", str(opts.num_layers),
-        "--batch-size", str(opts.batch_size),
-        "--max-seq-length", str(opts.max_seq_length),
-        "--steps-per-report", str(opts.steps_per_report),
-        "--steps-per-eval", str(opts.steps_per_eval),
-        "--seed", str(opts.seed),
-        "--fine-tune-type", opts.fine_tune_type,
+        "--data",
+        str(staged),
+        "--adapter-path",
+        str(adapter_dir),
+        "--iters",
+        str(opts.iters),
+        "--learning-rate",
+        str(opts.learning_rate),
+        "--num-layers",
+        str(opts.num_layers),
+        "--batch-size",
+        str(opts.batch_size),
+        "--max-seq-length",
+        str(opts.max_seq_length),
+        "--steps-per-report",
+        str(opts.steps_per_report),
+        "--steps-per-eval",
+        str(opts.steps_per_eval),
+        "--seed",
+        str(opts.seed),
+        "--fine-tune-type",
+        opts.fine_tune_type,
     ]
 
     env = dict(os.environ, PYTHONUNBUFFERED="1")
     tail: list[str] = []
     process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, env=env, start_new_session=True,
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+        start_new_session=True,
     )
     try:
         reader = threading.Thread(
@@ -176,9 +197,7 @@ def train_lora(
         reader.join(timeout=10)
         if process.returncode not in (0, None, -signal.SIGTERM):
             tail_text = "".join(tail[-20:])
-            raise RuntimeError(
-                f"mlx_lm lora failed ({process.returncode}):\n{tail_text}"
-            )
+            raise RuntimeError(f"mlx_lm lora failed ({process.returncode}):\n{tail_text}")
     finally:
         if process.poll() is None:
             try:
@@ -195,18 +214,26 @@ def train_lora(
         base_model=str(base_model),
         adapter_path=str(adapter_dir),
         hyperparameters={
-            **{k: getattr(opts, k) for k in
-               ("iters", "learning_rate", "num_layers", "batch_size",
-                "max_seq_length", "seed", "fine_tune_type")},
+            **{
+                k: getattr(opts, k)
+                for k in (
+                    "iters",
+                    "learning_rate",
+                    "num_layers",
+                    "batch_size",
+                    "max_seq_length",
+                    "seed",
+                    "fine_tune_type",
+                )
+            },
             "adapter_config": adapter_config,
         },
         name=adapter_dir.name,
     )
 
 
-def _pump(process, tail: list[str], on_metric, on_line):
-    """Stream the child's stdout (a background thread of *this* process);
-    keeps the last lines of output for error reporting."""
+def _pump(process, tail: list[str], on_metric, on_line) -> None:
+    """Stream the child's stdout; keep the last lines for error reporting."""
     for line in process.stdout:  # type: ignore[union-attr]
         tail.append(line)
         if len(tail) > 200:

@@ -1,4 +1,4 @@
-"""Configuration for feature extraction and preprocessing."""
+"""Configuration for image preprocessing and feature extraction."""
 
 from __future__ import annotations
 
@@ -14,25 +14,24 @@ class FeatureOptions:
     working_size:
         Images are centre-cropped to a square and resized to
         ``working_size x working_size`` before feature computation, so
-        features are comparable across images (agreed 2025, spec Q4).
-        ``None`` keeps native resolution.
+        features are comparable across images. ``None`` keeps native
+        resolution.
     centre_crop:
         Crop to the central square before resizing.
     contrast_normalise:
         Robust percentile normalisation to [0, 1] (p1-p99 clip-and-scale).
     denoise:
-        Median-filter denoising before normalisation. The strength is an
-        explicit scale parameter (spec §2: denoising must not silently erase
-        signal) — the kernel never denoises unless asked.
+        Median-filter denoising before normalisation. Denoising is off by
+        default and its strength is explicit: it must never silently erase the
+        signal being measured.
     denoise_ksize:
         Median filter kernel size, clamped to {3, 5} (float-image limit).
     peak_prominence_frac:
         Prominence threshold for all peak-count features, as a fraction of
-        the profile's dynamic range (agreed Q1, default 0.10).
+        the profile's dynamic range.
     edge_density_frac:
-        Edge-density threshold as a fraction of the image's own gradient
-        p99 (see features/README.md on why a fixed percentile would be
-        degenerate).
+        Edge-density threshold as a fraction of the image's own gradient p99.
+        A fixed percentile would return the same density for every image.
     """
 
     working_size: int | None = 128

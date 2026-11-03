@@ -11,7 +11,7 @@ __all__ = [
     "OWImageFeatureExtractor",
     "OWLMGenerator",
     "OWLMTrainer",
-    "OWNeuralNetworkViewer",
     "OWLoRATrainer",
+    "OWNeuralNetworkViewer",
     "OWVocabInspector",
 ]

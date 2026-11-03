@@ -1,19 +1,17 @@
-"""Widget test fixtures: offscreen Qt, no display needed (nnviewer precedent).
+"""Widget test fixtures: offscreen Qt, no display needed.
 
 This directory is only collected when the Orange interpreter runs the suite
 (see root conftest.py), so importing Orange is safe here — but the conftest
 itself is still IMPORTED when a plain Python runs pytest, so bail cleanly.
 """
 
-import importlib.util
-
 import pytest
 
 
 def _orange_usable() -> bool:
     try:
-        import Orange  # noqa: F401
         import AnyQt.QtWidgets  # noqa: F401
+        import Orange  # noqa: F401
 
         return True
     except Exception:
@@ -23,7 +21,7 @@ def _orange_usable() -> bool:
 if not _orange_usable():
     pytest.skip("widget tests need the Orange interpreter", allow_module_level=True)
 
-import os
+import os  # noqa: E402
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # The offscreen platform's font database default family is literally
@@ -32,10 +30,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # canvas runs (cocoa) never show it. Silence it in the test harness only.
 os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.fonts*=false")
 
-import numpy as np
-import pytest
-from AnyQt.QtWidgets import QApplication
-from Orange.data import DiscreteVariable, Domain, StringVariable, Table
+import numpy as np  # noqa: E402
+from AnyQt.QtWidgets import QApplication  # noqa: E402
+from Orange.data import DiscreteVariable, Domain, StringVariable, Table  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -43,7 +40,7 @@ def qapp():
     return QApplication.instance() or QApplication([])
 
 
-# ---- fixtures for the folded orange3-nnviewer tests (tests/widgets/nn_viewer/) ----
+# ---- fixtures for the NN viewer tests (tests/widgets/nn_viewer/) ----
 
 import warnings as _warnings  # noqa: E402
 
@@ -116,7 +113,7 @@ def fire_hover():
 
 @pytest.fixture()
 def widget(qapp, make_model):
-    """An OWNeuralNetworkViewer instance (the folded nn-viewer widget)."""
+    """An OWNeuralNetworkViewer instance."""
     from nn_suite.widgets.ow_nn_viewer import OWNeuralNetworkViewer
 
     w = OWNeuralNetworkViewer()
@@ -174,8 +171,10 @@ def images_table(image_dir):
 @pytest.fixture()
 def qapp_process_events(qapp):
     """Deliver queued cross-thread signals after a worker finishes."""
+
     def _drain():
         qapp.processEvents()
+
     return _drain
 
 
@@ -198,6 +197,7 @@ def text_table(texts):
 @pytest.fixture()
 def capture():
     """Records values sent through an Output signal: `sent = capture(w.Outputs.x)`."""
+
     def _capture(output):
         sent = []
         original = output.send
