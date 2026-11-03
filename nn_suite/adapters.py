@@ -76,6 +76,34 @@ def table_texts(table: Table) -> list[str]:
     ]
 
 
+def table_pairs(table: Table) -> list[tuple[str, str]]:
+    """Prompt–response pairs from a Table (the SFT data format, spec §4.3).
+
+    Looks for columns literally named 'prompt'/'completion' (case-
+    insensitive); otherwise takes the first two string metas in display
+    order. A missing second column is an error.
+    """
+    string_metas = [v for v in table.domain.metas if v.is_string]
+    by_name = {v.name.lower(): v for v in string_metas}
+    prompt_var = by_name.get("prompt") or by_name.get("question")
+    completion_var = by_name.get("completion") or by_name.get("response") \
+        or by_name.get("answer")
+    if prompt_var is None and len(string_metas) < 2 or (
+        prompt_var is not None and completion_var is None
+    ):
+        raise ValueError(
+            "prompt–response pairs need two text columns (named prompt/ "
+            "completion, or the first two text columns)"
+        )
+    prompt_var = prompt_var or string_metas[0]
+    completion_var = completion_var or string_metas[1]
+    return [
+        (str(row[prompt_var]), str(row[completion_var]))
+        for row in table
+        if str(row[prompt_var]).strip() and str(row[completion_var]).strip()
+    ]
+
+
 def generations_table(generations: list[str]) -> Table:
     """Generations as a one-column Table (readable in Corpus Viewer /
     Orange3-Text widgets when that add-on is installed)."""

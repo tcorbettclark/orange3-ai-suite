@@ -81,7 +81,10 @@ packages = ["nn_kernel", "nn_suite"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not slow'"
+markers = [
+    "slow: end-to-end runs needing converted-model loads (~1 min each; run with '-m slow')",
+]
 filterwarnings = [
     # keras 3.15 (<3.16?) predates numpy 2's __array__ copy-keyword protocol;
     # the warning is emitted inside keras.src.backend.tensorflow.core. This is
