@@ -43,8 +43,11 @@ library used headless). The widgets are thin shells; the substance is the kernel
 2. Model-object conventions — the `generate(prompt, temperature)` interface,
    tokenizer-travels-with-model, adapter-serialized-with-base-model — are defined
    in the kernel, so Keras and MLX models interoperate through kernel types.
-3. Widgets declare a pinned kernel dependency (`nn-kernel>=x,<y`); the
-   `mlx-lm` version pin lives inside the kernel's lora extra.
+3. The widgets declare a pinned kernel dependency. **Amended during
+   implementation:** `nn_kernel` is a clean in-repo package *bundled in the
+   single distribution* (one wheel, one install) rather than a separate
+   pip-installable; the per-stage extras (`[image]`, `[lm]`, `[lora]`) live
+   on the one distribution, and the exact-pin policy for MLX is unchanged.
 4. The kernel API is treated as internal-until-stable; no premature generality —
    it is a course kernel with three subpackages, not a framework.
 
@@ -54,7 +57,12 @@ library used headless). The widgets are thin shells; the substance is the kernel
 
 ### `nn-kernel` — the substance
 
-Pure Python package, pip-installable, with extras so students install only what
+**Amended during implementation:** the kernel is a clean package directory
+inside this repository, bundled into the single `orange3-nn-suite` wheel
+(`pyproject.toml`), not a separate distribution. What follows retains the
+original extras design, which now applies to the one distribution:
+
+Pure Python package with extras so students install only what
 each course stage needs:
 
 | Extra | Brings | Used by |

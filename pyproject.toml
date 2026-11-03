@@ -1,0 +1,64 @@
+# orange3-nn-suite packaging.
+#
+# Dependency-pin policy (REPO-CONTEXT.md §5): the *runtime floors below with
+# caps are the development set, proven in the closest packaging precedent
+# (orange3-imagenets v0.0.3, verified 2025-11). At release the Keras-in-Orange
+# and MLX surfaces are pinned to exact versions.
+#
+# Layout decision (recorded in spec/nn-suite-architecture.md): nn_kernel is a
+# plain in-repo package *bundled in this single distribution* — not a separate
+# pip-installable. There is exactly one wheel, one install, one category.
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "orange3-nn-suite"
+version = "0.0.1"
+description = "Teaching neural networks and LLMs inside Orange: interpretable image features, tiny Keras language models, MLX LoRA fine-tuning."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+
+# Base: what the pure-Python kernel needs regardless of course stage.
+# numpy/scipy are also pulled in by Orange itself, so this costs nothing in
+# the Orange environment and keeps plain-Python kernel tests runnable.
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+# One extra per course stage (architecture doc §3); the add-on widgets degrade
+# gracefully with a "install orange3-nn-suite[image]" style message.
+image = [
+    "opencv-python-headless>=4.12,<5",
+]
+# Proven-in-widget combo (orange3-imagenets v0.0.3); no explicit tensorflow —
+# tf-keras brings it. Pin exact at release.
+lm = [
+    "keras>=3.10.0",
+    "tf-keras>=2.19.0",
+]
+# ACTION ITEM (architecture doc §8.3): pin `mlx-lm[train]` to the exact
+# version recorded at the first successful BritLLM dry run; policy is exact
+# pin only, so the extra stays commented out until then. Intended shape:
+# lora = [
+#     'mlx-lm[train]==<pinned-at-dry-run>; platform_machine == "arm64" and sys_platform == "darwin"',
+# ]
+
+# Development-only tooling (PEP 735 group, installed by `uv sync` by default).
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "opencv-python-headless>=4.12,<5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["nn_kernel"]
+# The Orange add-on package joins this list when the widget layer is built.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
