@@ -89,12 +89,20 @@ different image. The preview shows the preprocessed luminance and its row and
 column profiles. This makes a feature like `row_profile_peaks` visible: the
 peaks in the red or blue curve are the bands the feature counts.
 
-## 6. Optional: feature scaling
+## 6. Optional: scale features correctly
 
-Tick **Scale features** and compare. The option z-scores the whole output
-table. That is convenient for learners that are sensitive to scale, but the
-statistics come from the whole table, so it can leak information across
-cross-validation folds. Keep that caveat in mind when reading the result.
+Some learners are sensitive to feature scale. Do not z-score the whole output
+table before evaluation; that leaks statistics across validation folds.
+
+Instead:
+
+1. Add **Preprocess** and put a **Normalize** step in its pipeline.
+2. Connect *Image Feature Extractor* **Features** → *Preprocess* **Data**.
+3. Connect *Preprocess* **Preprocessor** → *Test & Score* **Preprocessor**.
+
+Test & Score then fits the normalisation inside each fold. The same
+**Preprocessed Data** output can feed a learner outside Test & Score when you
+do not need cross-validation.
 
 ## Checkpoint
 

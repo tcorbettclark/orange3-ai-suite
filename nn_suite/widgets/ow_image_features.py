@@ -125,7 +125,6 @@ class OWImageFeatureExtractor(OWWidget):
     peak_prominence_frac = Setting(0.10)
     edge_density_frac = Setting(0.50)
     groups_enabled = Setting("ABCDEF")
-    scale_features = Setting(False)
     preview_index = Setting(0)
 
     def __init__(self):
@@ -210,14 +209,6 @@ class OWImageFeatureExtractor(OWWidget):
 
         gui.auto_commit(
             self.controlArea, self, "auto_apply", "Extract features", commit=self.commit
-        )
-        gui.checkBox(
-            self.controlArea,
-            self,
-            "scale_features",
-            "Scale features (z-score, whole-batch; statistics come from the "
-            "whole table, so keep Test & Score's folds in mind)",
-            callback=self._defer_commit,
         )
 
         self._setup_preview()
@@ -477,9 +468,6 @@ class OWImageFeatureExtractor(OWWidget):
         ]
         columns = {name: i for i, name in enumerate(feature_cache.names)}
         values = feature_cache.values[:, [columns[name] for name in ordered]]
-        if self.scale_features and len(values) > 1:
-            stds = values.std(axis=0)
-            values = (values - values.mean(axis=0)) / np.where(stds < 1e-12, 1.0, stds)
         source = self.data.domain
         kept_idx = np.asarray(image_cache.readable_source, dtype=int)
         domain = Domain(
