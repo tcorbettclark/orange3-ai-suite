@@ -25,7 +25,9 @@ class FeatureOptions:
         default and its strength is explicit: it must never silently erase the
         signal being measured.
     denoise_ksize:
-        Median filter kernel size, clamped to {3, 5} (float-image limit).
+        Median filter kernel size. It must be odd and at least 3: 1 is a
+        no-op and even kernels are invalid for a median filter. Values are
+        clamped to 3-5, with even values rounded up (4 becomes 5).
     peak_prominence_frac:
         Prominence threshold for all peak-count features, as a fraction of
         the profile's dynamic range.

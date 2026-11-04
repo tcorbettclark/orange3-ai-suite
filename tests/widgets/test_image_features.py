@@ -209,18 +209,30 @@ def test_cache_reuses_features_for_groups_and_preprocessing(
     assert calls[5:] == ["ABCDEFG"] * 5
 
 
-def test_commit_controls_are_compact(qapp):
-    from AnyQt.QtWidgets import QSizePolicy
+def test_working_size_line_edit_applies_on_enter(qapp, capture, images_table):
+    from AnyQt.QtWidgets import QLineEdit
 
     w = OWImageFeatureExtractor()
     w.show()
-    assert w._auto_check.text() == "Apply automatically"
-    assert w._apply_button.text() == "Extract"
-    assert w._apply_button.sizePolicy().horizontalPolicy() == QSizePolicy.Maximum
-    assert w._apply_button.parentWidget() is w.controlArea
-    assert w._auto_check.parentWidget() is w.controlArea
-    layout = w.controlArea.layout()
-    assert layout.indexOf(w._apply_button) < layout.indexOf(w._auto_check)
+    assert isinstance(w._working_size_edit, QLineEdit)
+    assert w._working_size_edit.text() == "128"
+    assert not hasattr(w, "_apply_button")
+    assert not hasattr(w, "_auto_check")
+    assert not hasattr(w, "denoise_ksize")  # fixed at the kernel default
+
+    sent = capture(w.Outputs.features)
+    w.set_data(images_table)
+    w.commit.now()
+    w.wait_for_extraction()
+    assert sent[-1] is not None
+
+    edit = w._working_size_edit
+    edit.setText("64")
+    edit.textEdited.emit("64")  # what typing does; setText resets the flag
+    edit.returnPressed.emit()
+    w.wait_for_extraction()
+    assert w.working_size == 64
+    assert sent[-1] is not None
 
 
 def test_widget_keeps_kernel_feature_parameter_defaults(qapp):

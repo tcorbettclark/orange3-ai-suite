@@ -18,15 +18,16 @@ from dataclasses import dataclass
 
 import numpy as np
 from AnyQt.QtCore import QSignalBlocker, QSize, Qt, QThread, pyqtSignal
-from AnyQt.QtGui import QBrush, QColor, QIcon, QImage, QImageReader, QPixmap
+from AnyQt.QtGui import QBrush, QColor, QIcon, QImage, QImageReader, QIntValidator, QPixmap
 from AnyQt.QtWidgets import (
     QCheckBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListView,
     QListWidget,
     QListWidgetItem,
-    QSizePolicy,
     QSplitter,
     QTreeWidget,
     QTreeWidgetItem,
@@ -300,12 +301,10 @@ class OWImageFeatureExtractor(OWWidget):
         extraction_failed = Msg("Feature extraction failed:\n{}")
 
     # settings
-    auto_apply = Setting(True)
     working_size = Setting(128)
     centre_crop = Setting(True)
     contrast_normalise = Setting(True)
     denoise = Setting(False)
-    denoise_ksize = Setting(3)
     groups_enabled = Setting("ABCDEF")
     selected_index = Setting(0)
 
@@ -327,46 +326,41 @@ class OWImageFeatureExtractor(OWWidget):
         self._restart_pending = False
         self._last_result: _WorkerResult | None = None
         self._progress_active = False
+        self._working_size_dirty = False
 
         prep_box = gui.widgetBox(self.controlArea, "Preprocessing")
-        gui.spin(
-            prep_box,
-            self,
-            "working_size",
-            32,
-            512,
-            label="Working size (square)",
-            callback=self._defer_commit,
-        )
+        size_row = QHBoxLayout()
+        prep_box.layout().addLayout(size_row)
+        size_row.addWidget(QLabel("Working size (square)"))
+        self._working_size_edit = QLineEdit()
+        self._working_size_edit.setValidator(QIntValidator(32, 512, self))
+        self._working_size_edit.setText(str(self.working_size))
+        self._working_size_edit.setFixedWidth(70)
+        self._working_size_edit.textEdited.connect(self._working_size_edited)
+        self._working_size_edit.returnPressed.connect(self._apply_working_size)
+        self._working_size_edit.editingFinished.connect(self._apply_working_size)
+        size_row.addWidget(self._working_size_edit)
+        size_row.addStretch(1)
         gui.checkBox(
             prep_box,
             self,
             "centre_crop",
             "Centre-crop to square",
-            callback=self._defer_commit,
+            callback=self._apply,
         )
         gui.checkBox(
             prep_box,
             self,
             "contrast_normalise",
             "Contrast-normalise",
-            callback=self._defer_commit,
+            callback=self._apply,
         )
         gui.checkBox(
             prep_box,
             self,
             "denoise",
             "Denoise (median filter)",
-            callback=self._defer_commit,
-        )
-        gui.spin(
-            prep_box,
-            self,
-            "denoise_ksize",
-            3,
-            5,
-            label="Denoise strength",
-            callback=self._defer_commit,
+            callback=self._apply,
         )
 
         group_box = gui.widgetBox(self.controlArea, "Feature groups (ablation)")
@@ -379,47 +373,44 @@ class OWImageFeatureExtractor(OWWidget):
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
 
-        self._apply_button = gui.button(
-            self.controlArea, self, "Extract", callback=self._commit_now
-        )
-        self._apply_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        self._auto_check = gui.checkBox(
-            self.controlArea,
-            self,
-            "auto_apply",
-            "Apply automatically",
-            callback=self._auto_toggled,
-        )
-        self.commit.now = self._commit_now
-        self.commit.deferred = self._defer_commit
+        self.controlArea.layout().addStretch(1)
+        self.commit.now = self._apply
+        self.commit.deferred = self._apply
 
         self._setup_grid()
         self.resize(1100, 750)
 
-    def _commit_now(self):
+    def _apply(self):
         self.commit.call()
-        self.commit.dirty = False
+
+    def _working_size_edited(self, _text: str):
+        self._working_size_dirty = True
+
+    def _apply_working_size(self):
+        if not self._working_size_dirty:
+            return
+        self._working_size_dirty = False
+        try:
+            value = int(self._working_size_edit.text().strip())
+        except ValueError:
+            self._working_size_edit.setText(str(self.working_size))
+            return
+        value = max(32, min(512, value))
+        self._working_size_edit.setText(str(value))
+        if value != self.working_size:
+            self.working_size = value
+            self._apply()
 
     def _set_progress(self, value: int):
         if self._progress_active:
             self.progressBarSet(value)
-
-    def _defer_commit(self):
-        if self.auto_apply:
-            self._commit_now()
-        else:
-            self.commit.dirty = True
-
-    def _auto_toggled(self):
-        if self.auto_apply and self.commit.dirty:
-            self._commit_now()
 
     def _sync_group_settings(self):
         self.groups_enabled = "".join(
             letter for letter, _ in GROUP_LABELS if self._group_checks[letter].isChecked()
         )
         self._refresh_panel()
-        self._defer_commit()
+        self._apply()
 
     # ---- image grid --------------------------------------------------------
 
@@ -558,11 +549,7 @@ class OWImageFeatureExtractor(OWWidget):
             return
         cache = self._current_feature_cache()
         if cache is None:
-            if self._worker is not None and self._worker.isRunning():
-                state = "extracting features..."
-            else:
-                state = "extract features to inspect values."
-            self._panel_title.setText(f"{prefix} — {state}")
+            self._panel_title.setText(prefix)
             return
         if source not in self._feature_row_by_source:
             self._panel_title.setText(f"{prefix} — image could not be read.")
@@ -658,14 +645,8 @@ class OWImageFeatureExtractor(OWWidget):
         self._clear_histogram()
         cache = self._current_feature_cache()
         row = self._selected_feature_row()
-        if cache is None:
-            if self._worker is not None and self._worker.isRunning():
-                self._histogram_caption.setText("Extracting features...")
-            else:
-                self._histogram_caption.setText("Extract features to see the distribution.")
-            return
-        if row is None:
-            self._histogram_caption.setText("No feature values for this image.")
+        if cache is None or row is None:
+            self._histogram_caption.setText("")
             return
         try:
             column = cache.names.index(feature_name)
@@ -833,7 +814,6 @@ class OWImageFeatureExtractor(OWWidget):
             centre_crop=self.centre_crop,
             contrast_normalise=self.contrast_normalise,
             denoise=self.denoise,
-            denoise_ksize=self.denoise_ksize,
         )
 
     def _preprocess_key(self) -> tuple:
@@ -842,7 +822,6 @@ class OWImageFeatureExtractor(OWWidget):
             self.centre_crop,
             self.contrast_normalise,
             self.denoise,
-            self.denoise_ksize,
         )
 
     @Inputs.images

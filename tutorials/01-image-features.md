@@ -23,7 +23,8 @@ button and choose `demo/mnist/train`.
 **From scratch:**
 
 1. Add **Import Images** and point it at `demo/mnist/train`.
-2. Add **Image Feature Extractor** and connect *Import Images* **Data** to its
+2. Add **Image Feature Extractor**, set the working size to 56 (type the
+   number and press Enter), and connect *Import Images* **Data** to its
    **Images** input.
 3. Add **Test & Score**, **Confusion Matrix**, **Data Table** and
    **Column Statistics**.

@@ -24,7 +24,8 @@ button and choose `data/clouds`.
 **From scratch:**
 
 1. **Import Images** → folder `data/clouds`.
-2. **Image Feature Extractor**, working size 128.
+2. **Image Feature Extractor**: set working size to 128 (type the number and
+   press Enter).
 3. **Test & Score**, **Confusion Matrix**, **Data Table**, **Column
    Statistics**.
 4. **Neural Network**, **Tree** and **Logistic Regression**.

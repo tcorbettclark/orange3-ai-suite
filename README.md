@@ -84,7 +84,8 @@ row per readable image. Class variables and meta columns are inherited, and the
 image path is kept as a meta column so any row can be traced back to its source.
 
 Controls cover preprocessing (working size, centre crop, contrast
-normalisation, optional median denoising) and feature groups A-G. Toggling
+normalisation, optional median denoising) and feature groups A-G. Changes apply
+automatically; type a working size and press Enter to reprocess. Toggling
 groups is the ablation experiment; group G (colour) is the opt-in shortcut
 demonstration. The main area shows every input image as a thumbnail, with the
 total count and the current selection in the header. The right-hand panel shows

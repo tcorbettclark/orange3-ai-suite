@@ -120,8 +120,7 @@ links.
 ## 5. Controls that apply automatically, and controls that do not
 
 - **Image Feature Extractor**: preprocessing and group changes apply
-  automatically when **Extract features Automatically** is ticked. Otherwise
-  press **Extract features**.
+  automatically. Type a new working size and press Enter to reprocess.
 - **LM Trainer** and **LoRA Trainer**: set the options, then press **Train**.
   **Stop** ends a run early and keeps what has been learned so far.
 - **LM Generator**: press **Generate** after changing the prompt or sampling
