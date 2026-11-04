@@ -174,6 +174,10 @@ class OWLMText(OWWidget):
         self.controlArea.layout().addWidget(self._stats)
         self.controlArea.layout().addStretch(1)
 
+        self._preview_label = QLabel("No rows.")
+        self._preview_label.setWordWrap(True)
+        self.mainArea.layout().addWidget(self._preview_label)
+
         splitter = QSplitter(Qt.Vertical, self.mainArea)
         self.mainArea.layout().addWidget(splitter)
         self._table = QTableWidget()
@@ -355,6 +359,16 @@ class OWLMText(OWWidget):
 
     def _populate_preview(self):
         self._table.clear()
+        total = len(self._rows)
+        if not total:
+            self._preview_label.setText("No rows.")
+        elif total <= PREVIEW_ROWS:
+            self._preview_label.setText(f"Showing all {total:,} rows.")
+        else:
+            self._preview_label.setText(
+                f"Showing the first {PREVIEW_ROWS:,} of {total:,} rows. "
+                f"The Data output contains all {total:,} rows."
+            )
         if self.table_mode == 0:
             headers = ("Source", "Text")
         else:

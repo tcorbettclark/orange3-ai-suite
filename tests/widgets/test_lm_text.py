@@ -91,6 +91,25 @@ def test_reload_reads_changed_file(qapp, capture, tmp_path):
     assert len(sent[-1]) == 3
 
 
+def test_preview_is_capped_with_explanation(qapp, capture, tmp_path):
+    path = _write(
+        tmp_path / "many.txt",
+        "\n".join(f"line {i}" for i in range(205)),
+    )
+    w = OWLMText()
+    w.show()
+    sent = capture(w.Outputs.data)
+    w.source_type = 0
+    w.split_mode = 2  # lines
+    w._path_edit.setText(str(path))
+    w._reload()
+
+    assert len(sent[-1]) == 205
+    assert w._table.rowCount() == 200
+    assert "first 200 of 205" in w._preview_label.text()
+    assert "Data output contains all 205" in w._preview_label.text()
+
+
 def test_gutenberg_cleaning_is_applied(qapp, capture, tmp_path):
     path = _write(
         tmp_path / "gutenberg.txt",
