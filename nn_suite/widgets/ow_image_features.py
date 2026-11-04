@@ -125,21 +125,29 @@ class OWImageFeatureExtractor(OWWidget):
             "working_size",
             32,
             512,
-            label="Working size (square)",
+            label="Working size (square, groups A-G)",
             callback=self._defer_commit,
         )
         gui.checkBox(
-            prep_box, self, "centre_crop", "Centre-crop to square", callback=self._defer_commit
+            prep_box,
+            self,
+            "centre_crop",
+            "Centre-crop to square (groups A-G)",
+            callback=self._defer_commit,
         )
         gui.checkBox(
             prep_box,
             self,
             "contrast_normalise",
-            "Contrast-normalise",
+            "Contrast-normalise (groups A-F)",
             callback=self._defer_commit,
         )
         gui.checkBox(
-            prep_box, self, "denoise", "Denoise (median filter)", callback=self._defer_commit
+            prep_box,
+            self,
+            "denoise",
+            "Denoise, median filter (groups A-F)",
+            callback=self._defer_commit,
         )
         gui.spin(
             prep_box,
@@ -147,7 +155,7 @@ class OWImageFeatureExtractor(OWWidget):
             "denoise_ksize",
             3,
             5,
-            label="Denoise strength",
+            label="Denoise strength (groups A-F)",
             callback=self._defer_commit,
         )
 
@@ -159,7 +167,7 @@ class OWImageFeatureExtractor(OWWidget):
             0.01,
             0.5,
             0.01,
-            label="Peak prominence (of range)",
+            label="Peak prominence, of range (group B)",
             callback=self._defer_commit,
         )
         gui.doubleSpin(
@@ -169,7 +177,7 @@ class OWImageFeatureExtractor(OWWidget):
             0.1,
             1.0,
             0.05,
-            label="Edge density (of gradient p99)",
+            label="Edge density, of gradient p99 (group D)",
             callback=self._defer_commit,
         )
 
