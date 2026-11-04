@@ -17,7 +17,7 @@ and generations come back as corpora that Orange's text widgets can analyse.
   plain Python session.
 - **`nn_suite/`** - the Orange add-on. Six widgets and the signal adapters that
   convert between Orange objects and kernel types. The widgets are thin shells:
-  options, live plots, previews and Orange signals.
+  options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
   workflows.
 
@@ -86,9 +86,10 @@ image path is kept as a meta column so any row can be traced back to its source.
 Controls cover preprocessing (working size, centre crop, contrast
 normalisation, optional median denoising) and feature groups A-G. Toggling
 groups is the ablation experiment; group G (colour) is the opt-in shortcut
-demonstration. A preview shows the selected image's preprocessed luminance with
-its row and column projections. The peak-prominence and edge-density thresholds
-are available as `FeatureOptions` fields in the kernel, not as widget controls.
+demonstration. The main area shows every input image as a thumbnail, with the
+total count and the current selection in the header. The peak-prominence and
+edge-density thresholds are available as `FeatureOptions` fields in the kernel,
+not as widget controls.
 
 The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.

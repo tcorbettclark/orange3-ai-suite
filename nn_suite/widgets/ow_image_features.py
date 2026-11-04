@@ -1,7 +1,7 @@
 """Image Feature Extractor: interpretable features for image classification.
 
 A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
-group options, a luminance/profile preview, and the Orange signal adapters.
+group options, a thumbnail grid, and the Orange signal adapters.
 
 Decoded images and their raw feature values are cached, so changing feature
 groups reuses the cached features instead of re-reading every image. Loading and
@@ -16,9 +16,17 @@ import traceback
 from dataclasses import dataclass
 
 import numpy as np
-from AnyQt.QtCore import Qt, QThread, pyqtSignal
-from AnyQt.QtGui import QImage, QPixmap
-from AnyQt.QtWidgets import QCheckBox, QLabel, QSizePolicy
+from AnyQt.QtCore import QSignalBlocker, QSize, Qt, QThread, pyqtSignal
+from AnyQt.QtGui import QIcon, QImage, QImageReader, QPixmap
+from AnyQt.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QLabel,
+    QListView,
+    QListWidget,
+    QListWidgetItem,
+    QSizePolicy,
+)
 from Orange.data import ContinuousVariable, Domain, Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
@@ -54,6 +62,8 @@ GROUP_HELP = {
 }
 
 _ALL_GROUPS = "ABCDEFG"
+_THUMBNAIL_SIZE = 48
+_GRID_ITEM_SIZE = QSize(66, 76)
 
 
 @dataclass
@@ -178,6 +188,51 @@ class ImageExtractionWorker(QThread):
             self.failed.emit(*self.error)
 
 
+def _read_thumbnail(path: str, size: int) -> QImage:
+    """Decode one image at thumbnail size, preserving aspect ratio."""
+    reader = QImageReader(path)
+    reader.setAutoTransform(True)
+    source_size = reader.size()
+    if source_size.isValid():
+        reader.setScaledSize(source_size.scaled(size, size, Qt.KeepAspectRatio))
+    image = reader.read()
+    if image.isNull():
+        return image
+    return image.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+
+class ThumbnailLoader(QThread):
+    """Decode image thumbnails off the GUI thread, in small batches."""
+
+    batch = pyqtSignal(int, object)  # generation, [(row, QImage), ...]
+
+    def __init__(self, generation: int, paths: tuple[str, ...], size: int):
+        super().__init__()
+        self._generation = generation
+        self._paths = paths
+        self._size = size
+        self._stop = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        pending = []
+        for row, path in enumerate(self._paths):
+            if self._stop:
+                return
+            if not path:
+                continue
+            image = _read_thumbnail(path, self._size)
+            if not image.isNull():
+                pending.append((row, image))
+            if len(pending) >= 32:
+                self.batch.emit(self._generation, pending)
+                pending = []
+        if pending and not self._stop:
+            self.batch.emit(self._generation, pending)
+
+
 class OWImageFeatureExtractor(OWWidget):
     """Extract human-interpretable features from images.
 
@@ -189,8 +244,8 @@ class OWImageFeatureExtractor(OWWidget):
     The controls select preprocessing (working size, centre crop, contrast
     normalisation, optional denoising) and feature groups. Toggling groups is
     the ablation experiment; group G (colour) is the opt-in shortcut
-    demonstration. The preview shows the selected image's preprocessed
-    luminance together with its row and column projections.
+    demonstration. The main area shows every input image as a thumbnail, with
+    the count and the current selection in the header.
     """
 
     name = "Image Feature Extractor"
@@ -226,12 +281,14 @@ class OWImageFeatureExtractor(OWWidget):
     denoise = Setting(False)
     denoise_ksize = Setting(3)
     groups_enabled = Setting("ABCDEF")
-    preview_index = Setting(0)
+    selected_index = Setting(0)
 
     def __init__(self):
         super().__init__()
         self.data = None
-        self._paths: list[str] = []
+        self._grid_paths: list[str] = []
+        self._thumbnail_loader: ThumbnailLoader | None = None
+        self._thumbnail_generation = 0
         self._image_cache: _ImageCache | None = None
         self._feature_cache: _FeatureCache | None = None
         self._worker: ImageExtractionWorker | None = None
@@ -239,6 +296,7 @@ class OWImageFeatureExtractor(OWWidget):
         self._data_version = 0
         self._restart_pending = False
         self._last_result: _WorkerResult | None = None
+        self._progress_active = False
 
         prep_box = gui.widgetBox(self.controlArea, "Preprocessing")
         gui.spin(
@@ -305,12 +363,16 @@ class OWImageFeatureExtractor(OWWidget):
         self.commit.now = self._commit_now
         self.commit.deferred = self._defer_commit
 
-        self._setup_preview()
+        self._setup_grid()
         self.resize(950, 700)
 
     def _commit_now(self):
         self.commit.call()
         self.commit.dirty = False
+
+    def _set_progress(self, value: int):
+        if self._progress_active:
+            self.progressBarSet(value)
 
     def _defer_commit(self):
         if self.auto_apply:
@@ -328,26 +390,105 @@ class OWImageFeatureExtractor(OWWidget):
         )
         self._defer_commit()
 
-    # ---- preview -----------------------------------------------------------
+    # ---- image grid --------------------------------------------------------
 
-    def _setup_preview(self):
-        import pyqtgraph as pg
+    def _setup_grid(self):
+        container = gui.widgetBox(self.mainArea, "Images")
+        header = gui.hBox(container)
+        self._grid_count = QLabel("No images.")
+        self._grid_selection = QLabel("")
+        header.layout().addWidget(self._grid_count)
+        header.layout().addStretch(1)
+        header.layout().addWidget(self._grid_selection)
 
-        container = gui.widgetBox(self.mainArea, "Image preview")
-        self._preview_spin = gui.spin(
-            container, self, "preview_index", 0, 0, label="Image #", callback=self._update_preview
-        )
-        self._preview_label = QLabel("No images.")
-        self._preview_label.setFixedSize(200, 200)
-        self._preview_label.setAlignment(Qt.AlignCenter)
-        container.layout().addWidget(self._preview_label)
-        self._profiles = pg.PlotWidget(background="w")
-        self._profiles.addLegend(offset=(10, 10))
-        self._profiles.setLabel("bottom", "normalised position across the image")
-        self._profiles.setLabel("left", "mean luminance")
-        self._row_curve = self._profiles.plot(pen="#1f77b4", name="row profile")
-        self._col_curve = self._profiles.plot(pen="#d62728", name="column profile")
-        container.layout().addWidget(self._profiles)
+        self._grid = QListWidget(container)
+        self._grid.setViewMode(QListView.IconMode)
+        self._grid.setResizeMode(QListView.Adjust)
+        self._grid.setMovement(QListView.Static)
+        self._grid.setUniformItemSizes(True)
+        self._grid.setGridSize(_GRID_ITEM_SIZE)
+        self._grid.setIconSize(QSize(_THUMBNAIL_SIZE, _THUMBNAIL_SIZE))
+        self._grid.setSpacing(2)
+        self._grid.setWordWrap(False)
+        self._grid.setSelectionMode(QListWidget.SingleSelection)
+        self._grid.setVerticalScrollMode(QListWidget.ScrollPerPixel)
+        self._grid.currentRowChanged.connect(self._on_grid_row_changed)
+        container.layout().addWidget(self._grid, 1)
+
+    def _set_grid_paths(self, paths):
+        paths = list(paths)
+        self._grid_paths = paths
+        self._thumbnail_generation += 1
+        generation = self._thumbnail_generation
+        if self._thumbnail_loader is not None:
+            self._thumbnail_loader.stop()
+            self._thumbnail_loader.wait()
+            self._thumbnail_loader = None
+
+        with QSignalBlocker(self._grid):
+            self._grid.clear()
+            for i, path in enumerate(paths):
+                item = QListWidgetItem(str(i + 1))
+                item.setToolTip(path or "No path")
+                self._grid.addItem(item)
+
+        n_with_path = sum(1 for path in paths if path)
+        missing = len(paths) - n_with_path
+        if n_with_path:
+            label = f"{n_with_path} image{'s' if n_with_path != 1 else ''}"
+            if missing:
+                label += f" ({missing} without a path)"
+            self._grid_count.setText(label)
+        else:
+            self._grid_count.setText("No images.")
+        self._restore_grid_selection()
+
+        if n_with_path:
+            loader = ThumbnailLoader(generation, tuple(paths), _THUMBNAIL_SIZE)
+            loader.batch.connect(self._on_thumbnails_loaded)
+            loader.finished.connect(self._on_thumbnail_loader_finished)
+            self._thumbnail_loader = loader
+            loader.start()
+
+    def _restore_grid_selection(self):
+        n = self._grid.count()
+        if not n:
+            self._grid_selection.setText("")
+            return
+        row = min(max(int(self.selected_index), 0), n - 1)
+        self.selected_index = row
+        with QSignalBlocker(self._grid):
+            self._grid.setCurrentRow(row)
+            self._grid.scrollToItem(self._grid.item(row))
+        self._grid_selection.setText(f"image {row + 1} of {n}")
+
+    def _on_grid_row_changed(self, row: int):
+        if row < 0:
+            return
+        self.selected_index = row
+        self._grid_selection.setText(f"image {row + 1} of {self._grid.count()}")
+
+    def _on_thumbnails_loaded(self, generation: int, batch):
+        if generation != self._thumbnail_generation:
+            return
+        for row, image in batch:
+            item = self._grid.item(row)
+            if item is not None and not image.isNull():
+                item.setIcon(QIcon(QPixmap.fromImage(image)))
+
+    def _on_thumbnail_loader_finished(self):
+        if self.sender() is self._thumbnail_loader:
+            self._thumbnail_loader = None
+
+    def wait_for_thumbnails(self, timeout_ms: int = 30000):
+        """Wait for the current thumbnail loader and deliver its batches."""
+        if self._thumbnail_loader is not None:
+            loader = self._thumbnail_loader
+            loader.wait(timeout_ms)
+            self._thumbnail_loader = None
+        app = QApplication.instance()
+        if app is not None:
+            app.processEvents()
 
     def _feature_options(self):
         from nn_kernel.features import FeatureOptions
@@ -369,43 +510,19 @@ class OWImageFeatureExtractor(OWWidget):
             self.denoise_ksize,
         )
 
-    def _update_preview(self):
-        self._preview_label.setText("No images.")
-        self._row_curve.setData([], [])
-        self._col_curve.setData([], [])
-        if not self._paths:
-            return
-        try:
-            import cv2
-
-            from nn_kernel.features import preprocess
-
-            idx = min(int(self.preview_index), len(self._paths) - 1)
-            bgr = cv2.imread(self._paths[idx])
-            if bgr is None:
-                self._preview_label.setText("Preview unavailable.")
-                return
-            lum = preprocess(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), self._feature_options())
-        except ImportError:
-            return  # preview is a nicety; extraction errors carry the install hint
-        h, w = lum.shape
-        grayscale = np.ascontiguousarray(np.clip(lum * 255.0, 0, 255).round().astype(np.uint8))
-        image = QImage(grayscale.tobytes(), w, h, w, QImage.Format_Grayscale8)
-        self._preview_label.setPixmap(
-            QPixmap.fromImage(image).scaled(196, 196, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        )
-        row_profile = lum.mean(axis=1)
-        col_profile = lum.mean(axis=0)
-        self._row_curve.setData(np.linspace(0, 1, len(row_profile)), row_profile)
-        self._col_curve.setData(np.linspace(0, 1, len(col_profile)), col_profile)
-
     @Inputs.images
     def set_data(self, table):
         self.data = table
         self._data_version += 1
         self._image_cache = None
         self._feature_cache = None
-        self._paths = []
+        paths = []
+        if table is not None:
+            try:
+                _, paths = image_paths(table)
+            except ValueError:
+                pass
+        self._set_grid_paths(paths)
         self.commit.deferred()
 
     @gui.deferred
@@ -423,10 +540,10 @@ class OWImageFeatureExtractor(OWWidget):
                 self._worker.stop()
                 self._worker.wait()
                 self._worker = None
+                self._progress_active = False
                 self.progressBarFinished()
-            self._paths = []
+            self._set_grid_paths([])
             self.Outputs.features.send(None)
-            self._update_preview()
             return
         try:
             self._extract_and_send()
@@ -454,6 +571,8 @@ class OWImageFeatureExtractor(OWWidget):
             self.Outputs.features.send(None)
             return
         _, paths = image_paths(self.data)
+        if list(paths) != self._grid_paths:
+            self._set_grid_paths(paths)
 
         kept = [(i, p) for i, p in enumerate(paths) if p]
         preprocess_key = self._preprocess_key()
@@ -471,8 +590,6 @@ class OWImageFeatureExtractor(OWWidget):
             and feature_cache is not None
             and feature_cache.preprocess_key == preprocess_key
         ):
-            self._paths = list(image_cache.paths)
-            self._clamp_preview()
             self._send_features()
             return
 
@@ -502,17 +619,19 @@ class OWImageFeatureExtractor(OWWidget):
             options=self._feature_options(),
             preprocess_key=preprocess_key,
         )
-        worker.progress.connect(self.progressBarSet)
+        worker.progress.connect(self._set_progress)
         worker.finished_ok.connect(self._on_worker_done)
         worker.failed.connect(self._on_worker_failed)
         self._worker = worker
         self.progressBarInit()
+        self._progress_active = True
         worker.start()
 
     def _on_worker_done(self, result: _WorkerResult):
         if result is self._last_result:
             return
         self._last_result = result
+        self._progress_active = False
         self.progressBarFinished()
         self._worker = None
         if result.data_version == self._data_version:
@@ -526,11 +645,10 @@ class OWImageFeatureExtractor(OWWidget):
                 self._restart_pending = False
                 self.commit.now()
             return
-        self._paths = list(result.image_cache.paths)
-        self._clamp_preview()
         self._send_features()
 
     def _on_worker_failed(self, tb: str, generation: int):
+        self._progress_active = False
         self.progressBarFinished()
         self._worker = None
         if generation != self._generation:
@@ -554,7 +672,6 @@ class OWImageFeatureExtractor(OWWidget):
         )
         if not feature_cache.values.size:
             self.Outputs.features.send(None)
-            self._update_preview()
             return
 
         ordered = [
@@ -579,7 +696,6 @@ class OWImageFeatureExtractor(OWWidget):
             self.data.metas[kept_idx],
         )
         self.Outputs.features.send(out)
-        self._update_preview()
 
     def wait_for_extraction(self, timeout_ms: int = 30000):
         """Wait for the current and any pending extraction worker.
@@ -596,19 +712,19 @@ class OWImageFeatureExtractor(OWWidget):
             elif worker.error is not None:
                 self._on_worker_failed(*worker.error)
             else:
+                self._progress_active = False
                 self.progressBarFinished()
                 break
-
-    def _clamp_preview(self):
-        n = len(self._paths)
-        self.preview_index = min(self.preview_index, max(n - 1, 0))
-        self._preview_spin.setMaximum(max(n - 1, 0))
 
     def onDeleteWidget(self):
         if self._worker is not None:
             self._worker.stop()
             self._worker.wait()
             self._worker = None
+        if self._thumbnail_loader is not None:
+            self._thumbnail_loader.stop()
+            self._thumbnail_loader.wait()
+            self._thumbnail_loader = None
         super().onDeleteWidget()
 
 

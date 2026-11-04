@@ -89,12 +89,12 @@ topology and spatial mass usually matter most; texture helps less than it does
 for clouds. Record the group combination that works best and the one that
 explains the most errors.
 
-## 5. Check the preview
+## 5. Browse the images
 
-In the main area of **Image Feature Extractor**, use **Image #** to select a
-different image. The preview shows the preprocessed luminance and its row and
-column profiles. This makes a feature like `row_profile_peaks` visible: the
-peaks in the red or blue curve are the bands the feature counts.
+The main area of **Image Feature Extractor** shows every input image as a
+thumbnail. The header reports the total count, and clicking a thumbnail selects
+it. Use the grid to spot blank, corrupted or unexpected images before training.
+Selecting an image does not change the extracted features.
 
 ## 6. Optional: scale features correctly
 

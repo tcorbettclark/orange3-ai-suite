@@ -95,6 +95,8 @@ def test_missing_file_skips_row_with_warning(qapp, capture, images_table, image_
     out = features_sent[-1]
     assert len(out) == 5
     assert w.Warning.rows_skipped.is_shown()
+    assert w._grid.count() == 6
+    assert w._grid_count.text() == "6 images"
 
 
 def test_all_groups_off(qapp, capture, images_table):
@@ -106,25 +108,30 @@ def test_all_groups_off(qapp, capture, images_table):
     w.commit.now()
     assert features_sent[-1] is None
     assert w.Warning.all_groups_off.is_shown()
+    assert w._grid.count() == 5
+    assert w._grid_count.text() == "5 images"
 
 
-def test_preview_populated_after_apply(qapp, images_table):
+def test_grid_populated_after_apply(qapp, images_table):
     w = OWImageFeatureExtractor()
     w.show()
     w.set_data(images_table)
     w.commit.now()
+    w.wait_for_thumbnails()
     w.wait_for_extraction()
-    assert len(w._paths) == 5
-    assert w._preview_spin.maximum() == 4
-    w.preview_index = 4  # the disc
-    w._update_preview()
-    pixmap = w._preview_label.pixmap()
-    assert pixmap is not None and not pixmap.isNull()
-    # the disc is bright at the centre; a float/uint8 channel mix-up would not be
-    assert pixmap.toImage().pixelColor(98, 98).lightness() > 200
-    # profiles carry data for the selected image, at the preprocessing
-    # working size (128 by default), not the source resolution (64)
-    assert w._row_curve.xData is not None and len(w._row_curve.xData) == 128
+
+    assert w._grid.count() == 5
+    assert w._grid_count.text() == "5 images"
+    assert [w._grid.item(i).text() for i in range(5)] == ["1", "2", "3", "4", "5"]
+    assert all(not w._grid.item(i).icon().isNull() for i in range(5))
+
+    # the disc thumbnail is bright at the centre
+    pixmap = w._grid.item(4).icon().pixmap(48, 48)
+    assert pixmap.toImage().pixelColor(24, 24).lightness() > 200
+
+    w._grid.setCurrentRow(4)  # the disc
+    assert w.selected_index == 4
+    assert w._grid_selection.text() == "image 5 of 5"
 
 
 def test_group_toggle_auto_applies(qapp, capture, images_table):
