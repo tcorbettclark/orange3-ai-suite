@@ -124,7 +124,8 @@ The prompt, temperature, maximum new tokens, number of generations and seed are
 all controls. Low temperature is repetitive; high temperature dissolves into
 word salad. Generations are emitted as a one-column Table that Corpus Viewer
 and Orange3-Text widgets can read. `Load model...` opens a saved Keras model or
-LoRA adapter directory.
+LoRA adapter directory. For LoRA models, a **Use LoRA adapter** checkbox switches
+between the adapted model and its raw base model.
 
 ### LoRA Trainer
 
@@ -163,6 +164,14 @@ weight and colour its sign. Small networks print numeric weights on the edges;
 hovering an edge highlights its endpoints and shows exact values. Biases appear
 under the neurons they feed and in tooltips. The diagram scales to fit the
 window and can be saved as a PNG.
+
+## Tutorials
+
+Hands-on walk-throughs live in [`tutorials/`](tutorials/README.md). They cover
+the image workflow, tokenizers, training from scratch, generation, LoRA
+continued pre-training and SFT, and evaluation with Orange. Each tutorial is
+self-contained and can be used as a classroom handout or as a manual test
+script.
 
 ## The teaching arc
 
