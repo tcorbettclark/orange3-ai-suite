@@ -53,9 +53,8 @@ Add **LM Text**, set **Source → Type** to **File**, browse to
 `data/text/pairs.txt`, switch **Table type** to **Q/A pairs**, and press
 **Reload**. The preview table shows the parsed prompt and completion columns.
 
-Connect **Data** to **LoRA Trainer** **Data**. The Table has `prompt`,
-`completion` and `source` string metas; the adapter looks for the first two
-names.
+Connect **Data** to **LoRA Trainer** **Data**. The Table has `prompt` and
+`completion` string metas; the source file stays in the preview only.
 
 ## 2. Run supervised fine-tuning
 
@@ -114,7 +113,7 @@ more consistent.
 
 ## Checkpoint
 
-- The Table has `prompt` and `completion` string columns (plus `source`).
+- The Table has `prompt` and `completion` string columns.
 - The LoRA Trainer accepts it as SFT data.
 - The Generator shows the adapted and raw base models side by side.
 - You can explain why the data format, not the loss function, makes this

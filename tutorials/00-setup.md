@@ -73,7 +73,8 @@ Changing split or cleaning options reprocesses the cached file; **Reload**
 rereads it from disk.
 
 For a folder, switch **Type** to **Folder** and choose a directory. LM Text
-recurses through it, reads every `.txt`, and keeps a `source` column.
+recurses through it and reads every `.txt`. The preview shows each row's source
+file, but the Data output contains only the text.
 
 For Q/A experiments, switch **Table type** to **Q/A pairs**. The fixed format is
 shown in the widget:

@@ -47,10 +47,11 @@ class OWLMText(OWWidget):
     """Read plain-text files into a Table for the language-model widgets.
 
     Source is a single ``.txt`` file or a recursively scanned folder. Document
-    mode emits one row per file, paragraph, line or sentence, with ``text`` and
-    ``source`` metas. Q/A mode emits ``prompt``, ``completion`` and ``source``
-    metas from fixed blocks: a new pair starts at ``Q:``, the prompt includes
-    the following ``A:`` line, and the completion runs to the next ``Q:``.
+    mode emits one row per file, paragraph, line or sentence, with a ``text``
+    meta. Q/A mode emits ``prompt`` and ``completion`` metas from fixed blocks:
+    a new pair starts at ``Q:``, the prompt includes the following ``A:`` line,
+    and the completion runs to the next ``Q:``. The source file is shown in the
+    preview but is not included in the Data output.
     """
 
     name = "LM Text"
@@ -199,7 +200,7 @@ class OWLMText(OWWidget):
         self._sync_mode()
         self.resize(850, 700)
         if self.source_path:
-            self._reload()
+            self._stats.setText("No text loaded. Press Reload to read the selected path.")
 
     def _source_type_changed(self):
         self._reload()
@@ -333,11 +334,8 @@ class OWLMText(OWWidget):
         if not rows:
             self.Outputs.data.send(None)
             return
-        domain = Domain(
-            [],
-            metas=[StringVariable("text"), StringVariable("source")],
-        )
-        metas = np.asarray([[text, source] for source, text in rows], dtype=object)
+        domain = Domain([], metas=[StringVariable("text")])
+        metas = np.asarray([[text] for _source, text in rows], dtype=object)
         self.Outputs.data.send(Table.from_numpy(domain, np.empty((len(rows), 0)), None, metas))
 
     def _send_pairs(self, rows):
@@ -346,14 +344,11 @@ class OWLMText(OWWidget):
             return
         domain = Domain(
             [],
-            metas=[
-                StringVariable("prompt"),
-                StringVariable("completion"),
-                StringVariable("source"),
-            ],
+            metas=[StringVariable("prompt"), StringVariable("completion")],
         )
         metas = np.asarray(
-            [[prompt, completion, source] for source, prompt, completion in rows], dtype=object
+            [[prompt, completion] for _source, prompt, completion in rows],
+            dtype=object,
         )
         self.Outputs.data.send(Table.from_numpy(domain, np.empty((len(rows), 0)), None, metas))
 

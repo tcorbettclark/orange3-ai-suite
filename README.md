@@ -116,10 +116,11 @@ groups or a convolutional model.
 
 Reads UTF-8 `.txt` files from one file or a recursively scanned folder into a
 plain Table. **Text documents** mode emits one row per whole file, paragraph,
-line or sentence, with `text` and `source` metas. **Q/A pairs** mode parses
-fixed blocks: a new pair starts at `Q:`, the prompt includes the following
-`A:` line, and the completion runs to the next `Q:`. The output uses `prompt`,
-`completion` and `source` metas.
+line or sentence, with a `text` meta. **Q/A pairs** mode parses fixed blocks: a
+new pair starts at `Q:`, the prompt includes the following `A:` line, and the
+completion runs to the next `Q:`. The output uses `prompt` and `completion`
+metas. The source file is shown in the preview but is not added to the Data
+output.
 
 Cleaning is opt-in: strip Project Gutenberg header/footer, reflow wrapped
 lines, remove repeated short lines, and remove page-number lines. A small

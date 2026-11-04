@@ -12,6 +12,14 @@ def _write(path, text):
     return path
 
 
+def test_new_instance_starts_empty(qapp):
+    w = OWLMText()
+    w.show()
+    assert w._rows == []
+    assert w._table.rowCount() == 0
+    assert w._text.toPlainText() == ""
+
+
 def test_document_file_rows_and_preview(qapp, capture, tmp_path):
     path = _write(tmp_path / "book.txt", "First paragraph.\n\nSecond paragraph.")
     w = OWLMText()
@@ -24,9 +32,8 @@ def test_document_file_rows_and_preview(qapp, capture, tmp_path):
     out = sent[-1]
     assert out is not None
     assert len(out) == 2
-    assert [m.name for m in out.domain.metas] == ["text", "source"]
+    assert [m.name for m in out.domain.metas] == ["text"]
     assert table_texts(out) == ["First paragraph.", "Second paragraph."]
-    assert out.metas[0, 1] == "book.txt"
     assert w._table.rowCount() == 2
     assert w._text.toPlainText() == "First paragraph."
     assert w._text.lineWrapMode() == QPlainTextEdit.WidgetWidth
@@ -48,7 +55,9 @@ def test_folder_is_recursive_and_keeps_source(qapp, capture, tmp_path):
     out = sent[-1]
     assert out is not None
     assert len(out) == 2
-    assert sorted(str(v) for v in out.metas[:, 1]) == ["a.txt", "sub/b.txt"]
+    assert table_texts(out) == ["Alpha.", "Beta."]
+    # The source is still visible in the preview, but not in the Data output.
+    assert sorted(w._table.item(r, 0).text() for r in range(2)) == ["a.txt", "sub/b.txt"]
 
 
 def test_qa_mode_extracts_pairs_and_warns_on_malformed(qapp, capture, tmp_path):
@@ -69,10 +78,11 @@ def test_qa_mode_extracts_pairs_and_warns_on_malformed(qapp, capture, tmp_path):
     out = sent[-1]
     assert out is not None
     assert len(out) == 2
-    assert [m.name for m in out.domain.metas] == ["prompt", "completion", "source"]
+    assert [m.name for m in out.domain.metas] == ["prompt", "completion"]
     assert out.metas[0, 0] == "Q: Who is the narrator?\nA:"
     assert out.metas[0, 1] == "A woman in an ancestral hall."
     assert out.metas[1, 1] == "The yellow wallpaper."
+    assert w._table.item(0, 0).text() == "pairs.txt"
     assert w.Warning.malformed_pairs.is_shown()
 
 
