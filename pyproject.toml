@@ -4,7 +4,7 @@
 # pinned exactly: the tuner internals are less stable than Keras's fit.
 #
 # Layout: nn_kernel is a plain in-repo package bundled in this single
-# distribution - one wheel, one install, one "Neural Networks" category.
+# distribution - one wheel, one install, three toolbox categories.
 
 [build-system]
 requires = ["hatchling>=1.26"]
@@ -55,10 +55,10 @@ packages = ["nn_kernel", "nn_suite"]
 # >= 3.38 discovers add-ons through entry points.
 
 [project.entry-points."orange.widgets"]
-"Neural Networks" = "nn_suite.widgets"
+"Language Models" = "nn_suite.widgets"
 
 [project.entry-points."Orange.widgets"]
-"Neural Networks" = "nn_suite.widgets"
+"Language Models" = "nn_suite.widgets"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

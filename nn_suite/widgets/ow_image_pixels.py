@@ -1,4 +1,4 @@
-"""NN Image Pixels: flatten downsampled images into raw pixel columns.
+"""Image Pixels: flatten downsampled images into raw pixel columns.
 
 A deliberately vanilla baseline: convert each image to luminance, resize it to
 a square grid and flatten it row-major. There is no convolution, no spatial
@@ -104,7 +104,7 @@ class PixelFeatureWorker(QThread):
             self.failed.emit(*self.error)
 
 
-class OWNNImagePixels(OWWidget):
+class OWImagePixels(OWWidget):
     """Flatten each input image into raw pixel features.
 
     Input is an Import Images table. Every image is converted to luminance,
@@ -117,9 +117,10 @@ class OWNNImagePixels(OWWidget):
     plain: it is the no-convolution, no-feature-engineering baseline.
     """
 
-    name = "NN Image Pixels"
+    name = "Image Pixels"
     description = "Flatten downsampled images into raw pixel features."
-    icon = "icons/nn_image_pixels.svg"
+    icon = "icons/image_pixels.svg"
+    category = "Image Analytics"
     priority = 35
     keywords = ["pixels", "raw", "image", "baseline", "flatten"]  # noqa: RUF012
 
@@ -351,4 +352,4 @@ class OWNNImagePixels(OWWidget):
 if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
-    WidgetPreview(OWNNImagePixels).run()
+    WidgetPreview(OWImagePixels).run()

@@ -1,4 +1,4 @@
-"""NN Viewer: draw a trained MLP with its weights annotated.
+"""Neural Network Viewer: draw a trained MLP with its weights annotated.
 
 Takes the *Model* output of Orange's Neural Network widget (which wraps
 scikit-learn's MLPClassifier / MLPRegressor) and renders the network on
@@ -171,7 +171,7 @@ class NNView(QGraphicsView):
             self.fitInView(rect.adjusted(-MARGIN, -MARGIN, MARGIN, MARGIN), KEEP_ASPECT)
 
 
-class OWNNViewer(OWWidget):
+class OWNeuralNetworkViewer(OWWidget):
     """Draw a trained neural network with weights on the edges.
 
     Input is the Model output of Orange's Neural Network widget (a
@@ -186,10 +186,11 @@ class OWNNViewer(OWWidget):
     weight matrices shows a waiting message instead of crashing.
     """
 
-    name = "NN Viewer"
+    name = "Neural Network Viewer"
     description = "Displays a trained neural network with weights on edges."
-    icon = "icons/nn_viewer.svg"
-    priority = 45  # a read-only viewer, next to the LM Vocab Viewer
+    icon = "icons/neural_network_viewer.svg"
+    category = "Visualize"
+    priority = 45
     keywords = ["neural network", "mlp", "weights", "visualisation"]  # noqa: RUF012
 
     # Class-level Setting is the canonical Orange pattern (settings are
@@ -482,4 +483,4 @@ if __name__ == "__main__":  # pragma: no cover - dev preview
 
     data = Table("housing")
     model = NNRegressionLearner(hidden_layer_sizes=(4,))(data)
-    WidgetPreview(OWNNViewer).run(model)
+    WidgetPreview(OWNeuralNetworkViewer).run(model)

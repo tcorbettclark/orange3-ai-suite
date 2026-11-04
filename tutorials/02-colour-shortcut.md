@@ -16,7 +16,7 @@ code licence.
 ## 1. Open or build the workflow
 
 **Quick start:** open `demo/cloud_features.ows` with **File > Open**. The
-NN Image Features is set to working size 128 and groups A-F.
+Image Features is set to working size 128 and groups A-F.
 
 If the Import Images path is stale, open **Import Images**, click the folder
 button and choose `data/clouds`.
@@ -24,7 +24,7 @@ button and choose `data/clouds`.
 **From scratch:**
 
 1. **Import Images** → folder `data/clouds`.
-2. **NN Image Features**: set working size to 128 (type the number and
+2. **Image Features**: set working size to 128 (type the number and
    press Enter).
 3. **Test & Score**, **Confusion Matrix**, **Data Table**, **Column
    Statistics**.
@@ -32,15 +32,15 @@ button and choose `data/clouds`.
 
 Connect:
 
-- *Import Images* **Data** → *NN Image Features* **Images**
-- *NN Image Features* **Features** → *Test & Score* **Data**
+- *Import Images* **Data** → *Image Features* **Images**
+- *Image Features* **Features** → *Test & Score* **Data**
 - *Neural Network* **Learner** → *Test & Score* **Learner**
 - *Tree* **Learner** → *Test & Score* **Learner**
 - *Logistic Regression* **Learner** → *Test & Score* **Learner**
 - *Test & Score* **Evaluation Results** → *Confusion Matrix*
   **Evaluation Results**
-- *NN Image Features* **Features** → *Data Table* **Data**
-- *NN Image Features* **Features** → *Column Statistics* **Data**
+- *Image Features* **Features** → *Data Table* **Data**
+- *Image Features* **Features** → *Column Statistics* **Data**
 
 ## 2. Baseline: luminance features only
 

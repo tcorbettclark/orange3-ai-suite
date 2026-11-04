@@ -28,7 +28,8 @@ Launch the canvas from the repository root:
 /Applications/Orange.app/Contents/MacOS/python -m Orange.canvas
 ```
 
-The widgets are in the **Neural Networks** category.
+The widgets are in three categories: **Language Models**, **Image Analytics**
+and **Visualize**.
 
 ## 2. Data
 
@@ -104,7 +105,7 @@ links.
 
 ## 5. Controls that apply automatically, and controls that do not
 
-- **NN Image Features**: preprocessing and group changes apply
+- **Image Features**: preprocessing and group changes apply
   automatically. Type a new working size and press Enter to reprocess.
 - **LM Text Loader**: press **Reload** to reread the file or folder; changing the
   table type, split mode or cleaning options reprocesses the cached text.
@@ -113,7 +114,7 @@ links.
   **Stop** ends a run early and keeps what has been learned so far.
 - **LM Generator**: press **Generate** after changing the prompt or sampling
   options.
-- **LM Vocab Viewer** and **NN Viewer** are read-only; they update when an
+- **LM Vocab Viewer** and **Neural Network Viewer** are read-only; they update when an
   input changes.
 
 ## 6. Save your work

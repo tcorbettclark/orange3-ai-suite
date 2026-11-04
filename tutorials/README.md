@@ -1,6 +1,6 @@
 # Tutorials
 
-Hands-on walk-throughs for the Neural Networks add-on. Each tutorial builds an
+Hands-on walk-throughs for the neural-network and language-model add-on. Each tutorial builds an
 Orange canvas and ends with something you can inspect, compare or reuse. They
 work as classroom handouts, as manual test scripts, and as starting points for
 extending the widgets.

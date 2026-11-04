@@ -2,7 +2,7 @@
 
 from AnyQt.QtWidgets import QToolTip
 
-from nn_suite.widgets.ow_nn_viewer import EdgeItem, NodeItem
+from nn_suite.widgets.ow_neural_network_viewer import EdgeItem, NodeItem
 
 
 def _of(widget, cls):

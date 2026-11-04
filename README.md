@@ -2,8 +2,9 @@
 
 Teaching neural networks and language models inside
 [Orange](https://orangedatamining.com/). The add-on provides interpretable
-image features, tiny Keras language models, and MLX LoRA fine-tuning in one
-"Neural Networks" toolbox category.
+image features, tiny Keras language models, and MLX LoRA fine-tuning across
+three toolbox categories: **Language Models**, **Image Analytics** and
+**Visualize**.
 
 Everything that can be inspected is inspectable: feature values are ordinary
 Table columns, training curves are live, tokenizers travel with their models,
@@ -15,13 +16,13 @@ and generations come back as corpora that Orange's text widgets can analyse.
   image features, tokenizers and windowing, Keras model builders, sampling,
   perplexity, and MLX LoRA wrappers. The same code runs in the widgets or in a
   plain Python session.
-- **`nn_suite/`** - the Orange add-on. Eight widgets and the signal adapters that
+- **`nn_suite/`** - the Orange add-on. Nine widgets and the signal adapters that
   convert between Orange objects and kernel types. The widgets are thin shells:
   options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
   workflows.
 
-One wheel, one install, one category.
+One wheel, one install, three toolbox categories.
 
 ## Installation
 
@@ -31,7 +32,7 @@ capability:
 
 | Extra | Brings | Used by |
 |---|---|---|
-| `image` | OpenCV | NN Image Features, NN Image Pixels |
+| `image` | OpenCV | Image Features, Image Pixels |
 | `lm` | Keras / TensorFlow | LM Pre-trainer, LM Generator, LM Vocab Viewer |
 | `lora` | `mlx-lm[train]` (Apple Silicon only) | LoRA Pre-trainer, LoRA SFT |
 
@@ -66,21 +67,21 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 
 ## Widgets
 
-| Widget | Input | Output | Extra |
-|---|---|---|---|
-| NN Image Features | Images | Features, Selected image (Table) | `image` |
-| NN Image Pixels | Images | Features (Table) | `image` |
-| LM Text Loader | none | Data (Table) | none |
-| LM Pre-trainer | Data (text) | Model, Checkpoint (Table) | `lm` |
-| LM Generator | Model | Generations (Table) | `lm` / `lora` |
-| LoRA Pre-trainer | Data (text) | Model | `lora` |
-| LoRA SFT | Data (prompt / completion) | Model | `lora` |
-| LM Vocab Viewer | Model or Data | none (read-only) | `lm` |
-| NN Viewer | Model | none (read-only) | none |
+| Widget | Category | Input | Output | Extra |
+|---|---|---|---|---|
+| Image Features | Image Analytics | Images | Features, Selected image (Table) | `image` |
+| Image Pixels | Image Analytics | Images | Features (Table) | `image` |
+| LM Text Loader | Language Models | none | Data (Table) | none |
+| LM Pre-trainer | Language Models | Data (text) | Model, Checkpoint (Table) | `lm` |
+| LM Generator | Language Models | Model | Generations (Table) | `lm` / `lora` |
+| LoRA Pre-trainer | Language Models | Data (text) | Model | `lora` |
+| LoRA SFT | Language Models | Data (prompt / completion) | Model | `lora` |
+| LM Vocab Viewer | Language Models | Model or Data | none (read-only) | `lm` |
+| Neural Network Viewer | Visualize | Model | none (read-only) | none |
 
 Each widget class has a docstring describing its inputs, outputs and controls.
 
-### NN Image Features
+### Image Features
 
 Computes a small set of human-readable features from each image and emits one
 row per readable image. Class variables and meta columns are inherited, and the
@@ -104,7 +105,7 @@ widget controls.
 The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.
 
-### NN Image Pixels
+### Image Pixels
 
 The deliberately plain baseline. Every image is converted to luminance,
 resized to a square grid and flattened row-major into values in [0, 1]. The
@@ -199,7 +200,7 @@ fraction of tokens seen only once; the tabs list tokens, ids and corpus counts.
 The viewer has no outputs, so it can never feed a mismatched vocabulary back
 into training or generation.
 
-### NN Viewer
+### Neural Network Viewer
 
 Draws the Model output of Orange's own Neural Network widget (a scikit-learn
 MLP). Nodes are arranged one column per layer; edge width encodes absolute
@@ -264,7 +265,7 @@ well.
 A typical canvas workflow:
 
 ```
-Import Images -> NN Image Features -> Test & Score -> Confusion Matrix
+Import Images -> Image Features -> Test & Score -> Confusion Matrix
                                             -> Data Table
                                             -> Column Statistics
 ```

@@ -40,7 +40,7 @@ def qapp():
     return QApplication.instance() or QApplication([])
 
 
-# ---- fixtures for the NN viewer tests (tests/widgets/nn_viewer/) ----
+# ---- fixtures for the neural network viewer tests (tests/widgets/neural_network_viewer/) ----
 
 import warnings as _warnings  # noqa: E402
 
@@ -113,10 +113,10 @@ def fire_hover():
 
 @pytest.fixture()
 def widget(qapp, make_model):
-    """An OWNNViewer instance."""
-    from nn_suite.widgets.ow_nn_viewer import OWNNViewer
+    """An OWNeuralNetworkViewer instance."""
+    from nn_suite.widgets.ow_neural_network_viewer import OWNeuralNetworkViewer
 
-    w = OWNNViewer()
+    w = OWNeuralNetworkViewer()
     w.show()
     yield w
     w.close()
