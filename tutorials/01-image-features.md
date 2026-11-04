@@ -96,6 +96,16 @@ thumbnail. The header reports the total count, and clicking a thumbnail selects
 it. Use the grid to spot blank, corrupted or unexpected images before training.
 Selecting an image does not change the extracted features.
 
+The **Feature values** panel on the right lists the selected image's features,
+grouped A-G. Groups that are switched off stay visible but greyed out. Click a
+feature to read its definition and see a histogram across the data, split by
+class, with a red line at the selected image's value. This is the quickest way
+to see whether a feature separates the labels before trusting it in a model.
+
+If you prefer a standard table, connect **Features** to a **Data Table**'s
+*Data* input and **Selected image** to its *Data Subset* input. The table then
+opens with the selected image highlighted.
+
 ## 6. Optional: scale features correctly
 
 Some learners are sensitive to feature scale. Do not z-score the whole output

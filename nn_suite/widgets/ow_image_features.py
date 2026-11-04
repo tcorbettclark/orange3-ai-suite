@@ -1,7 +1,8 @@
 """Image Feature Extractor: interpretable features for image classification.
 
 A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
-group options, a thumbnail grid, and the Orange signal adapters.
+group options, a thumbnail grid with a feature-values panel, and the Orange
+signal adapters.
 
 Decoded images and their raw feature values are cached, so changing feature
 groups reuses the cached features instead of re-reading every image. Loading and
@@ -17,15 +18,18 @@ from dataclasses import dataclass
 
 import numpy as np
 from AnyQt.QtCore import QSignalBlocker, QSize, Qt, QThread, pyqtSignal
-from AnyQt.QtGui import QIcon, QImage, QImageReader, QPixmap
+from AnyQt.QtGui import QBrush, QColor, QIcon, QImage, QImageReader, QPixmap
 from AnyQt.QtWidgets import (
-    QApplication,
     QCheckBox,
+    QHeaderView,
     QLabel,
     QListView,
     QListWidget,
     QListWidgetItem,
     QSizePolicy,
+    QSplitter,
+    QTreeWidget,
+    QTreeWidgetItem,
 )
 from Orange.data import ContinuousVariable, Domain, Table
 from Orange.widgets import gui
@@ -188,6 +192,15 @@ class ImageExtractionWorker(QThread):
             self.failed.emit(*self.error)
 
 
+def _format_feature_value(value) -> str:
+    if value is None or not np.isfinite(value):
+        return "—"
+    value = float(value)
+    if abs(value - round(value)) < 1e-9:
+        return str(round(value))
+    return f"{value:.4g}"
+
+
 def _read_thumbnail(path: str, size: int) -> QImage:
     """Decode one image at thumbnail size, preserving aspect ratio."""
     reader = QImageReader(path)
@@ -206,15 +219,23 @@ class ThumbnailLoader(QThread):
 
     batch = pyqtSignal(int, object)  # generation, [(row, QImage), ...]
 
-    def __init__(self, generation: int, paths: tuple[str, ...], size: int):
+    def __init__(self, generation: int, paths: tuple[str, ...], size: int, capture: bool = False):
         super().__init__()
         self._generation = generation
         self._paths = paths
         self._size = size
+        self._capture = capture
+        self.captured = [] if capture else None
         self._stop = False
 
     def stop(self):
         self._stop = True
+
+    def _emit(self, pending):
+        if self.captured is not None:
+            self.captured.append((self._generation, pending))
+        else:
+            self.batch.emit(self._generation, pending)
 
     def run(self):
         pending = []
@@ -227,10 +248,10 @@ class ThumbnailLoader(QThread):
             if not image.isNull():
                 pending.append((row, image))
             if len(pending) >= 32:
-                self.batch.emit(self._generation, pending)
+                self._emit(pending)
                 pending = []
         if pending and not self._stop:
-            self.batch.emit(self._generation, pending)
+            self._emit(pending)
 
 
 class OWImageFeatureExtractor(OWWidget):
@@ -245,7 +266,11 @@ class OWImageFeatureExtractor(OWWidget):
     normalisation, optional denoising) and feature groups. Toggling groups is
     the ablation experiment; group G (colour) is the opt-in shortcut
     demonstration. The main area shows every input image as a thumbnail, with
-    the count and the current selection in the header.
+    the count and the current selection in the header. A right-hand panel shows
+    the selected image's feature values, grouped A-G, and a class-split
+    histogram for the selected feature. The ``Selected image`` output sends
+    that row as a one-row table; connect it to a data table's subset input to
+    highlight the image among all rows.
     """
 
     name = "Image Feature Extractor"
@@ -259,6 +284,7 @@ class OWImageFeatureExtractor(OWWidget):
 
     class Outputs:
         features = Output("Features", Table)
+        selected = Output("Selected image", Table)
 
     class Warning(OWWidget.Warning):
         no_image_column = Msg("No image column found - connect the Images output of Import Images.")
@@ -289,8 +315,12 @@ class OWImageFeatureExtractor(OWWidget):
         self._grid_paths: list[str] = []
         self._thumbnail_loader: ThumbnailLoader | None = None
         self._thumbnail_generation = 0
+        self._capture_thumbnail_batches = False
         self._image_cache: _ImageCache | None = None
         self._feature_cache: _FeatureCache | None = None
+        self._feature_row_by_source: dict[int, int] = {}
+        self._output_table: Table | None = None
+        self._selected_feature: str | None = None
         self._worker: ImageExtractionWorker | None = None
         self._generation = 0
         self._data_version = 0
@@ -364,7 +394,7 @@ class OWImageFeatureExtractor(OWWidget):
         self.commit.deferred = self._defer_commit
 
         self._setup_grid()
-        self.resize(950, 700)
+        self.resize(1100, 750)
 
     def _commit_now(self):
         self.commit.call()
@@ -388,20 +418,26 @@ class OWImageFeatureExtractor(OWWidget):
         self.groups_enabled = "".join(
             letter for letter, _ in GROUP_LABELS if self._group_checks[letter].isChecked()
         )
+        self._refresh_panel()
         self._defer_commit()
 
     # ---- image grid --------------------------------------------------------
 
     def _setup_grid(self):
-        container = gui.widgetBox(self.mainArea, "Images")
-        header = gui.hBox(container)
+        splitter = QSplitter(Qt.Horizontal, self.mainArea)
+        splitter.setChildrenCollapsible(False)
+        self.mainArea.layout().addWidget(splitter)
+
+        grid_box = gui.widgetBox(splitter, "Images", addToLayout=False)
+        splitter.addWidget(grid_box)
+        header = gui.hBox(grid_box)
         self._grid_count = QLabel("No images.")
         self._grid_selection = QLabel("")
         header.layout().addWidget(self._grid_count)
         header.layout().addStretch(1)
         header.layout().addWidget(self._grid_selection)
 
-        self._grid = QListWidget(container)
+        self._grid = QListWidget(grid_box)
         self._grid.setViewMode(QListView.IconMode)
         self._grid.setResizeMode(QListView.Adjust)
         self._grid.setMovement(QListView.Static)
@@ -413,7 +449,297 @@ class OWImageFeatureExtractor(OWWidget):
         self._grid.setSelectionMode(QListWidget.SingleSelection)
         self._grid.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self._grid.currentRowChanged.connect(self._on_grid_row_changed)
-        container.layout().addWidget(self._grid, 1)
+        grid_box.layout().addWidget(self._grid, 1)
+
+        panel = gui.widgetBox(splitter, "Feature values", addToLayout=False)
+        splitter.addWidget(panel)
+        splitter.setCollapsible(1, True)
+        self._setup_feature_panel(panel)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([520, 320])
+
+    def _setup_feature_panel(self, panel):
+        import pyqtgraph as pg
+
+        from nn_kernel.features import features_of_group
+
+        self._panel_title = QLabel("No image selected.")
+        title_font = self._panel_title.font()
+        title_font.setBold(True)
+        self._panel_title.setFont(title_font)
+        self._panel_title.setWordWrap(True)
+        panel.layout().addWidget(self._panel_title)
+
+        self._feature_tree = QTreeWidget()
+        self._feature_tree.setHeaderLabels(["Feature", "Value"])
+        self._feature_tree.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self._feature_tree.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self._feature_tree.setRootIsDecorated(True)
+        self._feature_tree.setUniformRowHeights(True)
+        self._feature_tree.setAlternatingRowColors(True)
+        self._feature_tree.setIndentation(12)
+        self._feature_tree.currentItemChanged.connect(self._on_feature_item_changed)
+        panel.layout().addWidget(self._feature_tree, 1)
+
+        self._feature_items: dict[str, QTreeWidgetItem] = {}
+        self._feature_groups: dict[str, QTreeWidgetItem] = {}
+        for letter, label in GROUP_LABELS:
+            group_item = QTreeWidgetItem([label, ""])
+            group_item.setFlags(Qt.ItemIsEnabled)
+            group_font = group_item.font(0)
+            group_font.setBold(True)
+            group_item.setFont(0, group_font)
+            self._feature_tree.addTopLevelItem(group_item)
+            self._feature_groups[letter] = group_item
+            for feature in features_of_group(letter):
+                item = QTreeWidgetItem([feature.name, "—"])
+                item.setData(0, Qt.UserRole, feature.name)
+                item.setToolTip(0, feature.definition)
+                item.setToolTip(1, feature.definition)
+                group_item.addChild(item)
+                self._feature_items[feature.name] = item
+            group_item.setExpanded(True)
+
+        self._feature_definition = QLabel("")
+        self._feature_definition.setWordWrap(True)
+        self._feature_definition.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        panel.layout().addWidget(self._feature_definition)
+
+        self._histogram_caption = QLabel("")
+        self._histogram_caption.setWordWrap(True)
+        panel.layout().addWidget(self._histogram_caption)
+
+        self._histogram = pg.PlotWidget(background="w")
+        self._histogram.setMinimumHeight(170)
+        self._histogram.setMenuEnabled(False)
+        self._histogram.setMouseEnabled(x=False, y=False)
+        self._histogram.setLabel("bottom", "value")
+        self._histogram.setLabel("left", "count")
+        self._histogram.addLegend(offset=(-10, 10), colCount=2, labelTextSize="8pt")
+        panel.layout().addWidget(self._histogram)
+
+    def _current_feature_cache(self):
+        cache = self._feature_cache
+        if cache is None or cache.preprocess_key != self._preprocess_key():
+            return None
+        return cache
+
+    def _selected_feature_row(self):
+        cache = self._current_feature_cache()
+        if cache is None:
+            return None
+        return self._feature_row_by_source.get(int(self.selected_index))
+
+    def _class_suffix(self, source: int) -> str:
+        if self.data is None or not self.data.domain.class_vars:
+            return ""
+        var = self.data.domain.class_vars[0]
+        row = self.data.Y[source]
+        value = row[0] if np.ndim(row) else row
+        text = var.str_val(value) if var.is_discrete else f"{float(value):.4g}"
+        return f" — class {text}"
+
+    def _refresh_panel(self):
+        self._update_panel_title()
+        self._update_feature_values()
+        self._style_feature_groups()
+        self._ensure_feature_selection()
+
+    def _update_panel_title(self):
+        n = len(self._grid_paths)
+        if not n:
+            self._panel_title.setText("No images.")
+            return
+        source = min(max(int(self.selected_index), 0), n - 1)
+        prefix = f"Image {source + 1} of {n}{self._class_suffix(source)}"
+        if not self._grid_paths[source]:
+            self._panel_title.setText(f"{prefix} — no path.")
+            return
+        cache = self._current_feature_cache()
+        if cache is None:
+            if self._worker is not None and self._worker.isRunning():
+                state = "extracting features..."
+            else:
+                state = "extract features to inspect values."
+            self._panel_title.setText(f"{prefix} — {state}")
+            return
+        if source not in self._feature_row_by_source:
+            self._panel_title.setText(f"{prefix} — image could not be read.")
+            return
+        self._panel_title.setText(prefix)
+
+    def _update_feature_values(self):
+        cache = self._current_feature_cache()
+        row = self._selected_feature_row()
+        values = {}
+        if cache is not None and row is not None:
+            values = {
+                name: value for name, value in zip(cache.names, cache.values[row], strict=True)
+            }
+        for name, item in self._feature_items.items():
+            item.setText(1, _format_feature_value(values.get(name)))
+
+    def _style_feature_groups(self):
+        enabled = set(self.groups_enabled)
+        labels = dict(GROUP_LABELS)
+        for letter, group_item in self._feature_groups.items():
+            on = letter in enabled
+            group_item.setText(0, labels[letter] if on else f"{labels[letter]} (off)")
+            brush = QBrush(QColor("#222222" if on else "#9a9a9a"))
+            group_item.setForeground(0, brush)
+            group_item.setToolTip(
+                0,
+                labels[letter]
+                if on
+                else f"{labels[letter]} — switched off, so not in the Features output.",
+            )
+            for i in range(group_item.childCount()):
+                child = group_item.child(i)
+                child.setForeground(0, brush)
+                child.setForeground(1, brush)
+
+    def _ensure_feature_selection(self):
+        if not self._feature_items:
+            self._selected_feature = None
+            self._update_feature_details()
+            return
+        if self._selected_feature not in self._feature_items:
+            self._selected_feature = None
+            for letter, _ in GROUP_LABELS:
+                if letter not in self.groups_enabled:
+                    continue
+                group_item = self._feature_groups[letter]
+                if group_item.childCount():
+                    self._selected_feature = group_item.child(0).data(0, Qt.UserRole)
+                    break
+            if self._selected_feature is None:
+                self._selected_feature = (
+                    self._feature_tree.topLevelItem(0).child(0).data(0, Qt.UserRole)
+                )
+        item = self._feature_items[self._selected_feature]
+        with QSignalBlocker(self._feature_tree):
+            self._feature_tree.setCurrentItem(item)
+        self._update_feature_details()
+
+    def _on_feature_item_changed(self, current, _previous):
+        if current is None:
+            return
+        name = current.data(0, Qt.UserRole)
+        if not name:
+            return
+        self._selected_feature = name
+        self._update_feature_details()
+
+    def _update_feature_details(self):
+        name = self._selected_feature
+        if name is None:
+            self._feature_definition.setText("")
+            self._histogram_caption.setText("")
+            self._clear_histogram()
+            return
+        from nn_kernel.features import get_feature
+
+        self._feature_definition.setText(get_feature(name).definition)
+        self._update_histogram(name)
+
+    def _clear_histogram(self):
+        plot = self._histogram.getPlotItem()
+        plot.clear()
+        if plot.legend is not None:
+            plot.legend.clear()
+
+    def _update_histogram(self, feature_name: str):
+        import pyqtgraph as pg
+
+        from nn_kernel.features import get_feature
+
+        plot = self._histogram.getPlotItem()
+        self._clear_histogram()
+        cache = self._current_feature_cache()
+        row = self._selected_feature_row()
+        if cache is None:
+            if self._worker is not None and self._worker.isRunning():
+                self._histogram_caption.setText("Extracting features...")
+            else:
+                self._histogram_caption.setText("Extract features to see the distribution.")
+            return
+        if row is None:
+            self._histogram_caption.setText("No feature values for this image.")
+            return
+        try:
+            column = cache.names.index(feature_name)
+        except ValueError:
+            self._histogram_caption.setText("This feature was not extracted.")
+            return
+
+        values = np.asarray(cache.values[:, column], dtype=float)
+        sources = np.asarray(self._image_cache.readable_source, dtype=int)
+        class_var = self.data.domain.class_var if self.data is not None else None
+        labels = None
+        if class_var is not None and class_var.is_discrete:
+            labels = self.data.Y[sources]
+            if labels.ndim == 2:
+                labels = labels[:, 0]
+        finite = np.isfinite(values)
+        values = values[finite]
+        if labels is not None:
+            labels = labels[finite]
+        current = float(cache.values[row, column])
+        if not values.size:
+            self._histogram_caption.setText("No finite values to plot.")
+            return
+
+        vmin, vmax = float(values.min()), float(values.max())
+        if vmin == vmax:
+            edges = np.array([vmin - 0.5, vmax + 0.5])
+        elif np.allclose(values, np.round(values)) and vmax - vmin <= 60:
+            lo, hi = int(np.floor(vmin)), int(np.ceil(vmax))
+            edges = np.arange(lo - 0.5, hi + 1.5, 1.0)
+        else:
+            edges = np.linspace(vmin, vmax, 21)
+        centres = (edges[:-1] + edges[1:]) / 2
+        width = np.diff(edges)
+
+        if labels is None:
+            series = [("all images", None)]
+        else:
+            series = [(class_var.str_val(value), labels == value) for value in np.unique(labels)]
+
+        bottom = np.zeros(len(centres))
+        for index, (label, mask) in enumerate(series):
+            counts, _ = np.histogram(values if mask is None else values[mask], bins=edges)
+            if not counts.any():
+                continue
+            color = pg.intColor(index, hues=max(3, len(series)))
+            bar = pg.BarGraphItem(
+                x=centres,
+                height=counts,
+                width=width * 0.9,
+                bottom=bottom,
+                brush=color,
+                pen=pg.mkPen(color),
+            )
+            plot.addItem(bar)
+            if plot.legend is not None:
+                plot.legend.addItem(bar, label)
+            bottom += counts
+
+        if np.isfinite(current):
+            plot.addItem(
+                pg.InfiniteLine(
+                    pos=current,
+                    angle=90,
+                    movable=False,
+                    pen=pg.mkPen("#d62728", width=2),
+                )
+            )
+        caption = f"current: {_format_feature_value(current)}"
+        if labels is not None:
+            caption += " — bars by class"
+        if get_feature(feature_name).group not in self.groups_enabled:
+            caption += " — group off (not in output)"
+        self._histogram_caption.setText(caption)
 
     def _set_grid_paths(self, paths):
         paths = list(paths)
@@ -444,11 +770,18 @@ class OWImageFeatureExtractor(OWWidget):
         self._restore_grid_selection()
 
         if n_with_path:
-            loader = ThumbnailLoader(generation, tuple(paths), _THUMBNAIL_SIZE)
+            loader = ThumbnailLoader(
+                generation,
+                tuple(paths),
+                _THUMBNAIL_SIZE,
+                capture=self._capture_thumbnail_batches,
+            )
             loader.batch.connect(self._on_thumbnails_loaded)
             loader.finished.connect(self._on_thumbnail_loader_finished)
             self._thumbnail_loader = loader
             loader.start()
+        self._refresh_panel()
+        self._send_selected()
 
     def _restore_grid_selection(self):
         n = self._grid.count()
@@ -467,6 +800,8 @@ class OWImageFeatureExtractor(OWWidget):
             return
         self.selected_index = row
         self._grid_selection.setText(f"image {row + 1} of {self._grid.count()}")
+        self._send_selected()
+        self._refresh_panel()
 
     def _on_thumbnails_loaded(self, generation: int, batch):
         if generation != self._thumbnail_generation:
@@ -481,14 +816,14 @@ class OWImageFeatureExtractor(OWWidget):
             self._thumbnail_loader = None
 
     def wait_for_thumbnails(self, timeout_ms: int = 30000):
-        """Wait for the current thumbnail loader and deliver its batches."""
+        """Wait for thumbnails; set ``_capture_thumbnail_batches`` first in tests."""
         if self._thumbnail_loader is not None:
             loader = self._thumbnail_loader
             loader.wait(timeout_ms)
             self._thumbnail_loader = None
-        app = QApplication.instance()
-        if app is not None:
-            app.processEvents()
+            if loader.captured is not None:
+                for generation, batch in loader.captured:
+                    self._on_thumbnails_loaded(generation, batch)
 
     def _feature_options(self):
         from nn_kernel.features import FeatureOptions
@@ -516,6 +851,8 @@ class OWImageFeatureExtractor(OWWidget):
         self._data_version += 1
         self._image_cache = None
         self._feature_cache = None
+        self._feature_row_by_source = {}
+        self._output_table = None
         paths = []
         if table is not None:
             try:
@@ -542,8 +879,11 @@ class OWImageFeatureExtractor(OWWidget):
                 self._worker = None
                 self._progress_active = False
                 self.progressBarFinished()
+            self._feature_row_by_source = {}
+            self._output_table = None
             self._set_grid_paths([])
             self.Outputs.features.send(None)
+            self.Outputs.selected.send(None)
             return
         try:
             self._extract_and_send()
@@ -568,7 +908,11 @@ class OWImageFeatureExtractor(OWWidget):
             raise ValueError("OpenCV not available - install the [image] extra")
         if not self.groups_enabled:
             self.Warning.all_groups_off()
+            self._output_table = None
+            self._feature_row_by_source = {}
             self.Outputs.features.send(None)
+            self.Outputs.selected.send(None)
+            self._refresh_panel()
             return
         _, paths = image_paths(self.data)
         if list(paths) != self._grid_paths:
@@ -626,6 +970,7 @@ class OWImageFeatureExtractor(OWWidget):
         self.progressBarInit()
         self._progress_active = True
         worker.start()
+        self._refresh_panel()
 
     def _on_worker_done(self, result: _WorkerResult):
         if result is self._last_result:
@@ -658,6 +1003,8 @@ class OWImageFeatureExtractor(OWWidget):
             return
         last = tb.strip().splitlines()[-1] if tb.strip() else "unknown error"
         self.Error.extraction_failed(last)
+        self._refresh_panel()
+        self._send_selected()
 
     def _send_features(self):
         from nn_kernel.features import group_names
@@ -671,9 +1018,16 @@ class OWImageFeatureExtractor(OWWidget):
             shown=bool(image_cache.n_unreadable or image_cache.skipped_no_path),
         )
         if not feature_cache.values.size:
+            self._feature_row_by_source = {}
+            self._output_table = None
             self.Outputs.features.send(None)
+            self.Outputs.selected.send(None)
+            self._refresh_panel()
             return
 
+        self._feature_row_by_source = {
+            int(source): i for i, source in enumerate(image_cache.readable_source)
+        }
         ordered = [
             name
             for letter, _ in GROUP_LABELS
@@ -695,7 +1049,18 @@ class OWImageFeatureExtractor(OWWidget):
             self.data.Y[kept_idx] if source.class_vars else None,
             self.data.metas[kept_idx],
         )
+        self._output_table = out
         self.Outputs.features.send(out)
+        self._send_selected()
+        self._refresh_panel()
+
+    def _send_selected(self):
+        table = self._output_table
+        row = self._feature_row_by_source.get(int(self.selected_index))
+        if table is None or row is None or row >= len(table):
+            self.Outputs.selected.send(None)
+            return
+        self.Outputs.selected.send(table[row : row + 1])
 
     def wait_for_extraction(self, timeout_ms: int = 30000):
         """Wait for the current and any pending extraction worker.

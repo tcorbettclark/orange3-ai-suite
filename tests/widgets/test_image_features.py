@@ -89,6 +89,7 @@ def test_missing_file_skips_row_with_warning(qapp, capture, images_table, image_
     w = OWImageFeatureExtractor()
     w.show()
     features_sent = capture(w.Outputs.features)
+    selected_sent = capture(w.Outputs.selected)
     w.set_data(table)
     w.commit.now()
     w.wait_for_extraction()
@@ -97,24 +98,32 @@ def test_missing_file_skips_row_with_warning(qapp, capture, images_table, image_
     assert w.Warning.rows_skipped.is_shown()
     assert w._grid.count() == 6
     assert w._grid_count.text() == "6 images"
+    w._grid.setCurrentRow(5)  # ghost.png
+    assert selected_sent[-1] is None
+    assert "could not be read" in w._panel_title.text()
 
 
 def test_all_groups_off(qapp, capture, images_table):
     w = OWImageFeatureExtractor()
     w.show()
     features_sent = capture(w.Outputs.features)
+    selected_sent = capture(w.Outputs.selected)
     w.set_data(images_table)
     w.groups_enabled = ""
     w.commit.now()
     assert features_sent[-1] is None
+    assert selected_sent[-1] is None
     assert w.Warning.all_groups_off.is_shown()
     assert w._grid.count() == 5
     assert w._grid_count.text() == "5 images"
 
 
-def test_grid_populated_after_apply(qapp, images_table):
+def test_grid_populated_after_apply(qapp, capture, images_table):
     w = OWImageFeatureExtractor()
+    w._capture_thumbnail_batches = True
     w.show()
+    features_sent = capture(w.Outputs.features)
+    selected_sent = capture(w.Outputs.selected)
     w.set_data(images_table)
     w.commit.now()
     w.wait_for_thumbnails()
@@ -132,6 +141,23 @@ def test_grid_populated_after_apply(qapp, images_table):
     w._grid.setCurrentRow(4)  # the disc
     assert w.selected_index == 4
     assert w._grid_selection.text() == "image 5 of 5"
+    assert w._panel_title.text() == "Image 5 of 5 — class disc"
+
+    selected = selected_sent[-1]
+    assert selected is not None and len(selected) == 1
+    assert selected.metas[0, 0] == "disc.png"
+    assert selected.ids[0] in features_sent[-1].ids
+
+    # the panel shows values for the selected image; group G is off and greyed
+    assert w._feature_groups["G"].text(0) == "G: colour (off)"
+    from AnyQt.QtGui import QColor
+
+    assert w._feature_items["bluish_fraction"].foreground(0).color() == QColor("#9a9a9a")
+    w._feature_tree.setCurrentItem(w._feature_items["row_profile_peaks"])
+    assert w._selected_feature == "row_profile_peaks"
+    assert w._feature_items["row_profile_peaks"].text(1) != "—"
+    assert "current:" in w._histogram_caption.text()
+    assert len(w._histogram.getPlotItem().items) >= 1
 
 
 def test_group_toggle_auto_applies(qapp, capture, images_table):

@@ -68,7 +68,7 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 
 | Widget | Input | Output | Extra |
 |---|---|---|---|
-| Image Feature Extractor | Images | Features (Table) | `image` |
+| Image Feature Extractor | Images | Features, Selected image (Table) | `image` |
 | LM Trainer | Data (text) | Model, Checkpoint (Table) | `lm` |
 | LM Generator | Model | Generations (Table) | `lm` / `lora` |
 | LoRA Trainer | Data (text or pairs) | Model | `lora` |
@@ -87,9 +87,13 @@ Controls cover preprocessing (working size, centre crop, contrast
 normalisation, optional median denoising) and feature groups A-G. Toggling
 groups is the ablation experiment; group G (colour) is the opt-in shortcut
 demonstration. The main area shows every input image as a thumbnail, with the
-total count and the current selection in the header. The peak-prominence and
-edge-density thresholds are available as `FeatureOptions` fields in the kernel,
-not as widget controls.
+total count and the current selection in the header. The right-hand panel shows
+the selected image's feature values, grouped A-G, and a class-split histogram
+for the selected feature. Disabled groups stay visible but greyed out. The
+`Selected image` output carries the selected row as a one-row table, so it can
+drive a data table's subset input. The peak-prominence and edge-density
+thresholds are available as `FeatureOptions` fields in the kernel, not as
+widget controls.
 
 The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.
