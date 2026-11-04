@@ -28,6 +28,7 @@ def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
     features_sent = capture(w.Outputs.features)
     w.set_data(images_table)
     w.commit.now()
+    w.wait_for_extraction()
 
     out = features_sent[-1]
     assert out is not None
@@ -52,6 +53,7 @@ def test_group_ablation_via_settings(qapp, capture, images_table):
     w.set_data(images_table)
     w.groups_enabled = "E"  # topology only: hole_count, area, crossings
     w.commit.now()
+    w.wait_for_extraction()
     out = features_sent[-1]
     assert [v.name for v in out.domain.attributes] == [
         "hole_count",
@@ -89,6 +91,7 @@ def test_missing_file_skips_row_with_warning(qapp, capture, images_table, image_
     features_sent = capture(w.Outputs.features)
     w.set_data(table)
     w.commit.now()
+    w.wait_for_extraction()
     out = features_sent[-1]
     assert len(out) == 5
     assert w.Warning.rows_skipped.is_shown()
@@ -110,6 +113,7 @@ def test_preview_populated_after_apply(qapp, images_table):
     w.show()
     w.set_data(images_table)
     w.commit.now()
+    w.wait_for_extraction()
     assert len(w._paths) == 5
     assert w._preview_spin.maximum() == 4
     w.preview_index = 4  # the disc
@@ -130,9 +134,11 @@ def test_group_toggle_auto_applies(qapp, capture, images_table):
     sent = capture(w.Outputs.features)
     w.set_data(images_table)
     w.commit.now()
+    w.wait_for_extraction()
     assert "bluish_fraction" not in [v.name for v in sent[-1].domain.attributes]
 
     w._group_checks["G"].setChecked(True)  # toggles -> settings -> commit
+    w.wait_for_extraction()
     assert "bluish_fraction" in [v.name for v in sent[-1].domain.attributes]
 
 
@@ -152,22 +158,27 @@ def test_cache_reuses_features_for_groups_and_parameters(qapp, capture, images_t
     capture(w.Outputs.features)
     w.set_data(images_table)
     w.commit.now()
+    w.wait_for_extraction()
     assert calls == ["ABCDEFG"] * 5
 
     # group selection is a column subset of the cached raw features
     w.groups_enabled = "E"
     w.commit.now()
+    w.wait_for_extraction()
     assert calls == ["ABCDEFG"] * 5
 
     # parameter changes recompute only the affected profile/texture groups
     w.peak_prominence_frac = 0.2
     w.commit.now()
+    w.wait_for_extraction()
     assert calls[5:] == ["B"] * 5
     w.edge_density_frac = 0.8
     w.commit.now()
+    w.wait_for_extraction()
     assert calls[10:] == ["D"] * 5
 
     # preprocessing changes reuse the decoded images but recompute all groups
     w.working_size = 64
     w.commit.now()
+    w.wait_for_extraction()
     assert calls[15:] == ["ABCDEFG"] * 5

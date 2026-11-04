@@ -4,17 +4,19 @@ A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
 group options, a luminance/profile preview, and the Orange signal adapters.
 
 Decoded images and their raw feature values are cached, so changing feature
-groups or scaling reuses the cached features instead of re-reading every image.
-Preprocessing changes and parameter changes recompute from the cached images.
+groups reuses the cached features instead of re-reading every image. Loading and
+feature computation run in a background thread; the widget's progress bar
+reports both phases.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import traceback
 from dataclasses import dataclass
 
 import numpy as np
-from AnyQt.QtCore import Qt
+from AnyQt.QtCore import Qt, QThread, pyqtSignal
 from AnyQt.QtGui import QImage, QPixmap
 from AnyQt.QtWidgets import QCheckBox, QLabel
 from Orange.data import ContinuousVariable, Domain, Table
@@ -75,6 +77,126 @@ class _FeatureCache:
     params_key: tuple
 
 
+@dataclass
+class _WorkerResult:
+    generation: int
+    data_version: int
+    image_cache: _ImageCache
+    feature_cache: _FeatureCache
+
+
+class ImageExtractionWorker(QThread):
+    """Load images and compute features without blocking the GUI thread.
+
+    ``groups`` is the group subset to compute. ``_ALL_GROUPS`` means a full
+    computation; ``"B"``/``"D"`` recompute only the parameter-dependent groups
+    on top of an existing feature cache.
+    """
+
+    progress = pyqtSignal(int)
+    finished_ok = pyqtSignal(object)  # _WorkerResult
+    failed = pyqtSignal(str, int)  # traceback, generation
+
+    def __init__(
+        self,
+        generation: int,
+        data_version: int,
+        *,
+        paths: tuple[str, ...],
+        skipped_no_path: int,
+        image_cache: _ImageCache | None,
+        feature_cache: _FeatureCache | None,
+        options,
+        preprocess_key: tuple,
+        params_key: tuple,
+        groups: str,
+    ):
+        super().__init__()
+        self._generation = generation
+        self._data_version = data_version
+        self._paths = paths
+        self._skipped_no_path = skipped_no_path
+        self._image_cache = image_cache
+        self._feature_cache = feature_cache
+        self._options = options
+        self._preprocess_key = preprocess_key
+        self._params_key = params_key
+        self._groups = groups
+        self._stop = False
+        self.result: _WorkerResult | None = None
+        self.error: tuple[str, int] | None = None
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            import cv2
+
+            from nn_kernel.features import all_feature_names, extract_features
+
+            image_cache = self._image_cache
+            if image_cache is None:
+                images: list[np.ndarray] = []
+                readable: list[int] = []
+                n_unreadable = 0
+                total = max(1, 2 * len(self._paths))
+                for n, (source, path) in enumerate(self._paths):
+                    if self._stop:
+                        return
+                    bgr = cv2.imread(path)
+                    if bgr is None:
+                        n_unreadable += 1
+                    else:
+                        images.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+                        readable.append(source)
+                    self.progress.emit(int(100 * (n + 1) / total))
+                image_cache = _ImageCache(
+                    tuple(path for _, path in self._paths),
+                    images,
+                    tuple(readable),
+                    n_unreadable,
+                    self._skipped_no_path,
+                )
+                start = len(self._paths)
+            else:
+                start = 0
+
+            names = all_feature_names()
+            if self._groups == _ALL_GROUPS:
+                values = np.empty((len(image_cache.images), len(names)), dtype=np.float64)
+                columns = {name: i for i, name in enumerate(names)}
+            else:
+                names = self._feature_cache.names
+                values = self._feature_cache.values.copy()
+                columns = {name: i for i, name in enumerate(names)}
+
+            total = max(1, start + len(image_cache.images))
+            for n, image in enumerate(image_cache.images):
+                if self._stop:
+                    return
+                vec = extract_features(image, self._options, groups=self._groups)
+                for name, value in vec.items():
+                    values[n, columns[name]] = value
+                self.progress.emit(int(100 * (start + n + 1) / total))
+            if not image_cache.images:
+                self.progress.emit(100)
+
+            feature_cache = _FeatureCache(
+                tuple(names), values, self._preprocess_key, self._params_key
+            )
+            self.result = _WorkerResult(
+                self._generation,
+                self._data_version,
+                image_cache,
+                feature_cache,
+            )
+            self.finished_ok.emit(self.result)
+        except Exception:
+            self.error = (traceback.format_exc(), self._generation)
+            self.failed.emit(*self.error)
+
+
 class OWImageFeatureExtractor(OWWidget):
     """Extract human-interpretable features from images.
 
@@ -133,6 +255,11 @@ class OWImageFeatureExtractor(OWWidget):
         self._paths: list[str] = []
         self._image_cache: _ImageCache | None = None
         self._feature_cache: _FeatureCache | None = None
+        self._worker: ImageExtractionWorker | None = None
+        self._generation = 0
+        self._data_version = 0
+        self._restart_pending = False
+        self._last_result: _WorkerResult | None = None
 
         prep_box = gui.widgetBox(self.controlArea, "Preprocessing")
         gui.spin(
@@ -302,6 +429,7 @@ class OWImageFeatureExtractor(OWWidget):
     @Inputs.images
     def set_data(self, table):
         self.data = table
+        self._data_version += 1
         self._image_cache = None
         self._feature_cache = None
         self._paths = []
@@ -316,6 +444,13 @@ class OWImageFeatureExtractor(OWWidget):
         self.Error.opencv_missing.clear()
         self.Error.extraction_failed.clear()
         if self.data is None:
+            self._generation += 1
+            self._restart_pending = False
+            if self._worker is not None:
+                self._worker.stop()
+                self._worker.wait()
+                self._worker = None
+                self.progressBarFinished()
             self._paths = []
             self.Outputs.features.send(None)
             self._update_preview()
@@ -348,101 +483,112 @@ class OWImageFeatureExtractor(OWWidget):
         _, paths = image_paths(self.data)
 
         kept = [(i, p) for i, p in enumerate(paths) if p]
-        if self._image_cache is None:
-            self._image_cache = self._load_images(kept, len(paths) - len(kept))
-            self._feature_cache = None
-
-        image_cache = self._image_cache
-        self._paths = list(image_cache.paths)
-        self._clamp_preview()
-
         preprocess_key = self._preprocess_key()
         params_key = self._params_key()
-        if self._feature_cache is None or self._feature_cache.preprocess_key != preprocess_key:
-            self._feature_cache = self._compute_all_features(
-                image_cache, preprocess_key, params_key
-            )
-        elif self._feature_cache.params_key != params_key:
-            self._recompute_parameter_features(
-                image_cache, self._feature_cache, preprocess_key, params_key
-            )
 
-        self._send_features()
+        self._generation += 1
+        generation = self._generation
+        if self._worker is not None and self._worker.isRunning():
+            self._restart_pending = True
+            return
 
-    def _load_images(self, kept: list[tuple[int, str]], skipped_no_path: int) -> _ImageCache:
-        import cv2
+        image_cache = self._image_cache
+        feature_cache = self._feature_cache
+        if image_cache is None:
+            groups = _ALL_GROUPS
+            feature_cache = None
+        elif feature_cache is None or feature_cache.preprocess_key != preprocess_key:
+            groups = _ALL_GROUPS
+            feature_cache = None
+        elif feature_cache.params_key != params_key:
+            old_peak, old_edge = feature_cache.params_key
+            new_peak, new_edge = params_key
+            groups = ("B" if old_peak != new_peak else "") + ("D" if old_edge != new_edge else "")
+            if not groups:
+                self._send_features()
+                return
+        else:
+            self._paths = list(image_cache.paths)
+            self._clamp_preview()
+            self._send_features()
+            return
 
-        images: list[np.ndarray] = []
-        readable: list[int] = []
-        n_unreadable = 0
-        self.progressBarInit()
-        try:
-            for n, (i, path) in enumerate(kept):
-                self.progressBarSet(100.0 * n / max(len(kept), 1))
-                bgr = cv2.imread(path)
-                if bgr is None:
-                    n_unreadable += 1
-                    continue
-                images.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
-                readable.append(i)
-        finally:
-            self.progressBarFinished()
-        return _ImageCache(
-            paths=tuple(path for _, path in kept),
-            images=images,
-            readable_source=tuple(readable),
-            n_unreadable=n_unreadable,
-            skipped_no_path=skipped_no_path,
+        self._start_worker(
+            generation,
+            kept,
+            len(paths) - len(kept),
+            image_cache,
+            feature_cache,
+            groups,
+            preprocess_key,
+            params_key,
         )
 
-    def _compute_all_features(
-        self, image_cache: _ImageCache, preprocess_key: tuple, params_key: tuple
-    ) -> _FeatureCache:
-        from nn_kernel.features import all_feature_names, extract_features
-
-        names = all_feature_names()
-        values = np.empty((len(image_cache.images), len(names)), dtype=np.float64)
-        opts = self._feature_options()
-        self.progressBarInit()
-        try:
-            for n, image in enumerate(image_cache.images):
-                self.progressBarSet(100.0 * n / max(len(image_cache.images), 1))
-                vec = extract_features(image, opts, groups=_ALL_GROUPS)
-                values[n] = [vec[name] for name in names]
-        finally:
-            self.progressBarFinished()
-        return _FeatureCache(names, values, preprocess_key, params_key)
-
-    def _recompute_parameter_features(
+    def _start_worker(
         self,
-        image_cache: _ImageCache,
-        feature_cache: _FeatureCache,
-        preprocess_key: tuple,
-        params_key: tuple,
-    ) -> None:
-        from nn_kernel.features import extract_features
+        generation,
+        kept,
+        skipped_no_path,
+        image_cache,
+        feature_cache,
+        groups,
+        preprocess_key,
+        params_key,
+    ):
+        self._restart_pending = False
+        worker = ImageExtractionWorker(
+            generation,
+            self._data_version,
+            paths=tuple(kept),
+            skipped_no_path=skipped_no_path,
+            image_cache=image_cache,
+            feature_cache=feature_cache,
+            options=self._feature_options(),
+            preprocess_key=preprocess_key,
+            params_key=params_key,
+            groups=groups,
+        )
+        worker.progress.connect(self.progressBarSet)
+        worker.finished_ok.connect(self._on_worker_done)
+        worker.failed.connect(self._on_worker_failed)
+        self._worker = worker
+        self.progressBarInit()
+        worker.start()
 
-        old_peak, old_edge = feature_cache.params_key
-        new_peak, new_edge = params_key
-        groups = ""
-        if old_peak != new_peak:
-            groups += "B"
-        if old_edge != new_edge:
-            groups += "D"
-        if groups:
-            opts = self._feature_options()
-            columns = {name: i for i, name in enumerate(feature_cache.names)}
-            self.progressBarInit()
-            try:
-                for n, image in enumerate(image_cache.images):
-                    self.progressBarSet(100.0 * n / max(len(image_cache.images), 1))
-                    vec = extract_features(image, opts, groups=groups)
-                    for name, value in vec.items():
-                        feature_cache.values[n, columns[name]] = value
-            finally:
-                self.progressBarFinished()
-        feature_cache.preprocess_key = preprocess_key
-        feature_cache.params_key = params_key
+    def _on_worker_done(self, result: _WorkerResult):
+        if result is self._last_result:
+            return
+        self._last_result = result
+        self.progressBarFinished()
+        self._worker = None
+        if result.data_version == self._data_version:
+            # Accept a result that is still valid for the current data, even
+            # when a setting changed while the worker was running.
+            self._image_cache = result.image_cache
+            if (
+                result.feature_cache.preprocess_key == self._preprocess_key()
+                and result.feature_cache.params_key == self._params_key()
+            ):
+                self._feature_cache = result.feature_cache
+        if result.generation != self._generation:
+            if self._restart_pending:
+                self._restart_pending = False
+                self.commit.now()
+            return
+        self._paths = list(result.image_cache.paths)
+        self._clamp_preview()
+        self._send_features()
+
+    def _on_worker_failed(self, tb: str, generation: int):
+        self.progressBarFinished()
+        self._worker = None
+        if generation != self._generation:
+            if self._restart_pending:
+                self._restart_pending = False
+                self.commit.now()
+            return
+        last = tb.strip().splitlines()[-1] if tb.strip() else "unknown error"
+        self.Error.extraction_failed(last)
 
     def _send_features(self):
         from nn_kernel.features import group_names
@@ -484,10 +630,35 @@ class OWImageFeatureExtractor(OWWidget):
         self.Outputs.features.send(out)
         self._update_preview()
 
+    def wait_for_extraction(self, timeout_ms: int = 30000):
+        """Wait for the current and any pending extraction worker.
+
+        The worker stores its result before emitting the signal, so tests can
+        consume it without spinning the GUI event loop.
+        """
+        while self._worker is not None:
+            worker = self._worker
+            worker.wait(timeout_ms)
+            self._worker = None
+            if worker.result is not None:
+                self._on_worker_done(worker.result)
+            elif worker.error is not None:
+                self._on_worker_failed(*worker.error)
+            else:
+                self.progressBarFinished()
+                break
+
     def _clamp_preview(self):
         n = len(self._paths)
         self.preview_index = min(self.preview_index, max(n - 1, 0))
         self._preview_spin.setMaximum(max(n - 1, 0))
+
+    def onDeleteWidget(self):
+        if self._worker is not None:
+            self._worker.stop()
+            self._worker.wait()
+            self._worker = None
+        super().onDeleteWidget()
 
 
 if __name__ == "__main__":  # pragma: no cover - dev preview

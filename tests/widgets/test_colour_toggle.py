@@ -9,9 +9,11 @@ def test_widget_colour_toggle_makes_40_columns(qapp, capture, images_table):
     w.show()
     features_sent = capture(w.Outputs.features)
     w.set_data(images_table)
+    w.wait_for_extraction()
     w._group_checks["G"].setChecked(True)
     assert w.groups_enabled == "ABCDEFG"
     w.commit.now()
+    w.wait_for_extraction()
     out = features_sent[-1]
     from nn_kernel.features import all_feature_names
 
