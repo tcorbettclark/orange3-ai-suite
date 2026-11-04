@@ -5,6 +5,7 @@ extra) AND the converted model on disk; deg + routing tests run anywhere.
 """
 
 import importlib.util
+import json
 
 import numpy as np
 import pytest
@@ -92,3 +93,28 @@ def test_trainable_parameter_note_is_reported(qapp):
     w._on_metric({"kind": "params", "pct": 0.233, "detail": "6.21M / 2.67B"})
     assert "0.233%" in w.status_label.text()
     assert "6.21M / 2.67B" in w.status_label.text()
+
+
+def test_lora_fp16_guard_blocks_unconverted_model(qapp, text_table, tmp_path):
+    """4-bit QLoRA only: an unquantised base model must not train."""
+    w = OWLoRATrainer()
+    w.show()
+    w.set_data(text_table)
+    unquantised = tmp_path / "fp16-model"
+    unquantised.mkdir()
+    (unquantised / "config.json").write_text(json.dumps({"model_type": "llama"}))
+    w.base_model = str(unquantised)
+    w.run_training_blocking()
+    assert w.Warning.fp16_model.is_shown()
+    assert w.worker is None
+
+
+def test_lora_fp16_guard_accepts_quantised_dir(qapp, text_table):
+    from pathlib import Path
+
+    w = OWLoRATrainer()
+    quantised_dir = Path(__file__).resolve().parents[2] / "data" / "models" / "britllm-4bit"
+    if not (quantised_dir / "config.json").exists():
+        pytest.skip("converted model absent")
+    assert w._model_is_quantised(str(quantised_dir))
+    assert not w._model_is_quantised("britllm/britllm-3b-v0.1")

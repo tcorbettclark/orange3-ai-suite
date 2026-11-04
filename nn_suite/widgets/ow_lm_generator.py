@@ -27,11 +27,9 @@ class OWLMGenerator(OWWidget):
     seed. Generations are emitted as a one-column Table, ready for Corpus
     Viewer and the Orange3-Text analysis widgets.
 
-    ``Load model...`` opens a saved artifact directory: a Keras LM
-    (``meta.json``) or a LoRA adapter (``lora_meta.json``). The loaded model
-    stays active until the input signal replaces it. For LoRA models, the
-    "Use LoRA adapter" checkbox switches between the adapted model and its raw
-    base model, so the before/after comparison uses the identical weights.
+    For LoRA models, the "Use LoRA adapter" checkbox switches between the
+    adapted model and its raw base model, so the before/after comparison uses
+    the identical weights.
     """
 
     name = "LM Generator"
@@ -50,11 +48,7 @@ class OWLMGenerator(OWWidget):
         not_generative = Msg("The connected model does not expose generate().")
 
     class Error(OWWidget.Error):
-        load_failed = Msg("Could not load the model: {}")
         generation_failed = Msg("Generation failed: {}")
-
-    class Information(OWWidget.Information):
-        loaded = Msg("Loaded {} model: {}.")
 
     prompt = Setting("the")
     temperature = Setting(0.8)
@@ -90,14 +84,12 @@ class OWLMGenerator(OWWidget):
             "Use LoRA adapter (when available)",
         )
         self._adapter_check.setEnabled(False)
-        gui.button(self.controlArea, self, "Load model...", callback=self.load_model)
         gui.button(self.controlArea, self, "Generate", callback=self.generate)
         gui.rubber(self.controlArea)
 
     @Inputs.model
     def set_model(self, model):
         self.model = model
-        self.Error.load_failed.clear()
         self.Warning.not_generative(
             shown=model is not None and not callable(getattr(model, "generate", None))
         )
@@ -105,38 +97,6 @@ class OWLMGenerator(OWWidget):
         self._adapter_check.setEnabled(supports_adapter)
         if supports_adapter:
             self.use_adapter = bool(model.adapter_enabled)
-
-    def load_model(self):
-        """Load a saved model artifact directory."""
-        from pathlib import Path
-
-        self.Error.load_failed.clear()
-
-        from AnyQt.QtWidgets import QFileDialog
-
-        src_dir = QFileDialog.getExistingDirectory(
-            self, "Select a saved model/adapter artifact directory"
-        )
-        if not src_dir:
-            return
-        src = Path(src_dir)
-        try:
-            if (src / "lora_meta.json").exists():
-                from nn_kernel.lora import LoRAModel
-
-                model, kind = LoRAModel.from_artifact(src), "MLX LoRA"
-            elif (src / "meta.json").exists():
-                from nn_kernel.lm import LanguageModel
-
-                model, kind = LanguageModel.load(src), "Keras LM"
-            else:
-                self.Warning.not_generative()
-                return
-        except Exception as exc:
-            self.Error.load_failed(f"{type(exc).__name__}: {exc}")
-            return
-        self.set_model(model)
-        self.Information.loaded(kind, src.name)
 
     def generate(self):
         self.Outputs.generations.send(None)

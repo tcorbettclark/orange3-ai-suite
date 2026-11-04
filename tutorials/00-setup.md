@@ -117,12 +117,9 @@ links.
 ## 6. Save your work
 
 - Orange workflow: **File > Save As**.
-- Keras language model: **Save model** in LM Trainer. This writes a directory
-  containing the weights, vocabulary and metadata.
-- LoRA adapter: **Save adapter** in LoRA Trainer. This writes a directory
-  containing the adapter files and the base-model reference.
-
-The Generator can load either directory with **Load model...**.
+- Trained models currently travel through the canvas as **Model** signals.
+  Persistence to disk is being moved to dedicated Load LM/Save LM widgets, so
+  the Trainer and Generator do not have their own save/load buttons.
 
 ## 7. The LoRA adapter switch
 

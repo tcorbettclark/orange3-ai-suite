@@ -94,17 +94,11 @@ The run ends cleanly and the partially trained model is still emitted. Check
 the checkpoint table and generate from it in
 [05 - Generation and temperature](05-generation.md).
 
-## 7. Save the model
+## 7. Keep the model in the workflow
 
-Press **Save model** and choose a directory such as `my-story-lm`. The
-directory contains:
-
-- the Keras weights;
-- the tokenizer;
-- the hyperparameters and corpus statistics.
-
-The model and its vocabulary are one unit. Loading the directory later
-reproduces the same model.
+The trained model is emitted on the **Model** output and can be connected
+directly to **LM Generator**. The Trainer no longer has a Save button;
+persistence will return as a dedicated Save LM widget.
 
 ## Checkpoint
 

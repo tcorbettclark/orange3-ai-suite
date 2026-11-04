@@ -9,9 +9,6 @@ Use the LM Trainer from [04 - Train from scratch](04-train-from-scratch.md):
 
 - *LM Trainer* **Model** → *LM Generator* **Model**
 
-Alternatively press **Load model...** in the Generator and choose a saved
-model directory.
-
 ## 2. First generation
 
 Set:
@@ -55,14 +52,11 @@ This is the difference between training-time ground truth and generation-time
 feedback: at each step the Generator feeds its own prediction back into the
 model. A seed makes that loop reproducible.
 
-## 5. Save and load a round trip
+## 5. Model persistence
 
-1. In LM Trainer, press **Save model** and save to a directory.
-2. In LM Generator, press **Load model...** and select that directory.
-3. Generate with temperature 0.0 and seed 0.
-
-The loaded model should reproduce the same greedy text. This checks that the
-weights *and* the tokenizer were saved together.
+The Trainer and Generator exchange models through the normal Orange **Model**
+signal. Saving and loading model directories is being moved to dedicated
+Load LM/Save LM widgets.
 
 ## 6. Compare two models
 

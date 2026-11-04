@@ -157,9 +157,10 @@ from-scratch models and fine-tuned base models.
 The prompt, temperature, maximum new tokens, number of generations and seed are
 all controls. Low temperature is repetitive; high temperature dissolves into
 word salad. Generations are emitted as a one-column Table that Corpus Viewer
-and Orange3-Text widgets can read. `Load model...` opens a saved Keras model or
-LoRA adapter directory. For LoRA models, a **Use LoRA adapter** checkbox switches
-between the adapted model and its raw base model.
+and Orange3-Text widgets can read. For LoRA models, a **Use LoRA adapter**
+checkbox switches between the adapted model and its raw base model. Model
+persistence is intentionally not part of the Trainer or Generator; a dedicated
+Load LM/Save LM pair will own that role.
 
 ### LoRA Trainer
 

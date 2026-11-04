@@ -100,7 +100,6 @@ class OWLoRATrainer(OWWidget):
 
     class Information(OWWidget.Information):
         training = Msg("Training in progress; press Stop to end early.")
-        saved = Msg("Adapter artifact saved to {}.")
 
     # settings
     base_model = Setting(DEFAULT_BASE_MODEL)
@@ -144,7 +143,6 @@ class OWLoRATrainer(OWWidget):
 
         gui.button(self.controlArea, self, "Train", callback=self.start_training)
         gui.button(self.controlArea, self, "Stop", callback=self.stop_training)
-        gui.button(self.controlArea, self, "Save adapter", callback=self.save_adapter)
         self.status_label = gui.label(self.controlArea, self, "")
 
         import pyqtgraph as pg
@@ -316,9 +314,9 @@ class OWLoRATrainer(OWWidget):
         self.Outputs.model.send(self.model)
         detail = f" ({self._trainable_note})" if self._trainable_note else ""
         self.status_label.setText(
-            f"Done: adapter trained ({adapter.name or 'adapter'}){detail}; use "
-            "Save adapter to keep it, or connect the Model output to LM "
-            "Generator for the before/after comparison."
+            f"Done: adapter trained ({adapter.name or 'adapter'}){detail}; "
+            "connect the Model output to LM Generator for the before/after "
+            "comparison."
         )
 
     def _on_failed(self, tb: str):
@@ -333,18 +331,6 @@ class OWLoRATrainer(OWWidget):
             self.Error.mlx_missing()
         else:
             self.Error.training_failed(last)
-
-    def save_adapter(self):
-        from AnyQt.QtWidgets import QFileDialog
-
-        if self.model is None:
-            self.Warning.nothing_to_train()
-            return
-        path, _ = QFileDialog.getSaveFileName(self, "Save adapter artifact", "lora-adapter")
-        if not path:
-            return
-        saved = self.model.save(path)
-        self.Information.saved(str(saved))
 
     def onDeleteWidget(self):
         if self.worker is not None:

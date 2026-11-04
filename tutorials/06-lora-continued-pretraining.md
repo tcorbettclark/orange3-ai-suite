@@ -55,8 +55,8 @@ What is happening:
   continued pre-training, not instruction tuning.
 
 The model output is a `LoRAModel` holding the base model and the adapter. The
-adapter is not permanent until you press **Save adapter**; do that now, for
-example as `my-britllm-cpt`.
+adapter currently lives in the live Model signal; persistence will return as a
+dedicated Save LM widget.
 
 If training reports that the validation split is smaller than the batch size,
 reduce **Batch size** or provide more data.
