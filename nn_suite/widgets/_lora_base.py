@@ -1,14 +1,8 @@
-"""LoRA Trainer: fine-tune a real LLM with 4-bit QLoRA (Apple Silicon).
+"""Shared widget machinery for the LoRA Pre-trainer and LoRA SFT widgets.
 
-A thin shell over :mod:`nn_kernel.lora`. The widget adds the QThread and live
-loss curve, the base-model selector, the two data formats and the output
-artifact (adapter + base-model reference as one unit).
-
-The data-format choice is a teaching beat:
-
-- "Raw corpus" - continued pre-training, still self-supervised;
-- "Prompt-response pairs" - supervised fine-tuning, with the prompt masked
-  out of the loss.
+A thin shell over :mod:`nn_kernel.lora`. The base class owns the QThread, live
+loss curve, base-model selector, hyperparameters and Model output. Subclasses
+supply only the data contract and the explanatory data box.
 
 MLX is required (macOS on Apple Silicon); other machines get the standard
 graceful-degradation message.
@@ -19,14 +13,12 @@ from __future__ import annotations
 import traceback
 
 from AnyQt.QtCore import QThread, pyqtSignal
+from AnyQt.QtWidgets import QLabel
 from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from nn_suite.adapters import table_pairs, table_texts
-
-DATA_FORMATS = ("Raw corpus (continued pre-training)", "Prompt-response pairs (SFT)")
 DEFAULT_BASE_MODEL = "britllm/britllm-3b-v0.1"
 
 
@@ -56,26 +48,20 @@ class LoraWorker(QThread):
             self.failed.emit(traceback.format_exc())
 
 
-class OWLoRATrainer(OWWidget):
-    """Fine-tune a pretrained model with 4-bit QLoRA.
+class LoRATrainerBase(OWWidget, openclass=True):
+    """Shared 4-bit QLoRA training UI for the two LoRA widgets.
 
-    Input is a Table of raw text (one document per row) or prompt-response
-    pairs. Output is a ``LoRAModel``: the base model plus the trained adapter,
-    ready for the LM Generator.
-
-    The "Data format" choice is the lesson. A raw corpus trains with the same
-    next-token loss as pre-training (continued pre-training). Prompt-response
-    pairs are supervised fine-tuning: the completion tokens carry the loss and
-    the prompt is masked out. The live curve shows loss per iteration; the
+    Subclasses supply ``data_box_title``, ``data_help`` and ``_make_lora_data``.
+    The output is a ``LoRAModel``: the base model plus the trained adapter,
+    ready for the LM Generator. The live curve shows loss per iteration; the
     adapter's trainable-parameter share is a small fraction of the base
     model's parameters.
     """
 
-    name = "LoRA Trainer"
-    description = "Fine-tune a real LLM with 4-bit QLoRA (Apple Silicon)."
-    icon = "icons/lora_trainer.svg"
-    priority = 15
-    keywords = ["lora", "fine-tuning", "sft", "mlx", "qlora"]  # noqa: RUF012
+    name = None  # not a registered widget; subclasses provide the UI
+
+    data_box_title = "Data"
+    data_help = ""
 
     class Inputs:
         data = Input("Data", Table)
@@ -103,7 +89,6 @@ class OWLoRATrainer(OWWidget):
 
     # settings
     base_model = Setting(DEFAULT_BASE_MODEL)
-    data_format_index = Setting(0)  # raw corpus is the classroom default
     iters = Setting(300)
     learning_rate = Setting(1e-4)
     num_layers = Setting(16)
@@ -130,8 +115,11 @@ class OWLoRATrainer(OWWidget):
             "model; demo/fetch_britllm.py produces one.",
         )
 
-        data_box = gui.widgetBox(self.controlArea, "Data format (the lesson)")
-        gui.comboBox(data_box, self, "data_format_index", items=list(DATA_FORMATS))
+        data_box = gui.widgetBox(self.controlArea, self.data_box_title)
+        if self.data_help:
+            help_label = QLabel(self.data_help)
+            help_label.setWordWrap(True)
+            data_box.layout().addWidget(help_label)
 
         train_box = gui.widgetBox(self.controlArea, "Training")
         gui.spin(train_box, self, "iters", 1, 5000, label="Iterations")
@@ -166,13 +154,14 @@ class OWLoRATrainer(OWWidget):
 
     # ---- lifecycle ---------------------------------------------------------
 
-    def _collect_request(self, tmp_dir) -> dict:
-        from nn_kernel.lora import LoraData, LoraOptions
+    def _make_lora_data(self):
+        """Build the kernel's ``LoraData`` from the connected Table."""
+        raise NotImplementedError
 
-        if self.data_format_index == 1:
-            data_obj = LoraData.from_pairs(table_pairs(self.data))
-        else:
-            data_obj = LoraData.from_texts(table_texts(self.data))
+    def _collect_request(self, tmp_dir) -> dict:
+        from nn_kernel.lora import LoraOptions
+
+        data_obj = self._make_lora_data()
         options = LoraOptions(
             iters=self.iters,
             learning_rate=self.learning_rate,
@@ -337,9 +326,3 @@ class OWLoRATrainer(OWWidget):
             self.worker.request_stop_flag = True
             self.worker.wait(5000)
         super().onDeleteWidget()
-
-
-if __name__ == "__main__":  # pragma: no cover - dev preview
-    from orangewidget.utils.widgetpreview import WidgetPreview
-
-    WidgetPreview(OWLoRATrainer).run()

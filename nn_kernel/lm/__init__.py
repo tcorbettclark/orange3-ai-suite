@@ -2,7 +2,7 @@
 Keras model ladder.
 
 The Keras-dependent names (builders, training, ``LanguageModel``) resolve
-lazily, so importing the tokenizer or the vocab-inspector logic never pulls in
+lazily, so importing the tokenizer or the vocab-viewer logic never pulls in
 TensorFlow. That keeps the widget layer's optional ``[lm]`` extra genuinely
 optional.
 """

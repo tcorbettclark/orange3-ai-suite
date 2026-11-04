@@ -113,10 +113,10 @@ def fire_hover():
 
 @pytest.fixture()
 def widget(qapp, make_model):
-    """An OWNeuralNetworkViewer instance."""
-    from nn_suite.widgets.ow_nn_viewer import OWNeuralNetworkViewer
+    """An OWNNViewer instance."""
+    from nn_suite.widgets.ow_nn_viewer import OWNNViewer
 
-    w = OWNeuralNetworkViewer()
+    w = OWNNViewer()
     w.show()
     yield w
     w.close()

@@ -20,23 +20,22 @@ Get the absolute model path:
 python -c "from pathlib import Path; print(Path('data/models/britllm-4bit').resolve())"
 ```
 
-Paste that path into the LoRA Trainer's **Base model** field. A Hugging Face id
-is treated as unquantised and is rejected; the Trainer only accepts a verifiably
-4-bit model.
+Paste that path into the LoRA Pre-trainer's **Base model** field. A Hugging Face
+id is treated as unquantised and is rejected; the widget only accepts a
+verifiably 4-bit model.
 
 ## 1. Load the corpus Table
 
-Add **LM Text** and load `data/text/yellow-wallpaper.txt` as described in
-[00 - Setup](00-setup.md#3-load-text-with-lm-text). Use **Paragraphs**, and
+Add **LM Text Loader** and load `data/text/yellow-wallpaper.txt` as described in
+[00 - Setup](00-setup.md#3-load-text-with-lm-text-loader). Use **Paragraphs**, and
 enable the Gutenberg and reflow cleaning rules.
 
-Connect **Data** to **LoRA Trainer** **Data**.
+Connect **Data** to **LoRA Pre-trainer** **Data**.
 
 ## 2. Continued pre-training
 
 Set:
 
-- **Data format**: Raw corpus (continued pre-training)
 - **Iterations**: 30 for the first pass
 - **Learning rate**: 1e-4
 - **Fine-tuned layers**: 16
@@ -63,7 +62,7 @@ reduce **Batch size** or provide more data.
 
 ## 3. Compare base and adapted model
 
-Connect *LoRA Trainer* **Model** → *LM Generator* **Model**.
+Connect *LoRA Pre-trainer* **Model** → *LM Generator* **Model**.
 
 Set:
 

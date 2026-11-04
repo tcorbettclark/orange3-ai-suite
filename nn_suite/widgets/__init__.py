@@ -1,21 +1,23 @@
 """Neural Networks add-on widgets for Orange Data Mining."""
 
-from .ow_image_features import OWImageFeatureExtractor
 from .ow_lm_generator import OWLMGenerator
-from .ow_lm_text import OWLMText
-from .ow_lm_trainer import OWLMTrainer
-from .ow_lora_trainer import OWLoRATrainer
-from .ow_nn_viewer import OWNeuralNetworkViewer
-from .ow_pixel_features import OWPixelFeatures
-from .ow_vocab_inspector import OWVocabInspector
+from .ow_lm_pretrainer import OWLMPretrainer
+from .ow_lm_text_loader import OWLMTextLoader
+from .ow_lm_vocab_viewer import OWLMVocabViewer
+from .ow_lora_pretrainer import OWLoRAPretrainer
+from .ow_lora_sft import OWLoRASFT
+from .ow_nn_image_features import OWNNImageFeatures
+from .ow_nn_image_pixels import OWNNImagePixels
+from .ow_nn_viewer import OWNNViewer
 
 __all__ = [
-    "OWImageFeatureExtractor",
     "OWLMGenerator",
-    "OWLMText",
-    "OWLMTrainer",
-    "OWLoRATrainer",
-    "OWNeuralNetworkViewer",
-    "OWPixelFeatures",
-    "OWVocabInspector",
+    "OWLMPretrainer",
+    "OWLMTextLoader",
+    "OWLMVocabViewer",
+    "OWLoRAPretrainer",
+    "OWLoRASFT",
+    "OWNNImageFeatures",
+    "OWNNImagePixels",
+    "OWNNViewer",
 ]

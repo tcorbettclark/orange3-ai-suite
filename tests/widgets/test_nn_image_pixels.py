@@ -1,13 +1,13 @@
-"""Pixel Features widget tests: raw pixel columns and path handling."""
+"""NN Image Pixels widget tests: raw pixel columns and path handling."""
 
 import numpy as np
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.widgets.ow_pixel_features import OWPixelFeatures
+from nn_suite.widgets.ow_nn_image_pixels import OWNNImagePixels
 
 
 def test_pixel_features_output(qapp, capture, images_table):
-    w = OWPixelFeatures()
+    w = OWNNImagePixels()
     w.show()
     sent = capture(w.Outputs.features)
     w.set_data(images_table)
@@ -29,7 +29,7 @@ def test_pixel_features_output(qapp, capture, images_table):
 
 
 def test_pixel_features_dimensions_change_output(qapp, capture, images_table):
-    w = OWPixelFeatures()
+    w = OWNNImagePixels()
     w.show()
     sent = capture(w.Outputs.features)
     w.set_data(images_table)
@@ -53,7 +53,7 @@ def test_pixel_features_missing_file_skips_row(qapp, capture, image_dir):
     metas = np.asarray(names, dtype=object).reshape(-1, 1)
     table = Table.from_numpy(domain, np.empty((len(names), 0)), None, metas)
 
-    w = OWPixelFeatures()
+    w = OWNNImagePixels()
     w.show()
     sent = capture(w.Outputs.features)
     w.set_data(table)
@@ -64,7 +64,7 @@ def test_pixel_features_missing_file_skips_row(qapp, capture, image_dir):
 
 
 def test_pixel_features_no_image_column(qapp):
-    w = OWPixelFeatures()
+    w = OWNNImagePixels()
     w.show()
     domain = Domain([], metas=[StringVariable("text")])
     table = Table.from_numpy(

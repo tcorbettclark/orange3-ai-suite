@@ -1,9 +1,9 @@
-"""LM Text widget: file/folder reading, row modes, Q/A pairs and preview."""
+"""LM Text Loader widget: file/folder reading, row modes, Q/A pairs and preview."""
 
 from AnyQt.QtWidgets import QPlainTextEdit
 
 from nn_suite.adapters import table_texts
-from nn_suite.widgets.ow_lm_text import OWLMText
+from nn_suite.widgets.ow_lm_text_loader import OWLMTextLoader
 
 
 def _write(path, text):
@@ -13,7 +13,7 @@ def _write(path, text):
 
 
 def test_new_instance_starts_empty(qapp):
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     assert w._rows == []
     assert w._table.rowCount() == 0
@@ -22,7 +22,7 @@ def test_new_instance_starts_empty(qapp):
 
 def test_document_file_rows_and_preview(qapp, capture, tmp_path):
     path = _write(tmp_path / "book.txt", "First paragraph.\n\nSecond paragraph.")
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     sent = capture(w.Outputs.data)
     w.source_type = 0
@@ -45,7 +45,7 @@ def test_folder_is_recursive_and_keeps_source(qapp, capture, tmp_path):
     _write(root / "sub" / "b.txt", "Beta.")
     _write(root / "ignore.md", "not text")
 
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     sent = capture(w.Outputs.data)
     w.source_type = 1
@@ -67,7 +67,7 @@ def test_qa_mode_extracts_pairs_and_warns_on_malformed(qapp, capture, tmp_path):
         "Q: This one has no answer\n"
         "Q: What is she obsessed with?\nA: The yellow wallpaper.\n",
     )
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     sent = capture(w.Outputs.data)
     w.table_mode = 1
@@ -88,7 +88,7 @@ def test_qa_mode_extracts_pairs_and_warns_on_malformed(qapp, capture, tmp_path):
 
 def test_reload_reads_changed_file(qapp, capture, tmp_path):
     path = _write(tmp_path / "live.txt", "Only one.")
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     sent = capture(w.Outputs.data)
     w.source_type = 0
@@ -106,7 +106,7 @@ def test_preview_is_capped_with_explanation(qapp, capture, tmp_path):
         tmp_path / "many.txt",
         "\n".join(f"line {i}" for i in range(205)),
     )
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     sent = capture(w.Outputs.data)
     w.source_type = 0
@@ -126,7 +126,7 @@ def test_gutenberg_cleaning_is_applied(qapp, capture, tmp_path):
         "Header\n*** START OF THE PROJECT GUTENBERG EBOOK TEST ***\n"
         "Body text.\n*** END OF THE PROJECT GUTENBERG EBOOK TEST ***\nFooter\n",
     )
-    w = OWLMText()
+    w = OWLMTextLoader()
     w.show()
     sent = capture(w.Outputs.data)
     w.source_type = 0

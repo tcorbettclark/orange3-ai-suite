@@ -52,7 +52,7 @@ Questions to ask:
 
 ## 5. Compare with the source corpus
 
-Load the same downloaded story with **LM Text** and connect its **Data** output
+Load the same downloaded story with **LM Text Loader** and connect its **Data** output
 through **Corpus** to **Word Cloud**. Inspect that cloud next to the generated
 one. The source is the reference for "domain-plausible". A word that appears in
 the generated cloud but not in the source is a candidate hallucination or a

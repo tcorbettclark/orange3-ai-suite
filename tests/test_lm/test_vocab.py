@@ -1,4 +1,4 @@
-"""Vocab Inspector statistics tests (read-only logic)."""
+"""LM Vocab Viewer statistics tests (read-only logic)."""
 
 import pytest
 
@@ -56,7 +56,7 @@ def test_vocab_stats(word_tok):
 
 
 def test_small_vocab_char_vs_word_is_the_lesson():
-    # A word-rich but alphabet-poor corpus: the whole point of the Trainer's
+    # A word-rich but alphabet-poor corpus: the whole point of the LM Pre-trainer's
     # tokenizer dropdown — char level = far smaller vocab, longer sequences.
     words = " ".join(a + b for a in "abcd" for b in "abcdef")
     char_tok = Tokenizer.from_corpus([words], "char")

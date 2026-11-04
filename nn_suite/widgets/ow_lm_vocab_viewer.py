@@ -1,12 +1,12 @@
-"""Vocab Inspector: a read-only window into a tokenizer.
+"""LM Vocab Viewer: a read-only window into a tokenizer.
 
 Input is a model (preferred: its embedded tokenizer is shown) or data with text
 columns (then character-level and word-level tokenizers are built side by side,
-making the Trainer's tokenizer choice visible). There are deliberately no
-outputs: the inspector never feeds back into training or generation, so
+making the LM Pre-trainer's tokenizer choice visible). There are deliberately no
+outputs: the viewer never feeds back into training or generation, so
 vocabulary-mismatch bugs are impossible by construction.
 
-The inspector shows the token-to-id table, corpus frequency counts (a Zipf's
+The viewer shows the token-to-id table, corpus frequency counts (a Zipf's
 law side lesson) and its longest tokens.
 """
 
@@ -27,7 +27,7 @@ def _fill_table(table_widget: QTableWidget, rows: list[tuple]) -> None:
             table_widget.setItem(r, c, QTableWidgetItem(str(value)))
 
 
-class OWVocabInspector(OWWidget):
+class OWLMVocabViewer(OWWidget):
     """Inspect a tokenizer: tokens, ids and frequencies.
 
     Connect a model to see the vocabulary embedded in it, or connect text data
@@ -39,9 +39,9 @@ class OWVocabInspector(OWWidget):
     Read-only by design: there are no output signals.
     """
 
-    name = "Vocab Inspector"
+    name = "LM Vocab Viewer"
     description = "Inspect a model's tokenizer: tokens, ids, frequencies."
-    icon = "icons/vocab_inspector.svg"
+    icon = "icons/lm_vocab_viewer.svg"
     priority = 40
     keywords = ["vocabulary", "tokenizer", "tokens", "language model"]  # noqa: RUF012
 
@@ -151,4 +151,4 @@ class OWVocabInspector(OWWidget):
 if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
-    WidgetPreview(OWVocabInspector).run()
+    WidgetPreview(OWLMVocabViewer).run()

@@ -5,11 +5,11 @@ can remember. This is the "from scratch" end of the language-model arc.
 
 ## 1. Load the training Table
 
-Add **LM Text** and load `data/text/yellow-wallpaper.txt` as described in
-[00 - Setup](00-setup.md#3-load-text-with-lm-text). Use **Paragraphs**, and
+Add **LM Text Loader** and load `data/text/yellow-wallpaper.txt` as described in
+[00 - Setup](00-setup.md#3-load-text-with-lm-text-loader). Use **Paragraphs**, and
 enable the Gutenberg and reflow cleaning rules.
 
-Connect its **Data** output to **LM Trainer** **Data**.
+Connect its **Data** output to **LM Pre-trainer** **Data**.
 
 If you want a faster first pass, choose a shorter `.txt` file or **Lines**
 instead. The steps are identical; only the corpus size changes.
@@ -83,7 +83,7 @@ Repeat the MLP run with:
 - **Max vocab**: 5000
 - **Context window**: 8
 
-Look at the vocabulary in **Vocab Inspector** (connect the model's **Model**
+Look at the vocabulary in **LM Vocab Viewer** (connect the model's **Model**
 output to its **Model** input). Word level gives a larger vocabulary and shorter
 sequences. Compare the loss curve and the samples with the char-level run.
 
@@ -97,7 +97,7 @@ the checkpoint table and generate from it in
 ## 7. Keep the model in the workflow
 
 The trained model is emitted on the **Model** output and can be connected
-directly to **LM Generator**. The Trainer no longer has a Save button;
+directly to **LM Generator**. The LM Pre-trainer no longer has a Save button;
 persistence will return as a dedicated Save LM widget.
 
 ## Checkpoint

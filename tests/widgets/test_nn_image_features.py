@@ -1,10 +1,10 @@
-"""Image Feature Extractor widget tests: synthetic PNGs on disk."""
+"""NN Image Features widget tests: synthetic PNGs on disk."""
 
 import numpy as np
 from Orange.data import Domain, StringVariable, Table
 
 from nn_suite.adapters import image_paths
-from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
+from nn_suite.widgets.ow_nn_image_features import OWNNImageFeatures
 
 rng = np.random.default_rng(0)
 
@@ -23,7 +23,7 @@ def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
 
     expected = [n for g in ("A", "B", "C", "D", "E", "F") for n in group_names(g)]
 
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     features_sent = capture(w.Outputs.features)
     w.set_data(images_table)
@@ -47,7 +47,7 @@ def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
 
 
 def test_group_ablation_via_settings(qapp, capture, images_table):
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     features_sent = capture(w.Outputs.features)
     w.set_data(images_table)
@@ -65,7 +65,7 @@ def test_group_ablation_via_settings(qapp, capture, images_table):
 
 
 def test_no_image_column_warning(qapp):
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     domain = Domain([], metas=[StringVariable("text")])
     table = Table.from_numpy(
@@ -86,7 +86,7 @@ def test_missing_file_skips_row_with_warning(qapp, capture, images_table, image_
     metas = np.asarray(names, dtype=object).reshape(-1, 1)
     table = Table.from_numpy(domain, np.empty((len(names), 0)), None, metas)
 
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     features_sent = capture(w.Outputs.features)
     selected_sent = capture(w.Outputs.selected)
@@ -104,7 +104,7 @@ def test_missing_file_skips_row_with_warning(qapp, capture, images_table, image_
 
 
 def test_all_groups_off(qapp, capture, images_table):
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     features_sent = capture(w.Outputs.features)
     selected_sent = capture(w.Outputs.selected)
@@ -119,7 +119,7 @@ def test_all_groups_off(qapp, capture, images_table):
 
 
 def test_grid_populated_after_apply(qapp, capture, images_table):
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w._capture_thumbnail_batches = True
     w.show()
     features_sent = capture(w.Outputs.features)
@@ -164,7 +164,7 @@ def test_grid_populated_after_apply(qapp, capture, images_table):
 
 def test_group_toggle_auto_applies(qapp, capture, images_table):
     """The controls are wired to the commit, not just to their settings."""
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     sent = capture(w.Outputs.features)
     w.set_data(images_table)
@@ -190,7 +190,7 @@ def test_cache_reuses_features_for_groups_and_preprocessing(
         return original(*args, **kwargs)
 
     monkeypatch.setattr(features_module, "extract_features", counted)
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     capture(w.Outputs.features)
     w.set_data(images_table)
@@ -214,7 +214,7 @@ def test_cache_reuses_features_for_groups_and_preprocessing(
 def test_working_size_line_edit_applies_on_enter(qapp, capture, images_table):
     from AnyQt.QtWidgets import QLineEdit
 
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     assert isinstance(w._working_size_edit, QLineEdit)
     assert w._working_size_edit.text() == "128"
@@ -238,7 +238,7 @@ def test_working_size_line_edit_applies_on_enter(qapp, capture, images_table):
 
 
 def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
-    w = OWImageFeatureExtractor()
+    w = OWNNImageFeatures()
     w.show()
     opts = w._feature_options()
     assert opts.peak_prominence_frac == 0.10
@@ -248,7 +248,7 @@ def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
 def test_wide_thumbnail_is_center_cropped(tmp_path):
     from PIL import Image
 
-    from nn_suite.widgets.ow_image_features import _read_thumbnail
+    from nn_suite.widgets.ow_nn_image_features import _read_thumbnail
 
     path = tmp_path / "wide.png"
     Image.fromarray(np.zeros((50, 100, 3), dtype=np.uint8)).save(path)

@@ -2,14 +2,14 @@
 
 Builds (idempotently):
 
-    demo/mnist_features.ows   (Import Images -> Image Feature Extractor ->
+    demo/mnist_features.ows   (Import Images -> NN Image Features ->
                                Test & Score + Neural Network, plus
                                Data Table / Column Statistics / Confusion Matrix)
     demo/cloud_features.ows   (same shape, cloud corpus settings)
 
 The canvas API (orangecanvas.scheme) writes the .ows XML we would otherwise
 hand-craft; widget settings are pre-seeded per node (Import Images path,
-Image Feature Extractor's working size). On load, the canvas resolves
+NN Image Features' working size). On load, the canvas resolves
 widgets by qualified_name and matches links by channel name, so the
 descriptions here only need faithful channel names/ids — extracted
 programmatically from the real widget classes.
@@ -40,11 +40,11 @@ def make_descriptions() -> dict[str, WidgetDescription]:
     from Orange.widgets.model.owneuralnetwork import OWNNLearner
     from orangecontrib.imageanalytics.widgets.owimageimport import OWImportImages
 
-    from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
+    from nn_suite.widgets.ow_nn_image_features import OWNNImageFeatures
 
     classes = {
         "Import Images": OWImportImages,
-        "Image Feature Extractor": OWImageFeatureExtractor,
+        "NN Image Features": OWNNImageFeatures,
         "Neural Network": OWNNLearner,
         "Test & Score": OWTestAndScore,
         "Data Table": OWTable,
@@ -59,7 +59,7 @@ def make_descriptions() -> dict[str, WidgetDescription]:
         "Confusion Matrix",
         "Test & Score",
         "Neural Network",
-        "Image Feature Extractor",
+        "NN Image Features",
     ):
         cls = classes[label]
         inputs = [
@@ -97,7 +97,7 @@ def image_import_path_properties(directory: Path):
     return {"recent_paths": [recent]}
 
 
-FEATURE_PROPS = "Image Feature Extractor"
+FEATURE_PROPS = "NN Image Features"
 
 
 def build_workflow(
@@ -106,7 +106,7 @@ def build_workflow(
     d = make_descriptions()
 
     scheme = Scheme(title=title, description=description)
-    columns = ["Import Images", "Image Feature Extractor", "Test & Score", "Confusion Matrix"]
+    columns = ["Import Images", "NN Image Features", "Test & Score", "Confusion Matrix"]
 
     nodes = {}
     x = 60
@@ -155,21 +155,21 @@ def build_workflow(
 def main() -> None:
     build_workflow(
         "MNIST digits — interpretable features",
-        "Import Images (demo/mnist/train) -> Image Feature Extractor (working "
+        "Import Images (demo/mnist/train) -> NN Image Features (working "
         "size 56) -> Test & Score with the Neural Network; Data Table, Column "
         "Statistics and Confusion Matrix for inspection.",
         BASE.parent / "demo" / "mnist" / "train",
-        {"auto_apply": True, "working_size": 56, "groups_enabled": "ABCDEF"},
+        {"working_size": 56, "groups_enabled": "ABCDEF"},
         BASE / "mnist_features.ows",
     )
     build_workflow(
         "WMO Cloud Atlas genera — interpretable features",
-        "Import Images (data/clouds, fetched by demo/fetch_clouds.py) -> Image "
-        "Feature Extractor -> Test & Score with the Neural Network; inspect "
+        "Import Images (data/clouds, fetched by demo/fetch_clouds.py) -> "
+        "NN Image Features -> Test & Score with the Neural Network; inspect "
         "features in Data Table / Column Statistics; Confusion Matrix shows "
         "which genera confound.",
         BASE.parent / "data" / "clouds",
-        {"auto_apply": True, "working_size": 128, "groups_enabled": "ABCDEF"},
+        {"working_size": 128, "groups_enabled": "ABCDEF"},
         BASE / "cloud_features.ows",
     )
 

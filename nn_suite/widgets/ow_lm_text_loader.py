@@ -1,4 +1,4 @@
-"""LM Text: read plain-text files into document rows or Q/A pairs.
+"""LM Text Loader: read plain-text files into document rows or Q/A pairs.
 
 A source widget for the language-model teaching suite. It reads UTF-8 ``.txt``
 files, applies opt-in cleaning, and emits a plain Orange Table. In document
@@ -43,7 +43,7 @@ SPLIT_KEYS = ("whole", "paragraphs", "lines", "sentences")
 PREVIEW_ROWS = 200
 
 
-class OWLMText(OWWidget):
+class OWLMTextLoader(OWWidget):
     """Read plain-text files into a Table for the language-model widgets.
 
     Source is a single ``.txt`` file or a recursively scanned folder. Document
@@ -54,9 +54,9 @@ class OWLMText(OWWidget):
     preview but is not included in the Data output.
     """
 
-    name = "LM Text"
+    name = "LM Text Loader"
     description = "Read plain-text files into documents or Q/A pairs."
-    icon = "icons/lm_text.svg"
+    icon = "icons/lm_text_loader.svg"
     priority = 20
     keywords = ["text", "corpus", "documents", "language model", "q/a"]  # noqa: RUF012
 
@@ -411,4 +411,4 @@ def _short(text: str, limit: int = 180) -> str:
 if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
-    WidgetPreview(OWLMText).run()
+    WidgetPreview(OWLMTextLoader).run()

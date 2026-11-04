@@ -5,9 +5,9 @@ useful, repetitive, or nonsensical.
 
 ## 1. Connect a model
 
-Use the LM Trainer from [04 - Train from scratch](04-train-from-scratch.md):
+Use the LM Pre-trainer from [04 - Train from scratch](04-train-from-scratch.md):
 
-- *LM Trainer* **Model** → *LM Generator* **Model**
+- *LM Pre-trainer* **Model** → *LM Generator* **Model**
 
 ## 2. First generation
 
@@ -54,7 +54,7 @@ model. A seed makes that loop reproducible.
 
 ## 5. Model persistence
 
-The Trainer and Generator exchange models through the normal Orange **Model**
+The LM Pre-trainer and LM Generator exchange models through the normal Orange **Model**
 signal. Saving and loading model directories is being moved to dedicated
 Load LM/Save LM widgets.
 
@@ -70,7 +70,7 @@ architecture's memory is visible in the text.
 ## 7. LoRA models
 
 If you trained an adapter in [06 - LoRA continued pre-training](06-lora-continued-pretraining.md),
-connect the LoRA Trainer **Model** output to the Generator. The **Use LoRA
+connect either LoRA widget's **Model** output to the Generator. The **Use LoRA
 adapter** checkbox becomes enabled:
 
 - checked: the base model plus the adapter;

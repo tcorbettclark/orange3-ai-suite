@@ -1,4 +1,4 @@
-"""LM Trainer: pre-train a tiny language model on text data.
+"""LM Pre-trainer: pre-train a tiny language model on text data.
 
 A thin shell over :mod:`nn_kernel.lm`: options, a live loss plot and the
 checkpoint table. Training runs in a background QThread and streams per-epoch
@@ -72,7 +72,7 @@ class TrainingWorker(QThread):
             self.failed.emit(traceback.format_exc())
 
 
-class OWLMTrainer(OWWidget):
+class OWLMPretrainer(OWWidget):
     """Pre-train a small language model and stream its learning curve.
 
     Input is a Table with text columns (or an Orange3-Text Corpus). Outputs are
@@ -88,9 +88,9 @@ class OWLMTrainer(OWWidget):
     so overfitting on a tiny corpus is visible rather than asserted.
     """
 
-    name = "LM Trainer"
-    description = "Pre-train a tiny language model (bigram / MLP / LSTM) on text data."
-    icon = "icons/lm_trainer.svg"
+    name = "LM Pre-trainer"
+    description = "Pre-train a tiny language model (bigram / MLP / LSTM) from scratch on text data."
+    icon = "icons/lm_pretrainer.svg"
     priority = 10
     keywords = ["pre-training", "language model", "keras", "perplexity"]  # noqa: RUF012
 
@@ -322,4 +322,4 @@ class OWLMTrainer(OWWidget):
 if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
-    WidgetPreview(OWLMTrainer).run()
+    WidgetPreview(OWLMPretrainer).run()

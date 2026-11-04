@@ -49,18 +49,17 @@ Q: Who is the woman in the wallpaper?
 A: The narrator herself, or the woman she imagines trapped behind it.
 ```
 
-Add **LM Text**, set **Source → Type** to **File**, browse to
+Add **LM Text Loader**, set **Source → Type** to **File**, browse to
 `data/text/pairs.txt`, switch **Table type** to **Q/A pairs**, and press
 **Reload**. The preview table shows the parsed prompt and completion columns.
 
-Connect **Data** to **LoRA Trainer** **Data**. The Table has `prompt` and
+Connect **Data** to **LoRA SFT** **Data**. The Table has `prompt` and
 `completion` string metas; the source file stays in the preview only.
 
 ## 2. Run supervised fine-tuning
 
 Set:
 
-- **Data format**: Prompt-response pairs (SFT)
 - **Base model**: absolute path to `data/models/britllm-4bit`
 - **Iterations**: 20 for the first pass
 - **Learning rate**: 1e-4
@@ -72,12 +71,13 @@ Set:
 The small batch is deliberate: the validation split must hold at least one full
 batch. With 10 pairs and a 10% validation split, only 1 row is held out.
 
-Press **Train**. The live loss curve shows the completion loss. Save the
-adapter as `my-britllm-sft`.
+Press **Train**. The live loss curve shows the completion loss. The adapter is
+emitted on the **Model** output; persistence is moving to a dedicated Save LM
+widget.
 
 ## 3. Compare raw and SFT model
 
-Connect *LoRA Trainer* **Model** → *LM Generator* **Model**.
+Connect *LoRA SFT* **Model** → *LM Generator* **Model**.
 
 Set:
 
@@ -108,13 +108,13 @@ completion.
 ## 5. Try a variation
 
 Add five more pairs in the same style to `data/text/pairs.txt`, press **Reload**
-in LM Text, and retrain. Compare the same prompt. Watch whether the answer pattern becomes
+in LM Text Loader, and retrain. Compare the same prompt. Watch whether the answer pattern becomes
 more consistent.
 
 ## Checkpoint
 
 - The Table has `prompt` and `completion` string columns.
-- The LoRA Trainer accepts it as SFT data.
+- **LoRA SFT** accepts it as supervised fine-tuning data.
 - The Generator shows the adapted and raw base models side by side.
 - You can explain why the data format, not the loss function, makes this
   supervised.

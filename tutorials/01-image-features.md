@@ -6,7 +6,7 @@ features, and use group toggles as an ablation experiment.
 ## What you will build
 
 ```
-Import Images -> Image Feature Extractor -> Test & Score -> Confusion Matrix
+Import Images -> NN Image Features -> Test & Score -> Confusion Matrix
                                             -> Data Table
                                             -> Column Statistics
 Neural Network -> Test & Score
@@ -15,7 +15,7 @@ Neural Network -> Test & Score
 ## 1. Open or build the workflow
 
 **Quick start:** open `demo/mnist_features.ows` with **File > Open**. The
-Image Feature Extractor is already set to working size 56 and groups A-F.
+NN Image Features is already set to working size 56 and groups A-F.
 
 If the Import Images path is stale, open **Import Images**, click the folder
 button and choose `demo/mnist/train`.
@@ -23,19 +23,19 @@ button and choose `demo/mnist/train`.
 **From scratch:**
 
 1. Add **Import Images** and point it at `demo/mnist/train`.
-2. Add **Image Feature Extractor**, set the working size to 56 (type the
+2. Add **NN Image Features**, set the working size to 56 (type the
    number and press Enter), and connect *Import Images* **Data** to its
    **Images** input.
 3. Add **Test & Score**, **Confusion Matrix**, **Data Table** and
    **Column Statistics**.
 4. Add **Neural Network**.
 5. Connect:
-   - *Image Feature Extractor* **Features** → *Test & Score* **Data**
+   - *NN Image Features* **Features** → *Test & Score* **Data**
    - *Neural Network* **Learner** → *Test & Score* **Learner**
    - *Test & Score* **Evaluation Results** → *Confusion Matrix*
      **Evaluation Results**
-   - *Image Feature Extractor* **Features** → *Data Table* **Data**
-   - *Image Feature Extractor* **Features** → *Column Statistics* **Data**
+   - *NN Image Features* **Features** → *Data Table* **Data**
+   - *NN Image Features* **Features** → *Column Statistics* **Data**
 
 ## 2. Inspect the feature table
 
@@ -74,9 +74,8 @@ a convolutional network; it is to explain every mistake in terms of features.
 
 ## 4. Ablation: which groups carry the signal?
 
-Hover any group checkbox to see what it measures. In **Image Feature
-Extractor**, switch a whole group off. The feature table is recomputed from the
-cache.
+Hover any group checkbox to see what it measures. In **NN Image Features**,
+switch a whole group off. The feature table is recomputed from the cache.
 
 Try this sequence:
 
@@ -92,7 +91,7 @@ explains the most errors.
 
 ## 5. Browse the images
 
-The main area of **Image Feature Extractor** shows every input image as a
+The main area of **NN Image Features** shows every input image as a
 thumbnail. The header reports the total count, and clicking a thumbnail selects
 it. Use the grid to spot blank, corrupted or unexpected images before training.
 Selecting an image does not change the extracted features.
@@ -115,7 +114,7 @@ table before evaluation; that leaks statistics across validation folds.
 Instead:
 
 1. Add **Preprocess** and put a **Normalize** step in its pipeline.
-2. Connect *Image Feature Extractor* **Features** → *Preprocess* **Data**.
+2. Connect *NN Image Features* **Features** → *Preprocess* **Data**.
 3. Connect *Preprocess* **Preprocessor** → *Test & Score* **Preprocessor**.
 
 Test & Score then fits the normalisation inside each fold. The same
@@ -124,8 +123,8 @@ do not need cross-validation.
 
 ## 7. Optional: raw-pixel baseline
 
-Add **Pixel Features** and connect *Import Images* **Data** → *Pixel Features*
-**Images**, and *Pixel Features* **Features** → *Test & Score* **Data**. Leave
+Add **NN Image Pixels** and connect *Import Images* **Data** → *NN Image Pixels*
+**Images**, and *NN Image Pixels* **Features** → *Test & Score* **Data**. Leave
 the dimensions at 10. This gives 100 raw luminance columns per image and no
 spatial encoding; it is the deliberately plain baseline against which the
 handcrafted features can be compared.

@@ -23,12 +23,12 @@ uv run --extra lora python demo/fetch_britllm.py   # optional LoRA tutorials
 
 ## Conventions
 
-- **Widget**: an Orange box, for example *LM Trainer*.
+- **Widget**: an Orange box, for example *LM Pre-trainer*.
 - **Link**: an arrow between an output and an input, for example *Model* to
   *Model*.
 - **Run**: some widgets compute when a button is pressed; others apply
   automatically. The text says which.
-- *LM Text* reads a UTF-8 `.txt` file or folder and emits a text Table. No
+- *LM Text Loader* reads a UTF-8 `.txt` file or folder and emits a text Table. No
   Python Script is needed for the language-model tutorials.
 
 ## The tutorials
@@ -38,11 +38,11 @@ uv run --extra lora python demo/fetch_britllm.py   # optional LoRA tutorials
 | [00 - Setup](00-setup.md) | Installation, data, text Tables | add-on |
 | [01 - Image features](01-image-features.md) | Import Images → features → model → evaluation | MNIST |
 | [02 - Colour shortcut and baselines](02-colour-shortcut.md) | Cloud workflow, group ablation, several learners | cloud corpus |
-| [03 - Tokenizers](03-tokenizers.md) | Data → Vocab Inspector | text Table |
+| [03 - Tokenizers](03-tokenizers.md) | Data → LM Vocab Viewer | text Table |
 | [04 - Train from scratch](04-train-from-scratch.md) | Bigram, MLP-over-window and LSTM training | text Table |
-| [05 - Generation and temperature](05-generation.md) | LM Trainer → LM Generator, save/load | tutorial 04 |
-| [06 - LoRA continued pre-training](06-lora-continued-pretraining.md) | Base model → LoRA Trainer → Generator | Apple Silicon, BritLLM |
-| [07 - LoRA supervised fine-tuning](07-lora-sft.md) | Prompt-response pairs, prompt masking | Apple Silicon, BritLLM |
+| [05 - Generation and temperature](05-generation.md) | LM Pre-trainer → LM Generator | tutorial 04 |
+| [06 - LoRA continued pre-training](06-lora-continued-pretraining.md) | Base model → LoRA Pre-trainer → Generator | Apple Silicon, BritLLM |
+| [07 - LoRA supervised fine-tuning](07-lora-sft.md) | Prompt-response pairs → LoRA SFT → Generator | Apple Silicon, BritLLM |
 | [08 - Evaluation with Orange](08-evaluation.md) | Generations → text-analysis widgets | Orange3-Text (optional) |
 
 ## A note on the two teaching streams

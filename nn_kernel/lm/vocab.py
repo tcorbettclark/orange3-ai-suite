@@ -1,8 +1,8 @@
 """Read-only statistics over a :class:`~nn_kernel.lm.tokenizer.Tokenizer`.
 
-The Vocab Inspector has no pipeline role: these functions return plain data for
+The LM Vocab Viewer has no pipeline role: these functions return plain data for
 a widget to render and never feed back into training or generation. They make
-the Trainer's tokenizer choice testable ("char level: smaller vocab, longer
+the LM Pre-trainer's tokenizer choice testable ("char level: smaller vocab, longer
 sequences").
 """
 

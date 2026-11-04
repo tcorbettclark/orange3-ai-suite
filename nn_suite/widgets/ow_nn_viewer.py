@@ -171,7 +171,7 @@ class NNView(QGraphicsView):
             self.fitInView(rect.adjusted(-MARGIN, -MARGIN, MARGIN, MARGIN), KEEP_ASPECT)
 
 
-class OWNeuralNetworkViewer(OWWidget):
+class OWNNViewer(OWWidget):
     """Draw a trained neural network with weights on the edges.
 
     Input is the Model output of Orange's Neural Network widget (a
@@ -188,8 +188,8 @@ class OWNeuralNetworkViewer(OWWidget):
 
     name = "NN Viewer"
     description = "Displays a trained neural network with weights on edges."
-    icon = "icons/nnviewer.svg"
-    priority = 45  # a read-only viewer, next to the Vocab Inspector
+    icon = "icons/nn_viewer.svg"
+    priority = 45  # a read-only viewer, next to the LM Vocab Viewer
     keywords = ["neural network", "mlp", "weights", "visualisation"]  # noqa: RUF012
 
     # Class-level Setting is the canonical Orange pattern (settings are
@@ -482,4 +482,4 @@ if __name__ == "__main__":  # pragma: no cover - dev preview
 
     data = Table("housing")
     model = NNRegressionLearner(hidden_layer_sizes=(4,))(data)
-    WidgetPreview(OWNeuralNetworkViewer).run(model)
+    WidgetPreview(OWNNViewer).run(model)

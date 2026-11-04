@@ -31,9 +31,9 @@ capability:
 
 | Extra | Brings | Used by |
 |---|---|---|
-| `image` | OpenCV | Image Feature Extractor |
-| `lm` | Keras / TensorFlow | LM Trainer, LM Generator, Vocab Inspector |
-| `lora` | `mlx-lm[train]` (Apple Silicon only) | LoRA Trainer |
+| `image` | OpenCV | NN Image Features, NN Image Pixels |
+| `lm` | Keras / TensorFlow | LM Pre-trainer, LM Generator, LM Vocab Viewer |
+| `lora` | `mlx-lm[train]` (Apple Silicon only) | LoRA Pre-trainer, LoRA SFT |
 
 Development (kernel tests run without Orange):
 
@@ -68,18 +68,19 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 
 | Widget | Input | Output | Extra |
 |---|---|---|---|
-| Image Feature Extractor | Images | Features, Selected image (Table) | `image` |
-| Pixel Features | Images | Features (Table) | `image` |
-| LM Text | none | Data (Table) | none |
-| LM Trainer | Data (text) | Model, Checkpoint (Table) | `lm` |
+| NN Image Features | Images | Features, Selected image (Table) | `image` |
+| NN Image Pixels | Images | Features (Table) | `image` |
+| LM Text Loader | none | Data (Table) | none |
+| LM Pre-trainer | Data (text) | Model, Checkpoint (Table) | `lm` |
 | LM Generator | Model | Generations (Table) | `lm` / `lora` |
-| LoRA Trainer | Data (text or pairs) | Model | `lora` |
-| Vocab Inspector | Model or Data | none (read-only) | `lm` |
+| LoRA Pre-trainer | Data (text) | Model | `lora` |
+| LoRA SFT | Data (prompt / completion) | Model | `lora` |
+| LM Vocab Viewer | Model or Data | none (read-only) | `lm` |
 | NN Viewer | Model | none (read-only) | none |
 
 Each widget class has a docstring describing its inputs, outputs and controls.
 
-### Image Feature Extractor
+### NN Image Features
 
 Computes a small set of human-readable features from each image and emits one
 row per readable image. Class variables and meta columns are inherited, and the
@@ -103,7 +104,7 @@ widget controls.
 The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.
 
-### Pixel Features
+### NN Image Pixels
 
 The deliberately plain baseline. Every image is converted to luminance,
 resized to a square grid and flattened row-major into values in [0, 1]. The
@@ -112,7 +113,7 @@ image. It performs no feature engineering and adds no spatial encoding, so it
 is useful for comparing a raw-pixel MLP against the interpretable feature
 groups or a convolutional model.
 
-### LM Text
+### LM Text Loader
 
 Reads UTF-8 `.txt` files from one file or a recursively scanned folder into a
 plain Table. **Text documents** mode emits one row per whole file, paragraph,
@@ -126,9 +127,9 @@ Cleaning is opt-in: strip Project Gutenberg header/footer, reflow wrapped
 lines, remove repeated short lines, and remove page-number lines. A small
 preview table shows the first rows; selecting a row shows its full text below.
 
-### LM Trainer
+### LM Pre-trainer
 
-Pre-trains a small language model on a text corpus. The architecture dropdown
+Pre-trains a small language model from scratch on a text corpus. The architecture dropdown
 selects:
 
 - **Bigram** - context of one token; the floor that any learning achieves.
@@ -145,7 +146,8 @@ domain pastiche.
 
 The trained model embeds its tokenizer and can be saved as one directory:
 `LanguageModel.save()` writes the Keras model, the vocabulary and the
-hyperparameters together.
+hyperparameters together. The widget itself has no Save button; persistence is
+moving to dedicated Load LM/Save LM widgets.
 
 ### LM Generator
 
@@ -159,36 +161,42 @@ all controls. Low temperature is repetitive; high temperature dissolves into
 word salad. Generations are emitted as a one-column Table that Corpus Viewer
 and Orange3-Text widgets can read. For LoRA models, a **Use LoRA adapter**
 checkbox switches between the adapted model and its raw base model. Model
-persistence is intentionally not part of the Trainer or Generator; a dedicated
-Load LM/Save LM pair will own that role.
+persistence is intentionally not part of the training or generation widgets; a
+dedicated Load LM/Save LM pair will own that role.
 
-### LoRA Trainer
+### LoRA Pre-trainer
 
-Fine-tunes a pretrained model with 4-bit QLoRA on Apple Silicon. The training
-data format is the lesson:
-
-- **Raw corpus** - continued pre-training. The model is still self-supervised;
-  the corpus supplies the next-token targets.
-- **Prompt-response pairs** - supervised fine-tuning. A human authored the
-  prompt and the completion; mlx-lm masks the prompt tokens so loss is
-  computed on the completion only.
+Continues pre-training a pretrained model with 4-bit QLoRA on Apple Silicon.
+Input is a raw text corpus, one document per row. The model is still
+self-supervised: the corpus supplies the next-token targets, and the adapter
+only restricts which weights change. Use this for domain adaptation, not for
+teaching a response pattern.
 
 The live curve shows training and validation loss per iteration. The output is
-a `LoRAModel`: the base model plus its adapter, serialised as one artifact. The
-adapter can be switched off in the Generator to compare the same base model
-before and after adaptation.
+a `LoRAModel`: the base model plus its adapter. The adapter can be switched off
+in the Generator to compare the same base model before and after adaptation.
 
-Only 4-bit quantised models are accepted. `demo/fetch_britllm.py` downloads and
-converts the default model; a Hugging Face id is treated as unquantised because
-its quantisation cannot be verified without downloading it.
+### LoRA SFT
 
-### Vocab Inspector
+Supervised fine-tuning with 4-bit QLoRA on Apple Silicon. Input is a Table with
+`prompt` and `completion` text columns. A human authored the prompt and the
+desired completion; mlx-lm masks the prompt tokens so loss is computed on the
+completion only. The prompt/response contract covers Q&A, instruction
+following and tool use; it is not tied to the `Q:`/`A:` grammar of the text
+loader.
+
+Both LoRA widgets share the same training controls, live loss curve and Model
+output. Only 4-bit quantised models are accepted. `demo/fetch_britllm.py`
+downloads and converts the default model; a Hugging Face id is treated as
+unquantised because its quantisation cannot be verified without downloading it.
+
+### LM Vocab Viewer
 
 A read-only view of a tokenizer. Connect a model to see the vocabulary embedded
 in it, or connect text data to build character-level and word-level tokenizers
 side by side. The summary reports vocabulary size, mean token length and the
 fraction of tokens seen only once; the tabs list tokens, ids and corpus counts.
-The inspector has no outputs, so it can never feed a mismatched vocabulary back
+The viewer has no outputs, so it can never feed a mismatched vocabulary back
 into training or generation.
 
 ### NN Viewer
@@ -215,13 +223,13 @@ previous one exposes.
 
 ### 1. Train a model from scratch
 
-Use **LM Trainer** on a single-domain corpus loaded with **LM Text**, for
+Use **LM Pre-trainer** on a single-domain corpus loaded with **LM Text Loader**, for
 example a public-domain short story. Start with the bigram, then the
 MLP-over-window, then the LSTM. Compare
 loss curves and checkpoint samples: the bigram plateaus quickly, the MLP has a
 fixed and visible memory, and the LSTM trains more smoothly at a higher cost.
 Switch between character and word tokenization and watch the vocabulary and
-sequence lengths change. Use **Vocab Inspector** to see the tokenizer behind
+sequence lengths change. Use **LM Vocab Viewer** to see the tokenizer behind
 the curve.
 
 The result is a model that produces domain-flavoured pastiche, not knowledge.
@@ -235,10 +243,10 @@ is the point where scale buys fluency, not obedience.
 
 ### 3. Adapt the base model
 
-Use **LoRA Trainer** on the same base model in two passes:
+Use the two LoRA widgets on the same base model:
 
-1. **Continued pre-training** on the raw domain corpus, which adds domain depth.
-2. **Supervised fine-tuning** on authored prompt-response pairs, which makes
+1. **LoRA Pre-trainer** on the raw domain corpus, which adds domain depth.
+2. **LoRA SFT** on authored prompt-response pairs, which makes
    instruction-following appear.
 
 The adapter's trainable-parameter share is a small fraction of the base model's
@@ -256,7 +264,7 @@ well.
 A typical canvas workflow:
 
 ```
-Import Images -> Image Feature Extractor -> Test & Score -> Confusion Matrix
+Import Images -> NN Image Features -> Test & Score -> Confusion Matrix
                                             -> Data Table
                                             -> Column Statistics
 ```
@@ -351,7 +359,7 @@ subprocess, streams parsed metrics, and supports clean cancellation.
   100/class for validation), stored as PNGs in the folder-per-label layout that
   Import Images expects. Regenerate with `demo/fetch_mnist.py`.
 - `data/text/` - optional downloaded plain-text corpora. No text corpus is
-  committed; use **LM Text** to load any UTF-8 `.txt` file.
+  committed; use **LM Text Loader** to load any UTF-8 `.txt` file.
 - `demo/fetch_clouds.py` - fetches a five-genus cloud corpus from the WMO
   International Cloud Atlas into `data/clouds/`. The images are untracked and
   remain the property of their photographers; they are not covered by this

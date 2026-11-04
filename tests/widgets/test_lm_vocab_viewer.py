@@ -1,6 +1,6 @@
-"""Vocab Inspector widget: read-only, model-or-data input, NO outputs."""
+"""LM Vocab Viewer widget: read-only, model-or-data input, NO outputs."""
 
-from nn_suite.widgets.ow_vocab_inspector import OWVocabInspector
+from nn_suite.widgets.ow_lm_vocab_viewer import OWLMVocabViewer
 
 
 class NoTokenizerModel:
@@ -8,7 +8,7 @@ class NoTokenizerModel:
 
 
 def _make_widget(qapp):
-    w = OWVocabInspector()
+    w = OWLMVocabViewer()
     w.show()
     return w
 
@@ -43,11 +43,11 @@ def test_model_without_tokenizer_warns(qapp):
     assert "No input." in w.summary_label.text()
 
 
-def test_inspector_declares_no_outputs(qapp):
-    # the inspector never enters the pipeline: no output signals
+def test_viewer_declares_no_outputs(qapp):
+    # the viewer never enters the pipeline: no output signals
     from orangewidget.widget import Output
 
-    outputs = getattr(OWVocabInspector, "Outputs", None)
+    outputs = getattr(OWLMVocabViewer, "Outputs", None)
     declared = []
     if outputs is not None:
         declared = [v for v in outputs.__dict__.values() if isinstance(v, Output)]

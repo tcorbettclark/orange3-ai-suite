@@ -1,4 +1,4 @@
-"""LoRA Trainer widget tests.
+"""LoRA Pre-trainer widget tests.
 
 The real-training test needs mlx in THIS environment (Apple Silicon [lora]
 extra) AND the converted model on disk; deg + routing tests run anywhere.
@@ -11,38 +11,21 @@ import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.adapters import table_pairs
-from nn_suite.widgets.ow_lora_trainer import OWLoRATrainer
+from nn_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
 
 MLX_OK = importlib.util.find_spec("mlx") is not None
 
 
-def test_table_pairs_helper():
-    domain = Domain(
-        [],
-        metas=[
-            StringVariable("completion"),
-            StringVariable("prompt"),
-            StringVariable("note"),
-        ],
-    )
-    rows = [["answer a", "question a", "x"], ["answer b", "question b", "y"]]
-    table = Table.from_numpy(domain, np.empty((2, 0)), None, np.asarray(rows, dtype=object))
-    pairs = table_pairs(table)
-    assert pairs == [("question a", "answer a"), ("question b", "answer b")]
-
-
-def test_table_pairs_requires_two_columns():
-    domain = Domain([], metas=[StringVariable("only")])
-    table = Table.from_numpy(
-        domain, np.empty((1, 0)), None, np.asarray([["x"]], dtype=object).reshape(1, 1)
-    )
-    with pytest.raises(ValueError, match="two text columns"):
-        table_pairs(table)
+def test_pretrainer_builds_text_rows(qapp, text_table):
+    w = OWLoRAPretrainer()
+    w.set_data(text_table)
+    data = w._make_lora_data()
+    assert data.kind == "text"
+    assert len(data.train) + len(data.valid) == 2
 
 
 def test_mlx_missing_routes_to_install_hint(qapp):
-    w = OWLoRATrainer()
+    w = OWLoRAPretrainer()
     w.show()
     w._on_failed("ModuleNotFoundError: No module named 'mlx'")
     assert w.Error.mlx_missing.is_shown()
@@ -67,7 +50,7 @@ def test_real_training_path(qapp, capture):
     if not model_file.exists():
         pytest.skip("converted model absent — run demo/fetch_britllm.py")
 
-    w = OWLoRATrainer()
+    w = OWLoRAPretrainer()
     w.show()
     w.base_model = str(model_file.parent)
     domain = Domain([], metas=[StringVariable("text")])
@@ -88,18 +71,19 @@ def test_real_training_path(qapp, capture):
 
 
 def test_trainable_parameter_note_is_reported(qapp):
-    w = OWLoRATrainer()
+    w = OWLoRAPretrainer()
     w.show()
     w._on_metric({"kind": "params", "pct": 0.233, "detail": "6.21M / 2.67B"})
     assert "0.233%" in w.status_label.text()
     assert "6.21M / 2.67B" in w.status_label.text()
 
 
-def test_lora_fp16_guard_blocks_unconverted_model(qapp, text_table, tmp_path):
+def test_lora_fp16_guard_blocks_unconverted_model(qapp, text_table, tmp_path, monkeypatch):
     """4-bit QLoRA only: an unquantised base model must not train."""
-    w = OWLoRATrainer()
+    w = OWLoRAPretrainer()
     w.show()
     w.set_data(text_table)
+    monkeypatch.setattr(w, "_mlx_available", lambda: True)
     unquantised = tmp_path / "fp16-model"
     unquantised.mkdir()
     (unquantised / "config.json").write_text(json.dumps({"model_type": "llama"}))
@@ -112,7 +96,7 @@ def test_lora_fp16_guard_blocks_unconverted_model(qapp, text_table, tmp_path):
 def test_lora_fp16_guard_accepts_quantised_dir(qapp, text_table):
     from pathlib import Path
 
-    w = OWLoRATrainer()
+    w = OWLoRAPretrainer()
     quantised_dir = Path(__file__).resolve().parents[2] / "data" / "models" / "britllm-4bit"
     if not (quantised_dir / "config.json").exists():
         pytest.skip("converted model absent")

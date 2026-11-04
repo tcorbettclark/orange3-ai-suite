@@ -54,9 +54,9 @@ curl -L https://www.gutenberg.org/ebooks/1952.txt.utf-8 \
     -o data/text/yellow-wallpaper.txt
 ```
 
-## 3. Load text with LM Text
+## 3. Load text with LM Text Loader
 
-The LM widgets accept a Table with string text columns. Add **LM Text** to the
+The LM widgets accept a Table with string text columns. Add **LM Text Loader** to the
 canvas:
 
 1. Set **Source → Type** to **File**.
@@ -66,13 +66,14 @@ canvas:
    **Paragraphs**.
 5. Enable **Strip Project Gutenberg header/footer** and **Reflow wrapped
    lines** in the cleaning section.
-6. Connect **Data** to **LM Trainer**, **Vocab Inspector** or **LoRA Trainer**.
+6. Connect **Data** to **LM Pre-trainer**, **LoRA Pre-trainer**, **LoRA SFT** or
+**LM Vocab Viewer**.
 
 The preview table shows the first rows. Select one to read its full text below.
 Changing split or cleaning options reprocesses the cached file; **Reload**
 rereads it from disk.
 
-For a folder, switch **Type** to **Folder** and choose a directory. LM Text
+For a folder, switch **Type** to **Folder** and choose a directory. LM Text Loader
 recurses through it and reads every `.txt`. The preview shows each row's source
 file, but the Data output contains only the text.
 
@@ -103,15 +104,16 @@ links.
 
 ## 5. Controls that apply automatically, and controls that do not
 
-- **Image Feature Extractor**: preprocessing and group changes apply
+- **NN Image Features**: preprocessing and group changes apply
   automatically. Type a new working size and press Enter to reprocess.
-- **LM Text**: press **Reload** to reread the file or folder; changing the
+- **LM Text Loader**: press **Reload** to reread the file or folder; changing the
   table type, split mode or cleaning options reprocesses the cached text.
-- **LM Trainer** and **LoRA Trainer**: set the options, then press **Train**.
+- **LM Pre-trainer**, **LoRA Pre-trainer** and **LoRA SFT**: set the options,
+  then press **Train**.
   **Stop** ends a run early and keeps what has been learned so far.
 - **LM Generator**: press **Generate** after changing the prompt or sampling
   options.
-- **Vocab Inspector** and **NN Viewer** are read-only; they update when an
+- **LM Vocab Viewer** and **NN Viewer** are read-only; they update when an
   input changes.
 
 ## 6. Save your work
@@ -119,7 +121,7 @@ links.
 - Orange workflow: **File > Save As**.
 - Trained models currently travel through the canvas as **Model** signals.
   Persistence to disk is being moved to dedicated Load LM/Save LM widgets, so
-  the Trainer and Generator do not have their own save/load buttons.
+  the training and generation widgets do not have their own save/load buttons.
 
 ## 7. The LoRA adapter switch
 

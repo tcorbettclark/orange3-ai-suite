@@ -1,4 +1,4 @@
-"""Image Feature Extractor: interpretable features for image classification.
+"""NN Image Features: interpretable features for image classification.
 
 A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
 group options, a thumbnail grid with a feature-values panel, and the Orange
@@ -258,7 +258,7 @@ class ThumbnailLoader(QThread):
             self._emit(pending)
 
 
-class OWImageFeatureExtractor(OWWidget):
+class OWNNImageFeatures(OWWidget):
     """Extract human-interpretable features from images.
 
     Input is an Import Images table (image paths in a meta column). Output is
@@ -277,9 +277,9 @@ class OWImageFeatureExtractor(OWWidget):
     highlight the image among all rows.
     """
 
-    name = "Image Feature Extractor"
+    name = "NN Image Features"
     description = "Extract interpretable image features (groups A-F) for classifiers."
-    icon = "icons/image_features.svg"
+    icon = "icons/nn_image_features.svg"
     priority = 30
     keywords = ["image", "features", "interpretable", "texture", "topology"]  # noqa: RUF012
 
@@ -1079,4 +1079,4 @@ class OWImageFeatureExtractor(OWWidget):
 if __name__ == "__main__":  # pragma: no cover - dev preview
     from orangewidget.utils.widgetpreview import WidgetPreview
 
-    WidgetPreview(OWImageFeatureExtractor).run()
+    WidgetPreview(OWNNImageFeatures).run()

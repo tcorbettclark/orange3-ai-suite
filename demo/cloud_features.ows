@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
-<scheme version="2.0" title="WMO Cloud Atlas genera — interpretable features" description="Import Images (data/clouds, fetched by demo/fetch_clouds.py) -&gt; Image Feature Extractor -&gt; Test &amp; Score with the Neural Network; inspect features in Data Table / Column Statistics; Confusion Matrix shows which genera confound.">
+<scheme version="2.0" title="WMO Cloud Atlas genera — interpretable features" description="Import Images (data/clouds, fetched by demo/fetch_clouds.py) -&gt; NN Image Features -&gt; Test &amp; Score with the Neural Network; inspect features in Data Table / Column Statistics; Confusion Matrix shows which genera confound.">
 	<nodes>
 		<node id="0" name="Import Images" qualified_name="orangecontrib.imageanalytics.widgets.owimageimport.OWImportImages" project_name="" version="" title="Import Images" position="(60, 40)" />
-		<node id="1" name="Image Feature Extractor" qualified_name="nn_suite.widgets.ow_image_features.OWImageFeatureExtractor" project_name="" version="" title="Image Feature Extractor" position="(300, 40)" />
+		<node id="1" name="NN Image Features" qualified_name="nn_suite.widgets.ow_nn_image_features.OWNNImageFeatures" project_name="" version="" title="NN Image Features" position="(300, 40)" />
 		<node id="2" name="Test &amp; Score" qualified_name="Orange.widgets.evaluate.owtestandscore.OWTestAndScore" project_name="" version="" title="Test &amp; Score" position="(540, 40)" />
 		<node id="3" name="Confusion Matrix" qualified_name="Orange.widgets.evaluate.owconfusionmatrix.OWConfusionMatrix" project_name="" version="" title="Confusion Matrix" position="(780, 40)" />
 		<node id="4" name="Data Table" qualified_name="Orange.widgets.data.owtable.OWTable" project_name="" version="" title="Data Table" position="(780, 260)" />
@@ -25,7 +25,7 @@ YWxvZ3OUjApSZWNlbnRQYXRolJOUKYGUfZQojAdhYnNwYXRolIw6L1VzZXJzL3Rjb3JiZXR0Y2xh
 cmsvUHJvamVjdHMvb3JhbmdlMy1ubi1zdWl0ZS9kYXRhL2Nsb3Vkc5SMBnByZWZpeJSMBmNsb3Vk
 c5SMB3JlbHBhdGiUTowFdGl0bGWUjACUjAVzaGVldJRoDowLZmlsZV9mb3JtYXSUTnViYXMu
 </properties>
-		<properties node_id="1" format="literal">{'auto_apply': True, 'working_size': 128, 'groups_enabled': 'ABCDEF'}</properties>
+		<properties node_id="1" format="literal">{'working_size': 128, 'groups_enabled': 'ABCDEF'}</properties>
 	</node_properties>
 	<session_state>
 		<window_groups />

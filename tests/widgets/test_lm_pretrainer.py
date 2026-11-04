@@ -1,4 +1,4 @@
-"""LM Trainer widget: settings plumbing, threading path, graceful degradation.
+"""LM Pre-trainer widget: settings plumbing, threading path, graceful degradation.
 
 The full-training test only runs when Keras is importable in *this* Orange
 environment (the [lm] extra). Without it, the degradation-path test asserts
@@ -12,7 +12,7 @@ import pytest
 from Orange.data import ContinuousVariable, Domain, Table
 
 from nn_suite.adapters import table_texts
-from nn_suite.widgets.ow_lm_trainer import OWLMTrainer, TrainingWorker
+from nn_suite.widgets.ow_lm_pretrainer import OWLMPretrainer, TrainingWorker
 
 KERAS_AVAILABLE = importlib.util.find_spec("keras") is not None
 
@@ -27,7 +27,7 @@ def test_table_texts_adapter(text_table, texts):
 
 
 def test_textless_data_sets_warning(qapp):
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w.set_data(_numbers_table())
     assert w.Warning.no_text.is_shown()
@@ -39,7 +39,7 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
     """Full pipeline in-thread (blocking): needs Keras."""
     if not KERAS_AVAILABLE:
         pytest.skip("Keras not installed in this Orange environment ([lm] extra)")
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
     w.epochs = 2
@@ -64,7 +64,7 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
 
 def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
     """The Stop button's effect, mid-run: 200 epochs requested, stop after 3."""
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
     w.epochs = 200
@@ -89,7 +89,7 @@ def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
 
 
 def test_stop_button_sets_flag(qapp, text_table):
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
     w.worker = TrainingWorker([], None, {})
@@ -98,7 +98,7 @@ def test_stop_button_sets_flag(qapp, text_table):
 
 
 def test_missing_keras_message_routing(qapp):
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w._on_failed("ModuleNotFoundError: No module named 'keras'")
     assert w.Error.keras_missing.is_shown()
@@ -119,7 +119,7 @@ def test_start_training_without_keras_shows_install_hint(qapp, text_table):
     Uses the blocking variant: same lazy-import path as the threaded one,
     without a live QThread (offscreen teardown of threads is fragile).
     """
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
     w.run_training_blocking()
@@ -132,7 +132,7 @@ def test_start_training_without_keras_shows_install_hint(qapp, text_table):
     reason="needs Keras to patch the real kernel path (runs once [lm] is installed)",
 )
 def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
-    w = OWLMTrainer()
+    w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
 
