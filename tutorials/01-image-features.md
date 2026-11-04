@@ -40,9 +40,9 @@ button and choose `demo/mnist/train`.
 
 The first extraction decodes every image and computes all feature groups once;
 a progress bar reports both phases. After that, switching groups reuses the
-cached raw features, so the ablation is quick. Changing a feature parameter
-recomputes only the affected group; changing preprocessing reuses the decoded
-images without reading the files again.
+cached raw features, so the ablation is quick. Changing preprocessing reuses
+the decoded images but recomputes their features without reading the files
+again.
 
 Open **Data Table**. You should see:
 

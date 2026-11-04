@@ -142,7 +142,9 @@ def test_group_toggle_auto_applies(qapp, capture, images_table):
     assert "bluish_fraction" in [v.name for v in sent[-1].domain.attributes]
 
 
-def test_cache_reuses_features_for_groups_and_parameters(qapp, capture, images_table, monkeypatch):
+def test_cache_reuses_features_for_groups_and_preprocessing(
+    qapp, capture, images_table, monkeypatch
+):
     import nn_kernel.features as features_module
 
     calls = []
@@ -167,21 +169,11 @@ def test_cache_reuses_features_for_groups_and_parameters(qapp, capture, images_t
     w.wait_for_extraction()
     assert calls == ["ABCDEFG"] * 5
 
-    # parameter changes recompute only the affected profile/texture groups
-    w.peak_prominence_frac = 0.2
-    w.commit.now()
-    w.wait_for_extraction()
-    assert calls[5:] == ["B"] * 5
-    w.edge_density_frac = 0.8
-    w.commit.now()
-    w.wait_for_extraction()
-    assert calls[10:] == ["D"] * 5
-
     # preprocessing changes reuse the decoded images but recompute all groups
     w.working_size = 64
     w.commit.now()
     w.wait_for_extraction()
-    assert calls[15:] == ["ABCDEFG"] * 5
+    assert calls[5:] == ["ABCDEFG"] * 5
 
 
 def test_commit_controls_are_compact(qapp):
@@ -195,3 +187,11 @@ def test_commit_controls_are_compact(qapp):
     layout = w._apply_button.parentWidget().layout()
     assert layout.itemAt(0).widget() is w._apply_button
     assert layout.itemAt(1).widget() is w._auto_check
+
+
+def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
+    w = OWImageFeatureExtractor()
+    w.show()
+    opts = w._feature_options()
+    assert opts.peak_prominence_frac == 0.10
+    assert opts.edge_density_frac == 0.50

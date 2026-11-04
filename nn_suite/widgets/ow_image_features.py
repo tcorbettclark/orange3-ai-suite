@@ -74,7 +74,6 @@ class _FeatureCache:
     names: tuple[str, ...]
     values: np.ndarray
     preprocess_key: tuple
-    params_key: tuple
 
 
 @dataclass
@@ -86,12 +85,7 @@ class _WorkerResult:
 
 
 class ImageExtractionWorker(QThread):
-    """Load images and compute features without blocking the GUI thread.
-
-    ``groups`` is the group subset to compute. ``_ALL_GROUPS`` means a full
-    computation; ``"B"``/``"D"`` recompute only the parameter-dependent groups
-    on top of an existing feature cache.
-    """
+    """Load images and compute all raw features without blocking the GUI."""
 
     progress = pyqtSignal(int)
     finished_ok = pyqtSignal(object)  # _WorkerResult
@@ -105,11 +99,8 @@ class ImageExtractionWorker(QThread):
         paths: tuple[str, ...],
         skipped_no_path: int,
         image_cache: _ImageCache | None,
-        feature_cache: _FeatureCache | None,
         options,
         preprocess_key: tuple,
-        params_key: tuple,
-        groups: str,
     ):
         super().__init__()
         self._generation = generation
@@ -117,11 +108,8 @@ class ImageExtractionWorker(QThread):
         self._paths = paths
         self._skipped_no_path = skipped_no_path
         self._image_cache = image_cache
-        self._feature_cache = feature_cache
         self._options = options
         self._preprocess_key = preprocess_key
-        self._params_key = params_key
-        self._groups = groups
         self._stop = False
         self.result: _WorkerResult | None = None
         self.error: tuple[str, int] | None = None
@@ -163,28 +151,21 @@ class ImageExtractionWorker(QThread):
                 start = 0
 
             names = all_feature_names()
-            if self._groups == _ALL_GROUPS:
-                values = np.empty((len(image_cache.images), len(names)), dtype=np.float64)
-                columns = {name: i for i, name in enumerate(names)}
-            else:
-                names = self._feature_cache.names
-                values = self._feature_cache.values.copy()
-                columns = {name: i for i, name in enumerate(names)}
+            values = np.empty((len(image_cache.images), len(names)), dtype=np.float64)
+            columns = {name: i for i, name in enumerate(names)}
 
             total = max(1, start + len(image_cache.images))
             for n, image in enumerate(image_cache.images):
                 if self._stop:
                     return
-                vec = extract_features(image, self._options, groups=self._groups)
+                vec = extract_features(image, self._options, groups=_ALL_GROUPS)
                 for name, value in vec.items():
                     values[n, columns[name]] = value
                 self.progress.emit(int(100 * (start + n + 1) / total))
             if not image_cache.images:
                 self.progress.emit(100)
 
-            feature_cache = _FeatureCache(
-                tuple(names), values, self._preprocess_key, self._params_key
-            )
+            feature_cache = _FeatureCache(tuple(names), values, self._preprocess_key)
             self.result = _WorkerResult(
                 self._generation,
                 self._data_version,
@@ -206,10 +187,10 @@ class OWImageFeatureExtractor(OWWidget):
     source image.
 
     The controls select preprocessing (working size, centre crop, contrast
-    normalisation, optional denoising), peak and edge parameters, and feature
-    groups. Toggling groups is the ablation experiment; group G (colour) is
-    the opt-in shortcut demonstration. The preview shows the selected image's
-    preprocessed luminance together with its row and column projections.
+    normalisation, optional denoising) and feature groups. Toggling groups is
+    the ablation experiment; group G (colour) is the opt-in shortcut
+    demonstration. The preview shows the selected image's preprocessed
+    luminance together with its row and column projections.
     """
 
     name = "Image Feature Extractor"
@@ -244,8 +225,6 @@ class OWImageFeatureExtractor(OWWidget):
     contrast_normalise = Setting(True)
     denoise = Setting(False)
     denoise_ksize = Setting(3)
-    peak_prominence_frac = Setting(0.10)
-    edge_density_frac = Setting(0.50)
     groups_enabled = Setting("ABCDEF")
     preview_index = Setting(0)
 
@@ -299,28 +278,6 @@ class OWImageFeatureExtractor(OWWidget):
             3,
             5,
             label="Denoise strength",
-            callback=self._defer_commit,
-        )
-
-        param_box = gui.widgetBox(self.controlArea, "Feature parameters")
-        gui.doubleSpin(
-            param_box,
-            self,
-            "peak_prominence_frac",
-            0.01,
-            0.5,
-            0.01,
-            label="Peak prominence, of range (group B)",
-            callback=self._defer_commit,
-        )
-        gui.doubleSpin(
-            param_box,
-            self,
-            "edge_density_frac",
-            0.1,
-            1.0,
-            0.05,
-            label="Edge density, of gradient p99 (group D)",
             callback=self._defer_commit,
         )
 
@@ -401,8 +358,6 @@ class OWImageFeatureExtractor(OWWidget):
             contrast_normalise=self.contrast_normalise,
             denoise=self.denoise,
             denoise_ksize=self.denoise_ksize,
-            peak_prominence_frac=self.peak_prominence_frac,
-            edge_density_frac=self.edge_density_frac,
         )
 
     def _preprocess_key(self) -> tuple:
@@ -413,9 +368,6 @@ class OWImageFeatureExtractor(OWWidget):
             self.denoise,
             self.denoise_ksize,
         )
-
-    def _params_key(self) -> tuple:
-        return (self.peak_prominence_frac, self.edge_density_frac)
 
     def _update_preview(self):
         self._preview_label.setText("No images.")
@@ -505,7 +457,6 @@ class OWImageFeatureExtractor(OWWidget):
 
         kept = [(i, p) for i, p in enumerate(paths) if p]
         preprocess_key = self._preprocess_key()
-        params_key = self._params_key()
 
         self._generation += 1
         generation = self._generation
@@ -515,20 +466,11 @@ class OWImageFeatureExtractor(OWWidget):
 
         image_cache = self._image_cache
         feature_cache = self._feature_cache
-        if image_cache is None:
-            groups = _ALL_GROUPS
-            feature_cache = None
-        elif feature_cache is None or feature_cache.preprocess_key != preprocess_key:
-            groups = _ALL_GROUPS
-            feature_cache = None
-        elif feature_cache.params_key != params_key:
-            old_peak, old_edge = feature_cache.params_key
-            new_peak, new_edge = params_key
-            groups = ("B" if old_peak != new_peak else "") + ("D" if old_edge != new_edge else "")
-            if not groups:
-                self._send_features()
-                return
-        else:
+        if (
+            image_cache is not None
+            and feature_cache is not None
+            and feature_cache.preprocess_key == preprocess_key
+        ):
             self._paths = list(image_cache.paths)
             self._clamp_preview()
             self._send_features()
@@ -539,10 +481,7 @@ class OWImageFeatureExtractor(OWWidget):
             kept,
             len(paths) - len(kept),
             image_cache,
-            feature_cache,
-            groups,
             preprocess_key,
-            params_key,
         )
 
     def _start_worker(
@@ -551,10 +490,7 @@ class OWImageFeatureExtractor(OWWidget):
         kept,
         skipped_no_path,
         image_cache,
-        feature_cache,
-        groups,
         preprocess_key,
-        params_key,
     ):
         self._restart_pending = False
         worker = ImageExtractionWorker(
@@ -563,11 +499,8 @@ class OWImageFeatureExtractor(OWWidget):
             paths=tuple(kept),
             skipped_no_path=skipped_no_path,
             image_cache=image_cache,
-            feature_cache=feature_cache,
             options=self._feature_options(),
             preprocess_key=preprocess_key,
-            params_key=params_key,
-            groups=groups,
         )
         worker.progress.connect(self.progressBarSet)
         worker.finished_ok.connect(self._on_worker_done)
@@ -586,10 +519,7 @@ class OWImageFeatureExtractor(OWWidget):
             # Accept a result that is still valid for the current data, even
             # when a setting changed while the worker was running.
             self._image_cache = result.image_cache
-            if (
-                result.feature_cache.preprocess_key == self._preprocess_key()
-                and result.feature_cache.params_key == self._params_key()
-            ):
+            if result.feature_cache.preprocess_key == self._preprocess_key():
                 self._feature_cache = result.feature_cache
         if result.generation != self._generation:
             if self._restart_pending:

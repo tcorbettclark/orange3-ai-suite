@@ -84,12 +84,13 @@ row per readable image. Class variables and meta columns are inherited, and the
 image path is kept as a meta column so any row can be traced back to its source.
 
 Controls cover preprocessing (working size, centre crop, contrast
-normalisation, optional median denoising), peak and edge parameters, and
-feature groups A-G. Toggling groups is the ablation experiment; group G
-(colour) is the opt-in shortcut demonstration. A preview shows the selected
-image's preprocessed luminance with its row and column projections.
+normalisation, optional median denoising) and feature groups A-G. Toggling
+groups is the ablation experiment; group G (colour) is the opt-in shortcut
+demonstration. A preview shows the selected image's preprocessed luminance with
+its row and column projections. The peak-prominence and edge-density thresholds
+are available as `FeatureOptions` fields in the kernel, not as widget controls.
 
-The output feeds any Orange learner. Test & Score, Confusion Matrix, Feature
+The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.
 
 ### LM Trainer
