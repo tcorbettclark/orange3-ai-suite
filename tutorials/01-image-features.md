@@ -38,6 +38,12 @@ button and choose `demo/mnist/train`.
 
 ## 2. Inspect the feature table
 
+The first extraction decodes every image and computes all feature groups once;
+a progress bar reports both phases. After that, switching groups reuses the
+cached raw features, so the ablation is quick. Changing a feature parameter
+recomputes only the affected group; changing preprocessing reuses the decoded
+images without reading the files again.
+
 Open **Data Table**. You should see:
 
 - one row per image;
@@ -67,8 +73,9 @@ a convolutional network; it is to explain every mistake in terms of features.
 
 ## 4. Ablation: which groups carry the signal?
 
-In **Image Feature Extractor**, switch a whole group off. The feature table is
-recomputed automatically.
+Hover any group checkbox to see what it measures. In **Image Feature
+Extractor**, switch a whole group off. The feature table is recomputed from the
+cache.
 
 Try this sequence:
 
