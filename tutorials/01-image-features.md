@@ -122,6 +122,18 @@ Test & Score then fits the normalisation inside each fold. The same
 **Preprocessed Data** output can feed a learner outside Test & Score when you
 do not need cross-validation.
 
+## 7. Optional: raw-pixel baseline
+
+Add **Pixel Features** and connect *Import Images* **Data** → *Pixel Features*
+**Images**, and *Pixel Features* **Features** → *Test & Score* **Data**. Leave
+the dimensions at 10. This gives 100 raw luminance columns per image and no
+spatial encoding; it is the deliberately plain baseline against which the
+handcrafted features can be compared.
+
+Raise the dimensions to 14 or 28 and compare the accuracy and the number of
+columns. The raw-pixel model has no idea that adjacent pixels are neighbours,
+only that each pixel has its own input weight.
+
 ## Checkpoint
 
 - The feature output has 36 columns plus the inherited class and image path.

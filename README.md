@@ -15,7 +15,7 @@ and generations come back as corpora that Orange's text widgets can analyse.
   image features, tokenizers and windowing, Keras model builders, sampling,
   perplexity, and MLX LoRA wrappers. The same code runs in the widgets or in a
   plain Python session.
-- **`nn_suite/`** - the Orange add-on. Six widgets and the signal adapters that
+- **`nn_suite/`** - the Orange add-on. Seven widgets and the signal adapters that
   convert between Orange objects and kernel types. The widgets are thin shells:
   options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
@@ -69,6 +69,7 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 | Widget | Input | Output | Extra |
 |---|---|---|---|
 | Image Feature Extractor | Images | Features, Selected image (Table) | `image` |
+| Pixel Features | Images | Features (Table) | `image` |
 | LM Trainer | Data (text) | Model, Checkpoint (Table) | `lm` |
 | LM Generator | Model | Generations (Table) | `lm` / `lora` |
 | LoRA Trainer | Data (text or pairs) | Model | `lora` |
@@ -98,6 +99,15 @@ widget controls.
 
 The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.
+
+### Pixel Features
+
+The deliberately plain baseline. Every image is converted to luminance,
+resized to a square grid and flattened row-major into values in [0, 1]. The
+only control is the grid dimension; the default 10 produces 100 features per
+image. It performs no feature engineering and adds no spatial encoding, so it
+is useful for comparing a raw-pixel MLP against the interpretable feature
+groups or a convolutional model.
 
 ### LM Trainer
 
@@ -381,7 +391,7 @@ nn_kernel/
   lora/       LoRA data formats, MLX training subprocess, artifact/model objects
 nn_suite/
   adapters.py Orange <-> kernel conversion
-  widgets/    the six Orange widgets and their icons
+  widgets/    the seven Orange widgets and their icons
 demo/         corpora, fetchers, generated .ows workflows
 tests/        kernel tests + offscreen widget tests
 ```
