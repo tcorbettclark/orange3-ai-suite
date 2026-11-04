@@ -189,6 +189,9 @@ def test_commit_controls_are_compact(qapp):
 
     w = OWImageFeatureExtractor()
     w.show()
-    assert w._commit_box.checkbox.text() == "Apply automatically"
-    assert w._commit_box.button.text() == "Extract"
-    assert w._commit_box.button.sizePolicy().horizontalPolicy() == QSizePolicy.Maximum
+    assert w._auto_check.text() == "Apply automatically"
+    assert w._apply_button.text() == "Extract"
+    assert w._apply_button.sizePolicy().horizontalPolicy() == QSizePolicy.Maximum
+    layout = w._apply_button.parentWidget().layout()
+    assert layout.itemAt(0).widget() is w._apply_button
+    assert layout.itemAt(1).widget() is w._auto_check

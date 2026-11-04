@@ -298,7 +298,7 @@ class OWImageFeatureExtractor(OWWidget):
             "denoise_ksize",
             3,
             5,
-            label="Denoise strength (groups A-F)",
+            label="Denoise strength",
             callback=self._defer_commit,
         )
 
@@ -334,22 +334,36 @@ class OWImageFeatureExtractor(OWWidget):
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
 
-        self._commit_box = gui.auto_commit(
-            self.controlArea,
+        commit_row = gui.hBox(self.controlArea)
+        self._apply_button = gui.button(commit_row, self, "Extract", callback=self._commit_now)
+        self._apply_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self._auto_check = gui.checkBox(
+            commit_row,
             self,
             "auto_apply",
-            "Extract",
-            checkbox_label="Apply automatically",
-            orientation=Qt.Horizontal,
-            commit=self.commit,
+            "Apply automatically",
+            callback=self._auto_toggled,
         )
-        self._commit_box.button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        commit_row.layout().addStretch(1)
+        self.commit.now = self._commit_now
+        self.commit.deferred = self._defer_commit
 
         self._setup_preview()
         self.resize(950, 700)
 
+    def _commit_now(self):
+        self.commit.call()
+        self.commit.dirty = False
+
     def _defer_commit(self):
-        self.commit.deferred()
+        if self.auto_apply:
+            self._commit_now()
+        else:
+            self.commit.dirty = True
+
+    def _auto_toggled(self):
+        if self.auto_apply and self.commit.dirty:
+            self._commit_now()
 
     def _sync_group_settings(self):
         self.groups_enabled = "".join(
