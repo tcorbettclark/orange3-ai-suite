@@ -29,7 +29,9 @@ class OWLMGenerator(OWWidget):
 
     ``Load model...`` opens a saved artifact directory: a Keras LM
     (``meta.json``) or a LoRA adapter (``lora_meta.json``). The loaded model
-    stays active until the input signal replaces it.
+    stays active until the input signal replaces it. For LoRA models, the
+    "Use LoRA adapter" checkbox switches between the adapted model and its raw
+    base model, so the before/after comparison uses the identical weights.
     """
 
     name = "LM Generator"
@@ -59,6 +61,7 @@ class OWLMGenerator(OWWidget):
     max_new_tokens = Setting(48)
     n_generations = Setting(3)
     seed = Setting(0)
+    use_adapter = Setting(True)
 
     def __init__(self):
         super().__init__()
@@ -80,6 +83,13 @@ class OWLMGenerator(OWWidget):
         gui.spin(box, self, "max_new_tokens", 1, 512, label="Max new tokens")
         gui.spin(box, self, "n_generations", 1, 50, label="Number of generations")
         gui.spin(box, self, "seed", -1, 2**31 - 1, label="Seed (-1 = random)")
+        self._adapter_check = gui.checkBox(
+            self.controlArea,
+            self,
+            "use_adapter",
+            "Use LoRA adapter (when available)",
+        )
+        self._adapter_check.setEnabled(False)
         gui.button(self.controlArea, self, "Load model...", callback=self.load_model)
         gui.button(self.controlArea, self, "Generate", callback=self.generate)
         gui.rubber(self.controlArea)
@@ -91,6 +101,10 @@ class OWLMGenerator(OWWidget):
         self.Warning.not_generative(
             shown=model is not None and not callable(getattr(model, "generate", None))
         )
+        supports_adapter = hasattr(model, "adapter_enabled")
+        self._adapter_check.setEnabled(supports_adapter)
+        if supports_adapter:
+            self.use_adapter = bool(model.adapter_enabled)
 
     def load_model(self):
         """Load a saved model artifact directory."""
@@ -129,6 +143,8 @@ class OWLMGenerator(OWWidget):
         self.Error.generation_failed.clear()
         if self.model is None or not callable(getattr(self.model, "generate", None)):
             return
+        if hasattr(self.model, "adapter_enabled"):
+            self.model.adapter_enabled = self.use_adapter
         seed = self.seed
         try:
             outcomes = [

@@ -75,3 +75,27 @@ def test_output_type_is_table(qapp, capture, text_table):
     w.n_generations = 1
     w.generate()
     assert sent[-1].domain.metas[0].name == "generation"
+
+
+class AdapterStub(StubModel):
+    def __init__(self):
+        super().__init__()
+        self.adapter_enabled = True
+
+
+def test_adapter_toggle_is_only_for_adapter_models(qapp, capture):
+    w = OWLMGenerator()
+    w.show()
+    plain = StubModel()
+    w.set_model(plain)
+    assert not w._adapter_check.isEnabled()
+
+    model = AdapterStub()
+    w.set_model(model)
+    assert w._adapter_check.isEnabled()
+    assert w.use_adapter is True
+
+    w.use_adapter = False
+    w.n_generations = 1
+    w.generate()
+    assert model.adapter_enabled is False

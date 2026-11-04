@@ -84,3 +84,11 @@ def test_real_training_path(qapp, capture):
     assert w.model is not None and model_sent[-1] is w.model
     out = w.model.generate("the quick brown", temperature=0, max_new_tokens=6, seed=0)
     assert isinstance(out, str) and out.startswith("the quick brown")
+
+
+def test_trainable_parameter_note_is_reported(qapp):
+    w = OWLoRATrainer()
+    w.show()
+    w._on_metric({"kind": "params", "pct": 0.233, "detail": "6.21M / 2.67B"})
+    assert "0.233%" in w.status_label.text()
+    assert "6.21M / 2.67B" in w.status_label.text()

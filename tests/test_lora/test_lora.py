@@ -35,6 +35,7 @@ SAMPLE_LOG_LINES = [
     "\x1b[38;5;244m  20\x1b[0m    \x1b[1;32m0.725 \u25bc\x1b[0m    \x1b[1m  184\x1b[0m    \x1b[38;5;244m  3.3k\x1b[0m",
     "\x1b[38;5;244m  50\x1b[0m    \x1b[1;35mval\x1b[0m \x1b[1m0.018\x1b[0m    \x1b[38;5;244m1.40s\x1b[0m",
     "Model loaded: britllm/britllm-3b-v0.1 (some header noise line)",
+    "Trainable parameters: 0.233% (6.21M / 2.67B)",
 ]
 
 
@@ -79,6 +80,8 @@ def test_stream_metrics_parses_the_real_log():
     val = next(m for m in seen if m and m["kind"] == "val")
     assert train == {"iter": 20, "loss": 0.725, "tok_s": 184, "kind": "train"}
     assert val == {"iter": 1, "loss": 3.419, "kind": "val"}
+    params = next(m for m in seen if m and m["kind"] == "params")
+    assert params == {"kind": "params", "pct": 0.233, "detail": "6.21M / 2.67B"}
     assert stream_metrics("Model loaded: header noise") is None
 
 

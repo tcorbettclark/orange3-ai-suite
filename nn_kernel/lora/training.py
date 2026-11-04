@@ -33,6 +33,7 @@ _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 # training row: "  20    0.725 ▼    184    3.3k";  val row: "  50  val  0.018  1.40s"
 _TRAIN_ROW = re.compile(r"^\s*(\d+)\s+([\d.]+)\s*[▲▼]\s+(\d+)\s+([\dk.]+)\s*$")
 _VAL_ROW = re.compile(r"^\s*(\d+)\s+val\s+([\d.]+)\s+([\d.]+s)\s*$")
+_TRAINABLE = re.compile(r"Trainable parameters:\s*([\d.]+)%\s*\(([^)]+)\)")
 
 
 @dataclass
@@ -102,6 +103,13 @@ class LoraData:
 def stream_metrics(line: str) -> dict | None:
     """Parse one mlx-lm training-log line into a metric dict (or None)."""
     line = _ANSI.sub("", line.rstrip("\n"))
+    m = _TRAINABLE.search(line)
+    if m:
+        return {
+            "kind": "params",
+            "pct": float(m.group(1)),
+            "detail": m.group(2).strip(),
+        }
     m = _TRAIN_ROW.match(line)
     if m:
         return {

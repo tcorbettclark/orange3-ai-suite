@@ -118,6 +118,7 @@ class OWLoRATrainer(OWWidget):
         self.worker: LoraWorker | None = None
         self.model = None
         self._losses: list[tuple[int, float, str]] = []  # (iter, loss, kind)
+        self._trainable_note = ""
 
         model_box = gui.widgetBox(self.controlArea, "Model")
         gui.lineEdit(
@@ -234,6 +235,7 @@ class OWLoRATrainer(OWWidget):
         self.Outputs.model.send(None)
         self.model = None
         self._losses = []
+        self._trainable_note = ""
         self._train_curve.setData([], [])
         self._val_curve.setData([], [])
 
@@ -284,6 +286,10 @@ class OWLoRATrainer(OWWidget):
     # ---- live feedback -------------------------------------------------------
 
     def _on_metric(self, metric: dict):
+        if metric.get("kind") == "params":
+            self._trainable_note = f"trainable {metric['pct']}% ({metric['detail']})"
+            self.status_label.setText(self._trainable_note)
+            return
         self._losses.append((metric["iter"], metric["loss"], metric["kind"]))
         train = [(i, loss) for i, loss, kind in self._losses if kind == "train"]
         val = [(i, loss) for i, loss, kind in self._losses if kind == "val"]
@@ -294,6 +300,7 @@ class OWLoRATrainer(OWWidget):
         self.status_label.setText(
             f"iter {metric['iter']}: loss {metric['loss']:.3f}"
             + (f", {metric.get('tok_s')} tok/s" if metric.get("tok_s") else "")
+            + (f"; {self._trainable_note}" if self._trainable_note else "")
         )
 
     def _on_done(self, adapter):
@@ -307,10 +314,11 @@ class OWLoRATrainer(OWWidget):
             adapter.name,
         )
         self.Outputs.model.send(self.model)
+        detail = f" ({self._trainable_note})" if self._trainable_note else ""
         self.status_label.setText(
-            f"Done: adapter trained ({adapter.name or 'adapter'}); use Save "
-            "adapter to keep it, or connect the Model output to LM Generator "
-            "for the before/after comparison."
+            f"Done: adapter trained ({adapter.name or 'adapter'}){detail}; use "
+            "Save adapter to keep it, or connect the Model output to LM "
+            "Generator for the before/after comparison."
         )
 
     def _on_failed(self, tb: str):
