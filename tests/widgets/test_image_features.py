@@ -134,3 +134,40 @@ def test_group_toggle_auto_applies(qapp, capture, images_table):
 
     w._group_checks["G"].setChecked(True)  # toggles -> settings -> commit
     assert "bluish_fraction" in [v.name for v in sent[-1].domain.attributes]
+
+
+def test_cache_reuses_features_for_groups_and_parameters(qapp, capture, images_table, monkeypatch):
+    import nn_kernel.features as features_module
+
+    calls = []
+    original = features_module.extract_features
+
+    def counted(*args, **kwargs):
+        calls.append(kwargs.get("groups"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(features_module, "extract_features", counted)
+    w = OWImageFeatureExtractor()
+    w.show()
+    capture(w.Outputs.features)
+    w.set_data(images_table)
+    w.commit.now()
+    assert calls == ["ABCDEFG"] * 5
+
+    # group selection is a column subset of the cached raw features
+    w.groups_enabled = "E"
+    w.commit.now()
+    assert calls == ["ABCDEFG"] * 5
+
+    # parameter changes recompute only the affected profile/texture groups
+    w.peak_prominence_frac = 0.2
+    w.commit.now()
+    assert calls[5:] == ["B"] * 5
+    w.edge_density_frac = 0.8
+    w.commit.now()
+    assert calls[10:] == ["D"] * 5
+
+    # preprocessing changes reuse the decoded images but recompute all groups
+    w.working_size = 64
+    w.commit.now()
+    assert calls[15:] == ["ABCDEFG"] * 5

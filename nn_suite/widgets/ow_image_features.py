@@ -2,13 +2,16 @@
 
 A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
 group options, a luminance/profile preview, and the Orange signal adapters.
-Extraction runs in the GUI thread with a progress bar: at teaching scale it
-takes milliseconds per image.
+
+Decoded images and their raw feature values are cached, so changing feature
+groups or scaling reuses the cached features instead of re-reading every image.
+Preprocessing changes and parameter changes recompute from the cached images.
 """
 
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import dataclass
 
 import numpy as np
 from AnyQt.QtCore import Qt
@@ -30,6 +33,29 @@ GROUP_LABELS = (
     ("F", "F: symmetry"),
     ("G", "G: colour - the shortcut trap (off by default)"),
 )
+
+_ALL_GROUPS = "ABCDEFG"
+
+
+@dataclass
+class _ImageCache:
+    """Decoded RGB images for one input table."""
+
+    paths: tuple[str, ...]
+    images: list[np.ndarray]
+    readable_source: tuple[int, ...]
+    n_unreadable: int
+    skipped_no_path: int
+
+
+@dataclass
+class _FeatureCache:
+    """Raw feature values for every group, in ``all_feature_names()`` order."""
+
+    names: tuple[str, ...]
+    values: np.ndarray
+    preprocess_key: tuple
+    params_key: tuple
 
 
 class OWImageFeatureExtractor(OWWidget):
@@ -89,6 +115,8 @@ class OWImageFeatureExtractor(OWWidget):
         super().__init__()
         self.data = None
         self._paths: list[str] = []
+        self._image_cache: _ImageCache | None = None
+        self._feature_cache: _FeatureCache | None = None
 
         prep_box = gui.widgetBox(self.controlArea, "Preprocessing")
         gui.spin(
@@ -104,7 +132,11 @@ class OWImageFeatureExtractor(OWWidget):
             prep_box, self, "centre_crop", "Centre-crop to square", callback=self._defer_commit
         )
         gui.checkBox(
-            prep_box, self, "contrast_normalise", "Contrast-normalise", callback=self._defer_commit
+            prep_box,
+            self,
+            "contrast_normalise",
+            "Contrast-normalise",
+            callback=self._defer_commit,
         )
         gui.checkBox(
             prep_box, self, "denoise", "Denoise (median filter)", callback=self._defer_commit
@@ -208,6 +240,18 @@ class OWImageFeatureExtractor(OWWidget):
             edge_density_frac=self.edge_density_frac,
         )
 
+    def _preprocess_key(self) -> tuple:
+        return (
+            self.working_size,
+            self.centre_crop,
+            self.contrast_normalise,
+            self.denoise,
+            self.denoise_ksize,
+        )
+
+    def _params_key(self) -> tuple:
+        return (self.peak_prominence_frac, self.edge_density_frac)
+
     def _update_preview(self):
         self._preview_label.setText("No images.")
         self._row_curve.setData([], [])
@@ -241,6 +285,9 @@ class OWImageFeatureExtractor(OWWidget):
     @Inputs.images
     def set_data(self, table):
         self.data = table
+        self._image_cache = None
+        self._feature_cache = None
+        self._paths = []
         self.commit.deferred()
 
     @gui.deferred
@@ -284,13 +331,32 @@ class OWImageFeatureExtractor(OWWidget):
         _, paths = image_paths(self.data)
 
         kept = [(i, p) for i, p in enumerate(paths) if p]
-        skipped_no_path = len(paths) - len(kept)
+        if self._image_cache is None:
+            self._image_cache = self._load_images(kept, len(paths) - len(kept))
+            self._feature_cache = None
 
+        image_cache = self._image_cache
+        self._paths = list(image_cache.paths)
+        self._clamp_preview()
+
+        preprocess_key = self._preprocess_key()
+        params_key = self._params_key()
+        if self._feature_cache is None or self._feature_cache.preprocess_key != preprocess_key:
+            self._feature_cache = self._compute_all_features(
+                image_cache, preprocess_key, params_key
+            )
+        elif self._feature_cache.params_key != params_key:
+            self._recompute_parameter_features(
+                image_cache, self._feature_cache, preprocess_key, params_key
+            )
+
+        self._send_features()
+
+    def _load_images(self, kept: list[tuple[int, str]], skipped_no_path: int) -> _ImageCache:
         import cv2
 
-        from nn_kernel.features import extract_features, group_names
-
-        rows, readable = [], []
+        images: list[np.ndarray] = []
+        readable: list[int] = []
         n_unreadable = 0
         self.progressBarInit()
         try:
@@ -300,23 +366,79 @@ class OWImageFeatureExtractor(OWWidget):
                 if bgr is None:
                     n_unreadable += 1
                     continue
-                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                rows.append(
-                    extract_features(rgb, self._feature_options(), groups=self.groups_enabled)
-                )
+                images.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
                 readable.append(i)
         finally:
             self.progressBarFinished()
-
-        self.Warning.rows_skipped(
-            n_unreadable + skipped_no_path,
-            n_unreadable,
-            skipped_no_path,
-            shown=bool(n_unreadable or skipped_no_path),
+        return _ImageCache(
+            paths=tuple(path for _, path in kept),
+            images=images,
+            readable_source=tuple(readable),
+            n_unreadable=n_unreadable,
+            skipped_no_path=skipped_no_path,
         )
-        self._paths = [path for _, path in kept]
-        self._clamp_preview()
-        if not rows:
+
+    def _compute_all_features(
+        self, image_cache: _ImageCache, preprocess_key: tuple, params_key: tuple
+    ) -> _FeatureCache:
+        from nn_kernel.features import all_feature_names, extract_features
+
+        names = all_feature_names()
+        values = np.empty((len(image_cache.images), len(names)), dtype=np.float64)
+        opts = self._feature_options()
+        self.progressBarInit()
+        try:
+            for n, image in enumerate(image_cache.images):
+                self.progressBarSet(100.0 * n / max(len(image_cache.images), 1))
+                vec = extract_features(image, opts, groups=_ALL_GROUPS)
+                values[n] = [vec[name] for name in names]
+        finally:
+            self.progressBarFinished()
+        return _FeatureCache(names, values, preprocess_key, params_key)
+
+    def _recompute_parameter_features(
+        self,
+        image_cache: _ImageCache,
+        feature_cache: _FeatureCache,
+        preprocess_key: tuple,
+        params_key: tuple,
+    ) -> None:
+        from nn_kernel.features import extract_features
+
+        old_peak, old_edge = feature_cache.params_key
+        new_peak, new_edge = params_key
+        groups = ""
+        if old_peak != new_peak:
+            groups += "B"
+        if old_edge != new_edge:
+            groups += "D"
+        if groups:
+            opts = self._feature_options()
+            columns = {name: i for i, name in enumerate(feature_cache.names)}
+            self.progressBarInit()
+            try:
+                for n, image in enumerate(image_cache.images):
+                    self.progressBarSet(100.0 * n / max(len(image_cache.images), 1))
+                    vec = extract_features(image, opts, groups=groups)
+                    for name, value in vec.items():
+                        feature_cache.values[n, columns[name]] = value
+            finally:
+                self.progressBarFinished()
+        feature_cache.preprocess_key = preprocess_key
+        feature_cache.params_key = params_key
+
+    def _send_features(self):
+        from nn_kernel.features import group_names
+
+        image_cache = self._image_cache
+        feature_cache = self._feature_cache
+        self.Warning.rows_skipped(
+            image_cache.n_unreadable + image_cache.skipped_no_path,
+            image_cache.n_unreadable,
+            image_cache.skipped_no_path,
+            shown=bool(image_cache.n_unreadable or image_cache.skipped_no_path),
+        )
+        if not feature_cache.values.size:
             self.Outputs.features.send(None)
             self._update_preview()
             return
@@ -327,12 +449,13 @@ class OWImageFeatureExtractor(OWWidget):
             if letter in self.groups_enabled
             for name in group_names(letter)
         ]
-        values = np.asarray([[vec[name] for name in ordered] for vec in rows], dtype=np.float64)
+        columns = {name: i for i, name in enumerate(feature_cache.names)}
+        values = feature_cache.values[:, [columns[name] for name in ordered]]
         if self.scale_features and len(values) > 1:
             stds = values.std(axis=0)
             values = (values - values.mean(axis=0)) / np.where(stds < 1e-12, 1.0, stds)
         source = self.data.domain
-        kept_idx = np.asarray(readable, dtype=int)
+        kept_idx = np.asarray(image_cache.readable_source, dtype=int)
         domain = Domain(
             [ContinuousVariable(name) for name in ordered],
             class_vars=list(source.class_vars),
