@@ -13,7 +13,7 @@ import importlib.util
 import numpy as np
 from AnyQt.QtCore import Qt
 from AnyQt.QtGui import QImage, QPixmap
-from AnyQt.QtWidgets import QCheckBox, QHBoxLayout, QLabel
+from AnyQt.QtWidgets import QCheckBox, QLabel
 from Orange.data import ContinuousVariable, Domain, Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
@@ -179,16 +179,14 @@ class OWImageFeatureExtractor(OWWidget):
     def _setup_preview(self):
         import pyqtgraph as pg
 
-        container = gui.widgetBox(self.mainArea, "Preview (luminance + projections)")
-        top = QHBoxLayout()
-        container.layout().addLayout(top)
-        self._preview_label = QLabel("No images.")
-        self._preview_label.setFixedSize(200, 200)
-        self._preview_label.setAlignment(Qt.AlignCenter)
-        top.addWidget(self._preview_label)
+        container = gui.widgetBox(self.mainArea, "Image preview")
         self._preview_spin = gui.spin(
             container, self, "preview_index", 0, 0, label="Image #", callback=self._update_preview
         )
+        self._preview_label = QLabel("No images.")
+        self._preview_label.setFixedSize(200, 200)
+        self._preview_label.setAlignment(Qt.AlignCenter)
+        container.layout().addWidget(self._preview_label)
         self._profiles = pg.PlotWidget(background="w")
         self._profiles.addLegend(offset=(10, 10))
         self._profiles.setLabel("bottom", "normalised position across the image")
