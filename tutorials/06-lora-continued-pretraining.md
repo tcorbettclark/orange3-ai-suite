@@ -1,6 +1,6 @@
 # 06 - LoRA continued pre-training
 
-Adapt a real pretrained model to the Gibbon corpus with 4-bit QLoRA, then
+Adapt a real pretrained model to a public-domain story with 4-bit QLoRA, then
 compare the base model and the adapted model on identical prompts.
 
 ## Before you start
@@ -24,10 +24,11 @@ Paste that path into the LoRA Trainer's **Base model** field. A Hugging Face id
 is treated as unquantised and is rejected; the Trainer only accepts a verifiably
 4-bit model.
 
-## 1. Make the corpus Table
+## 1. Load the corpus Table
 
-Add **Python Script** and paste the full-Gibbon recipe from
-[00 - Setup](00-setup.md#full-gibbon-corpus). Press **Run**.
+Add **LM Text** and load `data/text/yellow-wallpaper.txt` as described in
+[00 - Setup](00-setup.md#3-load-text-with-lm-text). Use **Paragraphs**, and
+enable the Gutenberg and reflow cleaning rules.
 
 Connect **Data** to **LoRA Trainer** **Data**.
 
@@ -66,7 +67,7 @@ Connect *LoRA Trainer* **Model** → *LM Generator* **Model**.
 
 Set:
 
-- **Prompt text**: `In the second century of the Christian era, the empire of Rome`
+- **Prompt text**: `It is very seldom that mere ordinary people like John and myself`
 - **Temperature**: 0.0
 - **Max new tokens**: 48
 - **Number of generations**: 1
@@ -83,7 +84,7 @@ mechanism, not to claim convergence.
 Try a prompt that a raw base model will continue rather than answer:
 
 ```text
-Q: Who wrote The History of the Decline and Fall of the Roman Empire?
+Q: Who wrote The Yellow Wallpaper?
 A:
 ```
 

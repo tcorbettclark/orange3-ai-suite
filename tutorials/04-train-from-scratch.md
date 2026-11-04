@@ -3,15 +3,16 @@
 Train three tiny language models on the same corpus and compare what each one
 can remember. This is the "from scratch" end of the language-model arc.
 
-## 1. Make the training Table
+## 1. Load the training Table
 
-Add **Python Script** and paste the full-Gibbon recipe from
-[00 - Setup](00-setup.md#full-gibbon-corpus). Press **Run**.
+Add **LM Text** and load `data/text/yellow-wallpaper.txt` as described in
+[00 - Setup](00-setup.md#3-load-text-with-lm-text). Use **Paragraphs**, and
+enable the Gutenberg and reflow cleaning rules.
 
 Connect its **Data** output to **LM Trainer** **Data**.
 
-If you want a faster first pass, use the few-paragraphs recipe instead. The
-steps are identical; only the corpus size changes.
+If you want a faster first pass, choose a shorter `.txt` file or **Lines**
+instead. The steps are identical; only the corpus size changes.
 
 ## 2. Bigram: the floor
 
@@ -95,7 +96,7 @@ the checkpoint table and generate from it in
 
 ## 7. Save the model
 
-Press **Save model** and choose a directory such as `my-gibbon-lm`. The
+Press **Save model** and choose a directory such as `my-story-lm`. The
 directory contains:
 
 - the Keras weights;

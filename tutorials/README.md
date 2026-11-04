@@ -11,12 +11,12 @@ extending the widgets.
    commands are in the project [README](../README.md#installation).
 2. Work from the repository root, so the relative paths in these tutorials
    point at the bundled demo data.
-3. The MNIST and Gibbon data are committed in `demo/`. The cloud corpus and the
-   BritLLM model are optional and are fetched by scripts in `demo/`.
+3. The MNIST images are committed in `demo/`. The cloud corpus and BritLLM model
+   are optional. Text tutorials use a public-domain `.txt` downloaded by the
+   reader; no corpus is committed.
 
 ```bash
 uv run --extra lm python demo/fetch_mnist.py   # only needed to rebuild demo/mnist
-uv run python demo/fetch_gibbon.py     # only needed to rebuild the corpus
 uv run python demo/fetch_clouds.py     # optional cloud-corpus tutorial
 uv run --extra lora python demo/fetch_britllm.py   # optional LoRA tutorials
 ```
@@ -28,9 +28,8 @@ uv run --extra lora python demo/fetch_britllm.py   # optional LoRA tutorials
   *Model*.
 - **Run**: some widgets compute when a button is pressed; others apply
   automatically. The text says which.
-- *Python Script* is a standard Orange widget. Paste the snippets from
-  [00-setup.md](00-setup.md), press **Run**, and connect its **Data** output.
-  This is only used to make text Tables without an extra add-on.
+- *LM Text* reads a UTF-8 `.txt` file or folder and emits a text Table. No
+  Python Script is needed for the language-model tutorials.
 
 ## The tutorials
 

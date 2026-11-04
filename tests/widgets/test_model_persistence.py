@@ -44,7 +44,7 @@ def test_train_save_load_generate_round_trip(qapp, capture, monkeypatch, tmp_pat
     assert trainer.model is not None
 
     # 2. Save model (dialog patched)
-    model_dir = tmp_path / "gibbon-lm-demo"
+    model_dir = tmp_path / "story-lm-demo"
     monkeypatch.setattr(
         QFileDialog,
         "getSaveFileName",

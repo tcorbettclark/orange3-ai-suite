@@ -69,7 +69,9 @@ def table_texts(table: Table) -> list[str]:
             "no text found: connect data with string (text) columns, "
             "or an Import Documents / Corpus output"
         )
-    return ["\n".join(str(row[var]) for var in string_metas).strip() for row in table]
+    by_name = {v.name.lower(): v for v in string_metas}
+    text_metas = [by_name["text"]] if "text" in by_name else string_metas
+    return ["\n".join(str(row[var]) for var in text_metas).strip() for row in table]
 
 
 def table_pairs(table: Table) -> list[tuple[str, str]]:

@@ -15,7 +15,7 @@ and generations come back as corpora that Orange's text widgets can analyse.
   image features, tokenizers and windowing, Keras model builders, sampling,
   perplexity, and MLX LoRA wrappers. The same code runs in the widgets or in a
   plain Python session.
-- **`nn_suite/`** - the Orange add-on. Seven widgets and the signal adapters that
+- **`nn_suite/`** - the Orange add-on. Eight widgets and the signal adapters that
   convert between Orange objects and kernel types. The widgets are thin shells:
   options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
@@ -70,6 +70,7 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 |---|---|---|---|
 | Image Feature Extractor | Images | Features, Selected image (Table) | `image` |
 | Pixel Features | Images | Features (Table) | `image` |
+| LM Text | none | Data (Table) | none |
 | LM Trainer | Data (text) | Model, Checkpoint (Table) | `lm` |
 | LM Generator | Model | Generations (Table) | `lm` / `lora` |
 | LoRA Trainer | Data (text or pairs) | Model | `lora` |
@@ -110,6 +111,19 @@ only control is the grid dimension; the default 10 produces 100 features per
 image. It performs no feature engineering and adds no spatial encoding, so it
 is useful for comparing a raw-pixel MLP against the interpretable feature
 groups or a convolutional model.
+
+### LM Text
+
+Reads UTF-8 `.txt` files from one file or a recursively scanned folder into a
+plain Table. **Text documents** mode emits one row per whole file, paragraph,
+line or sentence, with `text` and `source` metas. **Q/A pairs** mode parses
+fixed blocks: a new pair starts at `Q:`, the prompt includes the following
+`A:` line, and the completion runs to the next `Q:`. The output uses `prompt`,
+`completion` and `source` metas.
+
+Cleaning is opt-in: strip Project Gutenberg header/footer, reflow wrapped
+lines, remove repeated short lines, and remove page-number lines. A small
+preview table shows the first rows; selecting a row shows its full text below.
 
 ### LM Trainer
 
@@ -199,8 +213,9 @@ previous one exposes.
 
 ### 1. Train a model from scratch
 
-Use **LM Trainer** on a single-domain corpus, for example the bundled Gibbon
-text. Start with the bigram, then the MLP-over-window, then the LSTM. Compare
+Use **LM Trainer** on a single-domain corpus loaded with **LM Text**, for
+example a public-domain short story. Start with the bigram, then the
+MLP-over-window, then the LSTM. Compare
 loss curves and checkpoint samples: the bigram plateaus quickly, the MLP has a
 fixed and visible memory, and the LSTM trains more smoothly at a higher cost.
 Switch between character and word tokenization and watch the vocabulary and
@@ -333,10 +348,8 @@ subprocess, streams parsed metrics, and supports clean cancellation.
 - `demo/mnist/` - committed subset of MNIST (500 images/class for training,
   100/class for validation), stored as PNGs in the folder-per-label layout that
   Import Images expects. Regenerate with `demo/fetch_mnist.py`.
-- `demo/gibbon_corpus.txt` - Volume One of Gibbon's *Decline and Fall*, from
-  public-domain Project Gutenberg eBook #25717. Regenerate with
-  `demo/fetch_gibbon.py`; the cleaner removes the Gutenberg header/footer,
-  table of contents, footnotes and editor notes, and reflows the paragraphs.
+- `data/text/` - optional downloaded plain-text corpora. No text corpus is
+  committed; use **LM Text** to load any UTF-8 `.txt` file.
 - `demo/fetch_clouds.py` - fetches a five-genus cloud corpus from the WMO
   International Cloud Atlas into `data/clouds/`. The images are untracked and
   remain the property of their photographers; they are not covered by this
@@ -350,7 +363,6 @@ subprocess, streams parsed metrics, and supports clean cancellation.
 
 ```bash
 uv run python demo/fetch_mnist.py
-uv run python demo/fetch_gibbon.py
 uv run python demo/fetch_clouds.py
 uv run python demo/fetch_britllm.py
 uv run python demo/make_workflows.py
@@ -393,7 +405,7 @@ nn_kernel/
   lora/       LoRA data formats, MLX training subprocess, artifact/model objects
 nn_suite/
   adapters.py Orange <-> kernel conversion
-  widgets/    the seven Orange widgets and their icons
+  widgets/    the eight Orange widgets and their icons
 demo/         corpora, fetchers, generated .ows workflows
 tests/        kernel tests + offscreen widget tests
 ```
@@ -403,6 +415,6 @@ tests/        kernel tests + offscreen widget tests
 MIT for the code in this repository.
 
 Third-party material keeps its own terms: MNIST is publicly redistributed,
-the Gibbon text is public domain, WMO Cloud Atlas images remain the property of
-their photographers and are used for personal, non-commercial teaching, and
-BritLLM weights keep their model licence.
+downloaded text keeps its own licence, WMO Cloud Atlas images remain the
+property of their photographers and are used for personal, non-commercial
+teaching, and BritLLM weights keep their model licence.

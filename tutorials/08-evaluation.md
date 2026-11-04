@@ -52,10 +52,11 @@ Questions to ask:
 
 ## 5. Compare with the source corpus
 
-Load `demo/gibbon_corpus.txt` through **Corpus** (or the few-paragraph Table
-from setup) and inspect its Word Cloud next to the generated one. The source is
-the reference for "domain-plausible". A word that appears in the generated
-cloud but not in the source is a candidate hallucination or a sampling artefact.
+Load the same downloaded story with **LM Text** and connect its **Data** output
+through **Corpus** to **Word Cloud**. Inspect that cloud next to the generated
+one. The source is the reference for "domain-plausible". A word that appears in
+the generated cloud but not in the source is a candidate hallucination or a
+sampling artefact.
 
 ## 6. Read the raw text
 

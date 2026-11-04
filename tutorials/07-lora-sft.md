@@ -15,54 +15,47 @@ is computed on the completion only.
 
 ## 1. Make a prompt-response Table
 
-Add **Python Script** and paste:
+Save this as `data/text/pairs.txt`:
 
-```python
-import numpy as np
-from Orange.data import Domain, StringVariable, Table
+```text
+Q: Who is the narrator of the story?
+A: A woman spending the summer in an ancestral hall with her husband, John.
 
-pairs = [
-    ("Q: In which century did the empire of Rome reach its greatest extent?\nA:",
-     "In the second century of the Christian era."),
-    ("Q: Who were the emperors named by Gibbon in the age of the Antonines?\nA:",
-     "Nerva, Trajan, Hadrian, and the two Antonines."),
-    ("Q: What guarded the extensive monarchy of Rome?\nA:",
-     "Ancient renown and disciplined valor."),
-    ("Q: What influence cemented the union of the provinces?\nA:",
-     "The gentle but powerful influence of laws and manners."),
-    ("Q: What did the frontiers of the empire enjoy?\nA:",
-     "The advantages of wealth and luxury."),
-    ("Q: Who acquired the principal conquests of the Romans?\nA:",
-     "The Romans achieved them under the republic."),
-    ("Q: Which city was the seat of government in Britain?\nA:",
-     "York."),
-    ("Q: What did Gaul boast of under the empire?\nA:",
-     "Her twelve hundred cities."),
-    ("Q: What was the condition of the imperial constitution?\nA:",
-     "The image of a free constitution was preserved with decent reverence."),
-    ("Q: What happened after the death of Marcus Antoninus?\nA:",
-     "The empire entered its decline and fall."),
-]
+Q: What is John's profession?
+A: He is a physician.
 
-pairs = pairs * 2  # 20 rows; enough to hold a small validation split
+Q: What does John prescribe for the narrator?
+A: Rest, air and tonics, and he forbids her to write.
 
-domain = Domain(
-    [],
-    metas=[StringVariable("prompt"), StringVariable("completion")],
-)
-out_data = Table.from_numpy(
-    domain,
-    np.empty((len(pairs), 0)),
-    None,
-    np.asarray(pairs, dtype=object).reshape(-1, 2),
-)
+Q: What room does the narrator stay in?
+A: A nursery at the top of the house, with barred windows and yellow wallpaper.
+
+Q: What does the narrator become obsessed with?
+A: The pattern of the yellow wallpaper.
+
+Q: What does she see behind the wallpaper?
+A: A woman creeping and shaking the pattern.
+
+Q: How does the narrator describe the wallpaper's smell?
+A: It has a yellow smell that follows her through the house.
+
+Q: What does she do on the last day?
+A: She peels off the wallpaper and creeps around the room.
+
+Q: What does John do when he sees her?
+A: He faints.
+
+Q: Who is the woman in the wallpaper?
+A: The narrator herself, or the woman she imagines trapped behind it.
 ```
 
-Press **Run**. Connect **Data** to **LoRA Trainer** **Data**.
+Add **LM Text**, set **Source → Type** to **File**, browse to
+`data/text/pairs.txt`, switch **Table type** to **Q/A pairs**, and press
+**Reload**. The preview table shows the parsed prompt and completion columns.
 
-The Table has two string metas named `prompt` and `completion`. The adapter
-looks for those names first; if they are absent, it takes the first two string
-columns.
+Connect **Data** to **LoRA Trainer** **Data**. The Table has `prompt`,
+`completion` and `source` string metas; the adapter looks for the first two
+names.
 
 ## 2. Run supervised fine-tuning
 
@@ -73,12 +66,12 @@ Set:
 - **Iterations**: 20 for the first pass
 - **Learning rate**: 1e-4
 - **Fine-tuned layers**: 16
-- **Batch size**: 2
+- **Batch size**: 1
 - **Max seq length**: 128
 - **Seed**: 42
 
 The small batch is deliberate: the validation split must hold at least one full
-batch. With 20 pairs and a 10% validation split, only 2 rows are held out.
+batch. With 10 pairs and a 10% validation split, only 1 row is held out.
 
 Press **Train**. The live loss curve shows the completion loss. Save the
 adapter as `my-britllm-sft`.
@@ -90,8 +83,7 @@ Connect *LoRA Trainer* **Model** → *LM Generator* **Model**.
 Set:
 
 - **Prompt text**:
-  `Q: Who wrote The History of the Decline and Fall of the Roman Empire?` then
-  a new line and `A:`
+  `Q: Who is the narrator of the story?` then a new line and `A:`
 - **Temperature**: 0.0
 - **Max new tokens**: 32
 - **Number of generations**: 1
@@ -116,13 +108,13 @@ completion.
 
 ## 5. Try a variation
 
-Add five more pairs in the same style, or repeat the existing pairs more times.
-Retrain and compare the same prompt. Watch whether the answer pattern becomes
+Add five more pairs in the same style to `data/text/pairs.txt`, press **Reload**
+in LM Text, and retrain. Compare the same prompt. Watch whether the answer pattern becomes
 more consistent.
 
 ## Checkpoint
 
-- The Table has `prompt` and `completion` string columns.
+- The Table has `prompt` and `completion` string columns (plus `source`).
 - The LoRA Trainer accepts it as SFT data.
 - The Generator shows the adapted and raw base models side by side.
 - You can explain why the data format, not the loss function, makes this

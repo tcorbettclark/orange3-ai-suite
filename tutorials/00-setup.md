@@ -32,10 +32,9 @@ The widgets are in the **Neural Networks** category.
 
 ## 2. Data
 
-The committed demo data is enough for most tutorials:
+The committed demo data is enough for the image tutorials:
 
-- `demo/mnist/train/` - PNG digits in one subfolder per label;
-- `demo/gibbon_corpus.txt` - public-domain Gibbon, Volume One.
+- `demo/mnist/train/` - PNG digits in one subfolder per label.
 
 The cloud corpus and the BritLLM model are optional. Fetch them when a tutorial
 asks for them:
@@ -45,62 +44,46 @@ uv run python demo/fetch_clouds.py
 uv run --extra lora python demo/fetch_britllm.py
 ```
 
-## 3. Make a text Table with Python Script
+For the language-model tutorials, download a public-domain short story. The
+tutorials use Charlotte Perkins Gilman's *The Yellow Wallpaper*, but any UTF-8
+`.txt` file works:
 
-The LM widgets accept an Orange Table with a string (text) column. Without
-Orange3-Text, the simplest way to make one is the standard **Python Script**
-widget:
-
-1. Add **Python Script** from the widget list.
-2. Paste one of the snippets below.
-3. Press **Run**.
-4. Connect its **Data** output to **LM Trainer**, **Vocab Inspector** or
-   **LoRA Trainer**.
-
-### Full Gibbon corpus
-
-```python
-import numpy as np
-from pathlib import Path
-from Orange.data import Domain, StringVariable, Table
-
-text = Path("demo/gibbon_corpus.txt").read_text(encoding="utf-8")
-paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-
-domain = Domain([], metas=[StringVariable("text")])
-out_data = Table.from_numpy(
-    domain,
-    np.empty((len(paragraphs), 0)),
-    None,
-    np.asarray(paragraphs, dtype=object).reshape(-1, 1),
-)
+```bash
+mkdir -p data/text
+curl -L https://www.gutenberg.org/ebooks/1952.txt.utf-8 \
+    -o data/text/yellow-wallpaper.txt
 ```
 
-### A few paragraphs
+## 3. Load text with LM Text
 
-Use this when you want a fast experiment. Replace the list with any text you
-like.
+The LM widgets accept a Table with string text columns. Add **LM Text** to the
+canvas:
 
-```python
-import numpy as np
-from Orange.data import Domain, StringVariable, Table
+1. Set **Source → Type** to **File**.
+2. **Browse...** to `data/text/yellow-wallpaper.txt`.
+3. Press **Reload**.
+4. Leave **Table type** as **Text documents** and **Split into** as
+   **Paragraphs**.
+5. Enable **Strip Project Gutenberg header/footer** and **Reflow wrapped
+   lines** in the cleaning section.
+6. Connect **Data** to **LM Trainer**, **Vocab Inspector** or **LoRA Trainer**.
 
-texts = [
-    "The king gathered his counsellors in the great hall. The north wind "
-    "carried tidings from the coast.",
-    "The physician arrived at dusk, his satchel heavy with herbs. He bled "
-    "the fevered patient and prescribed rest.",
-    "The merchant counted his coins by candlelight, muttering of tariffs "
-    "and the dishonesty of strangers.",
-]
+The preview table shows the first rows. Select one to read its full text below.
+Changing split or cleaning options reprocesses the cached file; **Reload**
+rereads it from disk.
 
-domain = Domain([], metas=[StringVariable("text")])
-out_data = Table.from_numpy(
-    domain,
-    np.empty((len(texts), 0)),
-    None,
-    np.asarray(texts, dtype=object).reshape(-1, 1),
-)
+For a folder, switch **Type** to **Folder** and choose a directory. LM Text
+recurses through it, reads every `.txt`, and keeps a `source` column.
+
+For Q/A experiments, switch **Table type** to **Q/A pairs**. The fixed format is
+shown in the widget:
+
+```text
+Q: Who is the narrator?
+A: A woman spending the summer in an ancestral hall.
+
+Q: What does she become obsessed with?
+A: The yellow wallpaper in her room.
 ```
 
 ## 4. Open a prepared workflow
@@ -121,6 +104,8 @@ links.
 
 - **Image Feature Extractor**: preprocessing and group changes apply
   automatically. Type a new working size and press Enter to reprocess.
+- **LM Text**: press **Reload** to reread the file or folder; changing the
+  table type, split mode or cleaning options reprocesses the cached text.
 - **LM Trainer** and **LoRA Trainer**: set the options, then press **Train**.
   **Stop** ends a run early and keeps what has been learned so far.
 - **LM Generator**: press **Generate** after changing the prompt or sampling

@@ -18,6 +18,16 @@ def test_table_texts_joins_string_metas():
     assert table_texts(table) == ["one one\nsecond doc"]
 
 
+def test_table_texts_prefers_text_column():
+    domain = Domain(
+        [],
+        metas=[StringVariable("source"), StringVariable("text")],
+    )
+    metas = np.asarray([["book.txt", "the actual document"]], dtype=object)
+    table = Table.from_numpy(domain, np.empty((1, 0)), None, metas)
+    assert table_texts(table) == ["the actual document"]
+
+
 def test_table_texts_rejects_textless_tables():
     domain = Domain([], metas=[])
     table = Table.from_numpy(domain, np.empty((2, 0)))

@@ -3,10 +3,11 @@
 Look inside the vocabulary before training anything. The tokenizer decides what
 a model can see, so it is the first thing to make concrete.
 
-## 1. Make a small text Table
+## 1. Load a text Table
 
-Add **Python Script** and paste the small-text recipe from
-[00 - Setup](00-setup.md#a-few-paragraphs). Press **Run**.
+Add **LM Text** and load `data/text/yellow-wallpaper.txt` as described in
+[00 - Setup](00-setup.md#3-load-text-with-lm-text). Use **Paragraphs** and
+enable the Gutenberg and reflow cleaning rules.
 
 Connect its **Data** output to **Vocab Inspector** **Data**.
 
@@ -31,16 +32,14 @@ Read the **Char level** and **Word level** tabs. Then answer:
 
 ## 3. Change the text
 
-Edit the text in **Python Script** to include an apostrophe and a quotation:
+Create a second `.txt` file with an apostrophe and a quotation:
 
-```python
-texts = [
-    "The king's counsellors said, \"We will not wait.\"",
-    "The physician's satchel held herbs, a knife and a tincture.",
-]
+```text
+The king's counsellors said, "We will not wait."
+The physician's satchel held herbs, a knife and a tincture.
 ```
 
-Press **Run** and inspect again. At word level, `king's` should stay one token;
+Load it with **LM Text** and press **Reload** and inspect again. At word level, `king's` should stay one token;
 quote marks are separate tokens. This is the dependency-free tokenizer the
 kernel uses, not a pretrained subword tokenizer.
 
