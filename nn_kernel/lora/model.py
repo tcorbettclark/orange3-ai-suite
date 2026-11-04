@@ -44,8 +44,10 @@ class LoRAAdapter:
     name: str = ""
 
     def save(self, dest: str | Path) -> Path:
-        """Write the self-contained artifact directory."""
-        _require_mlx()
+        """Write the self-contained artifact directory.
+
+        Metadata and file copying do not require MLX; only ``LoRAModel`` does.
+        """
         out = Path(dest)
         out.mkdir(parents=True, exist_ok=True)
         if self.adapter_path is not None:
@@ -69,7 +71,6 @@ class LoRAAdapter:
 
     @classmethod
     def load(cls, path: str | Path) -> LoRAAdapter:
-        _require_mlx()  # also validates the platform before touching the artifact
         src = Path(path)
         if (src / _META_FILE).exists():
             meta = json.loads((src / _META_FILE).read_text())
