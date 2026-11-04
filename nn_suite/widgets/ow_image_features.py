@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 from AnyQt.QtCore import Qt, QThread, pyqtSignal
 from AnyQt.QtGui import QImage, QPixmap
-from AnyQt.QtWidgets import QCheckBox, QLabel
+from AnyQt.QtWidgets import QCheckBox, QLabel, QSizePolicy
 from Orange.data import ContinuousVariable, Domain, Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
@@ -334,9 +334,16 @@ class OWImageFeatureExtractor(OWWidget):
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
 
-        gui.auto_commit(
-            self.controlArea, self, "auto_apply", "Extract features", commit=self.commit
+        self._commit_box = gui.auto_commit(
+            self.controlArea,
+            self,
+            "auto_apply",
+            "Extract",
+            checkbox_label="Apply automatically",
+            orientation=Qt.Horizontal,
+            commit=self.commit,
         )
+        self._commit_box.button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
         self._setup_preview()
         self.resize(950, 700)

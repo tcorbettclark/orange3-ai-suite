@@ -182,3 +182,13 @@ def test_cache_reuses_features_for_groups_and_parameters(qapp, capture, images_t
     w.commit.now()
     w.wait_for_extraction()
     assert calls[15:] == ["ABCDEFG"] * 5
+
+
+def test_commit_controls_are_compact(qapp):
+    from AnyQt.QtWidgets import QSizePolicy
+
+    w = OWImageFeatureExtractor()
+    w.show()
+    assert w._commit_box.checkbox.text() == "Apply automatically"
+    assert w._commit_box.button.text() == "Extract"
+    assert w._commit_box.button.sizePolicy().horizontalPolicy() == QSizePolicy.Maximum
