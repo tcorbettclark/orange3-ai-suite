@@ -58,7 +58,7 @@ def test_get_feature_errors():
 
 def test_extraction_full_vector():
     vec = extract_features(cloud_image(seed=1))
-    assert len(vec) == 36  # default: all groups EXCEPT the colour trap
+    assert len(vec) == 36  # default: all groups EXCEPT the colour shortcut
     assert vec.names() == all_feature_names()[:36]  # A-F, G excluded by default
     assert all(vec.group_of(n) != "G" for n in vec.names())
 

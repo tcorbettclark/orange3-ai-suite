@@ -52,7 +52,7 @@ signatures. This is the honest difficulty of hand-crafted features.
 
 ## 3. Switch on the shortcut
 
-Tick **G: colour - the shortcut trap**. The output grows from 36 to 40 columns.
+Tick **G: colour**. The output grows from 36 to 40 columns.
 
 Look at the new features in **Data Table**:
 
@@ -95,7 +95,7 @@ show which physical properties of the image are doing the work.
 
 ## Checkpoint
 
-- You can explain why colour is called a trap.
+- You can explain why colour is treated as a shortcut.
 - You can show a case where several learners agree, and say what that means.
 - You can point at a feature group and predict whether removing it will hurt.
 

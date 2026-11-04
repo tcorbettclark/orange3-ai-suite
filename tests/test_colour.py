@@ -1,4 +1,4 @@
-"""Group G — colour (the trap): shortcut features, default off."""
+"""Group G - colour: shortcut features, default off."""
 
 import numpy as np
 
@@ -12,7 +12,7 @@ def _compute(img):
 
 
 def sky_photo(size=64):
-    """Blue sky with white clouds (the trap case)."""
+    """Blue sky with white clouds (the shortcut case)."""
     img = np.zeros((size, size, 3), dtype=np.float32)
     img[..., 2] = 0.8  # blue everywhere
     img[..., :2] = 0.5
@@ -37,7 +37,7 @@ def test_bluish_fraction_separates_sky_from_ground():
     assert sky["greenery_fraction"] < 0.05
 
 
-def test_traps_are_documented_as_shortcuts():
+def test_shortcuts_are_documented():
     definition = colour.DEFINITIONS["bluish_fraction"].lower()
     assert "shortcut" in definition  # the lesson is part of the data
 

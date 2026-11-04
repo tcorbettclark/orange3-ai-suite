@@ -1,4 +1,4 @@
-"""Widget-side colour-trap toggle + scale option (the 40-column demo)."""
+"""Widget-side colour shortcut toggle (the 40-column demo)."""
 
 import numpy as np
 
@@ -6,7 +6,7 @@ from nn_suite.widgets.ow_image_features import OWImageFeatureExtractor
 
 
 def test_widget_colour_toggle_makes_40_columns(qapp, capture, images_table):
-    """The trap demo: colour group toggled in the widget -> 40 columns."""
+    """The shortcut demo: colour group toggled in the widget -> 40 columns."""
     w = OWImageFeatureExtractor()
     w.show()
     features_sent = capture(w.Outputs.features)

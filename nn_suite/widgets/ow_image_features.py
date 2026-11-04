@@ -31,8 +31,25 @@ GROUP_LABELS = (
     ("D", "D: texture"),
     ("E", "E: topology"),
     ("F", "F: symmetry"),
-    ("G", "G: colour - the shortcut trap (off by default)"),
+    ("G", "G: colour"),
 )
+
+GROUP_HELP = {
+    "A": "Global photometry: brightness, contrast, skewness, kurtosis and "
+    "bright fraction. Little spatial information; useful as a baseline.",
+    "B": "Profile summaries: dense row, column and diagonal projections. "
+    "Trend, roughness, peak counts, centre of mass and median crossings.",
+    "C": "Spatial mass: where the bright matter sits, how wide or tall it is, "
+    "elongation and the radial gradient.",
+    "D": "Texture: gradient strength, edge density, fine and coarse texture, "
+    "and autocorrelation width. Carries most signal for cloud imagery.",
+    "E": "Topology: Otsu foreground, enclosed-background hole count and stroke "
+    "crossings. The classic digit features.",
+    "F": "Symmetry: left-right, top-bottom and quadrant self-similarity.",
+    "G": "Colour: bluish fraction, blueness, saturation and greenery. A "
+    "deliberate shortcut, off by default: colour alone can answer 'is there "
+    "sky?' without learning any spatial structure.",
+}
 
 _ALL_GROUPS = "ABCDEFG"
 
@@ -186,6 +203,7 @@ class OWImageFeatureExtractor(OWWidget):
         for letter, label in GROUP_LABELS:
             check = QCheckBox(label, group_box)
             check.setChecked(letter in self.groups_enabled)
+            check.setToolTip(GROUP_HELP[letter])
             check.toggled.connect(self._sync_group_settings)
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
