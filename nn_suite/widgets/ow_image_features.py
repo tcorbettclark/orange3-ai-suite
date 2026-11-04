@@ -203,16 +203,19 @@ def _format_feature_value(value) -> str:
 
 
 def _read_thumbnail(path: str, size: int) -> QImage:
-    """Decode one image at thumbnail size, preserving aspect ratio."""
+    """Decode one image and center-crop it to a square thumbnail."""
     reader = QImageReader(path)
     reader.setAutoTransform(True)
     source_size = reader.size()
     if source_size.isValid():
-        reader.setScaledSize(source_size.scaled(size, size, Qt.KeepAspectRatio))
+        reader.setScaledSize(source_size.scaled(size, size, Qt.KeepAspectRatioByExpanding))
     image = reader.read()
     if image.isNull():
         return image
-    return image.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    image = image.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    x = max(0, (image.width() - size) // 2)
+    y = max(0, (image.height() - size) // 2)
+    return image.copy(x, y, size, size)
 
 
 class ThumbnailLoader(QThread):
@@ -432,7 +435,8 @@ class OWImageFeatureExtractor(OWWidget):
         self._grid.setViewMode(QListView.IconMode)
         self._grid.setResizeMode(QListView.Adjust)
         self._grid.setMovement(QListView.Static)
-        self._grid.setUniformItemSizes(True)
+        # Do not enable uniform item sizes: thumbnails arrive asynchronously,
+        # and cached text-only item geometry clips the later icons.
         self._grid.setGridSize(_GRID_ITEM_SIZE)
         self._grid.setIconSize(QSize(_THUMBNAIL_SIZE, _THUMBNAIL_SIZE))
         self._grid.setSpacing(2)

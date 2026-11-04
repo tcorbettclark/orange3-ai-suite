@@ -133,6 +133,8 @@ def test_grid_populated_after_apply(qapp, capture, images_table):
     assert w._grid_count.text() == "5 images"
     assert [w._grid.item(i).text() for i in range(5)] == ["1", "2", "3", "4", "5"]
     assert all(not w._grid.item(i).icon().isNull() for i in range(5))
+    rect = w._grid.visualRect(w._grid.model().index(0, 0))
+    assert rect.width() >= 48 and rect.height() >= 48
 
     # the disc thumbnail is bright at the centre
     pixmap = w._grid.item(4).icon().pixmap(48, 48)
@@ -241,3 +243,15 @@ def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
     opts = w._feature_options()
     assert opts.peak_prominence_frac == 0.10
     assert opts.edge_density_frac == 0.50
+
+
+def test_wide_thumbnail_is_center_cropped(tmp_path):
+    from PIL import Image
+
+    from nn_suite.widgets.ow_image_features import _read_thumbnail
+
+    path = tmp_path / "wide.png"
+    Image.fromarray(np.zeros((50, 100, 3), dtype=np.uint8)).save(path)
+    thumb = _read_thumbnail(str(path), 48)
+    assert thumb.width() == 48
+    assert thumb.height() == 48

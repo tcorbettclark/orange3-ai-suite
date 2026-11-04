@@ -89,7 +89,9 @@ normalisation, optional median denoising) and feature groups A-G. Changes apply
 automatically; type a working size and press Enter to reprocess. Toggling
 groups is the ablation experiment; group G (colour) is the opt-in shortcut
 demonstration. The main area shows every input image as a thumbnail, with the
-total count and the current selection in the header. The right-hand panel shows
+total count and the current selection in the header. Thumbnails are
+center-cropped to squares so wide and tall images fill the grid. The right-hand
+panel shows
 the selected image's feature values, grouped A-G, and a class-split histogram
 for the selected feature. Disabled groups stay visible but greyed out. The
 `Selected image` output carries the selected row as a one-row table, so it can
