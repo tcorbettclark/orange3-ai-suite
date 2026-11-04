@@ -268,28 +268,28 @@ class OWImageFeatureExtractor(OWWidget):
             "working_size",
             32,
             512,
-            label="Working size (square, groups A-G)",
+            label="Working size (square)",
             callback=self._defer_commit,
         )
         gui.checkBox(
             prep_box,
             self,
             "centre_crop",
-            "Centre-crop to square (groups A-G)",
+            "Centre-crop to square",
             callback=self._defer_commit,
         )
         gui.checkBox(
             prep_box,
             self,
             "contrast_normalise",
-            "Contrast-normalise (groups A-F)",
+            "Contrast-normalise",
             callback=self._defer_commit,
         )
         gui.checkBox(
             prep_box,
             self,
             "denoise",
-            "Denoise, median filter (groups A-F)",
+            "Denoise (median filter)",
             callback=self._defer_commit,
         )
         gui.spin(
