@@ -291,17 +291,17 @@ class OWImageFeatureExtractor(OWWidget):
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
 
-        commit_row = gui.hBox(self.controlArea)
-        self._apply_button = gui.button(commit_row, self, "Extract", callback=self._commit_now)
+        self._apply_button = gui.button(
+            self.controlArea, self, "Extract", callback=self._commit_now
+        )
         self._apply_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         self._auto_check = gui.checkBox(
-            commit_row,
+            self.controlArea,
             self,
             "auto_apply",
             "Apply automatically",
             callback=self._auto_toggled,
         )
-        commit_row.layout().addStretch(1)
         self.commit.now = self._commit_now
         self.commit.deferred = self._defer_commit
 

@@ -184,9 +184,10 @@ def test_commit_controls_are_compact(qapp):
     assert w._auto_check.text() == "Apply automatically"
     assert w._apply_button.text() == "Extract"
     assert w._apply_button.sizePolicy().horizontalPolicy() == QSizePolicy.Maximum
-    layout = w._apply_button.parentWidget().layout()
-    assert layout.itemAt(0).widget() is w._apply_button
-    assert layout.itemAt(1).widget() is w._auto_check
+    assert w._apply_button.parentWidget() is w.controlArea
+    assert w._auto_check.parentWidget() is w.controlArea
+    layout = w.controlArea.layout()
+    assert layout.indexOf(w._apply_button) < layout.indexOf(w._auto_check)
 
 
 def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
