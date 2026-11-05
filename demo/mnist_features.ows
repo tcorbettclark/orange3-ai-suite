@@ -2,7 +2,7 @@
 <scheme version="2.0" title="MNIST digits — interpretable features" description="Import Images (demo/mnist/train) -&gt; Image Features (working size 56) -&gt; Test &amp; Score with the Neural Network; Data Table, Column Statistics and Confusion Matrix for inspection.">
 	<nodes>
 		<node id="0" name="Import Images" qualified_name="orangecontrib.imageanalytics.widgets.owimageimport.OWImportImages" project_name="" version="" title="Import Images" position="(60, 40)" />
-		<node id="1" name="Image Features" qualified_name="nn_suite.widgets.ow_image_features.OWImageFeatures" project_name="" version="" title="Image Features" position="(300, 40)" />
+		<node id="1" name="Image Features" qualified_name="orangecontrib.ai_suite.widgets.ow_image_features.OWImageFeatures" project_name="" version="" title="Image Features" position="(300, 40)" />
 		<node id="2" name="Test &amp; Score" qualified_name="Orange.widgets.evaluate.owtestandscore.OWTestAndScore" project_name="" version="" title="Test &amp; Score" position="(540, 40)" />
 		<node id="3" name="Confusion Matrix" qualified_name="Orange.widgets.evaluate.owconfusionmatrix.OWConfusionMatrix" project_name="" version="" title="Confusion Matrix" position="(780, 40)" />
 		<node id="4" name="Data Table" qualified_name="Orange.widgets.data.owtable.OWTable" project_name="" version="" title="Data Table" position="(780, 260)" />
@@ -22,7 +22,7 @@
 	<node_properties>
 		<properties node_id="0" format="pickle">gASV2gAAAAAAAAB9lIwMcmVjZW50X3BhdGhzlF2UjB5vcmFuZ2V3aWRnZXQudXRpbHMuZmlsZWRp
 YWxvZ3OUjApSZWNlbnRQYXRolJOUKYGUfZQojAdhYnNwYXRolIw/L1VzZXJzL3Rjb3JiZXR0Y2xh
-cmsvUHJvamVjdHMvb3JhbmdlMy1ubi1zdWl0ZS9kZW1vL21uaXN0L3RyYWlulIwGcHJlZml4lIwF
+cmsvUHJvamVjdHMvb3JhbmdlMy1haS1zdWl0ZS9kZW1vL21uaXN0L3RyYWlulIwGcHJlZml4lIwF
 dHJhaW6UjAdyZWxwYXRolE6MBXRpdGxllIwAlIwFc2hlZXSUaA6MC2ZpbGVfZm9ybWF0lE51YmFz
 Lg==
 </properties>

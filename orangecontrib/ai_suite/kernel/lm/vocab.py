@@ -1,4 +1,4 @@
-"""Read-only statistics over a :class:`~nn_kernel.lm.tokenizer.Tokenizer`.
+"""Read-only statistics over a :class:`~orangecontrib.ai_suite.kernel.lm.tokenizer.Tokenizer`.
 
 The LM Vocab Viewer has no pipeline role: these functions return plain data for
 a widget to render and never feed back into training or generation. They make

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, profiles
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, profiles
 from synth import band_image, uniform_image, vertical_bar_image
 
 OPTS = FeatureOptions()

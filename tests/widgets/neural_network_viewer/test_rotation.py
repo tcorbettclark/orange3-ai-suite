@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_suite.widgets.ow_neural_network_viewer import EdgeItem
+from orangecontrib.ai_suite.widgets.ow_neural_network_viewer import EdgeItem
 
 
 def test_labels_align_with_edges(widget, make_model):

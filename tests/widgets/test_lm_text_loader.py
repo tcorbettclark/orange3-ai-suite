@@ -2,8 +2,8 @@
 
 from AnyQt.QtWidgets import QPlainTextEdit
 
-from nn_suite.adapters import table_texts
-from nn_suite.widgets.ow_lm_text_loader import OWLMTextLoader
+from orangecontrib.ai_suite.adapters import table_texts
+from orangecontrib.ai_suite.widgets.ow_lm_text_loader import OWLMTextLoader
 
 
 def _write(path, text):

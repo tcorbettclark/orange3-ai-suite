@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from nn_kernel.features import FeatureOptions, symmetry
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, symmetry
 from synth import band_image, ring_image, uniform_image
 
 OPTS = FeatureOptions()

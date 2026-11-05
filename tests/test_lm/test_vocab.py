@@ -2,7 +2,13 @@
 
 import pytest
 
-from nn_kernel.lm import Tokenizer, frequency_table, side_by_side, vocab_stats, zipf_summary
+from orangecontrib.ai_suite.kernel.lm import (
+    Tokenizer,
+    frequency_table,
+    side_by_side,
+    vocab_stats,
+    zipf_summary,
+)
 
 
 @pytest.fixture(scope="module")

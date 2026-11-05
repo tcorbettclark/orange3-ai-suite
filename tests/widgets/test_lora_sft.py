@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.adapters import table_pairs
-from nn_suite.widgets.ow_lora_sft import OWLoRASFT
+from orangecontrib.ai_suite.adapters import table_pairs
+from orangecontrib.ai_suite.widgets.ow_lora_sft import OWLoRASFT
 
 
 def _pair_table(pairs):

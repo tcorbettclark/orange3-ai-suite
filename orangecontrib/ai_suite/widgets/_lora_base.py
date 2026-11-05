@@ -1,6 +1,6 @@
 """Shared widget machinery for the LoRA Pre-trainer and LoRA SFT widgets.
 
-A thin shell over :mod:`nn_kernel.lora`. The base class owns the QThread, live
+A thin shell over :mod:`orangecontrib.ai_suite.kernel.lora`. The base class owns the QThread, live
 loss curve, base-model selector, hyperparameters and Model output. Subclasses
 supply only the data contract and the explanatory data box.
 
@@ -36,7 +36,7 @@ class LoraWorker(QThread):
 
     def run(self):
         try:
-            from nn_kernel.lora import train_lora  # guarded import inside
+            from orangecontrib.ai_suite.kernel.lora import train_lora  # guarded import inside
 
             adapter = train_lora(
                 on_metric=self.metric_signal.emit,
@@ -80,7 +80,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
     class Error(OWWidget.Error):
         mlx_missing = Msg(
             "MLX not available: LoRA training needs macOS on Apple Silicon "
-            "with the [lora] extra (pip install orange3-nn-suite[lora])."
+            "with the [lora] extra (pip install orange3-ai-suite[lora])."
         )
         training_failed = Msg("Training failed:\n{}")
 
@@ -159,7 +159,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         raise NotImplementedError
 
     def _collect_request(self, tmp_dir) -> dict:
-        from nn_kernel.lora import LoraOptions
+        from orangecontrib.ai_suite.kernel.lora import LoraOptions
 
         data_obj = self._make_lora_data()
         options = LoraOptions(
@@ -292,7 +292,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
     def _on_done(self, adapter):
         self.Information.training.clear()
-        from nn_kernel.lora import LoRAModel
+        from orangecontrib.ai_suite.kernel.lora import LoRAModel
 
         self.model = LoRAModel(
             adapter.base_model,

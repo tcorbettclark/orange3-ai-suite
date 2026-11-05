@@ -38,9 +38,9 @@ def make_descriptions() -> dict[str, WidgetDescription]:
     from Orange.widgets.evaluate.owconfusionmatrix import OWConfusionMatrix
     from Orange.widgets.evaluate.owtestandscore import OWTestAndScore
     from Orange.widgets.model.owneuralnetwork import OWNNLearner
-    from orangecontrib.imageanalytics.widgets.owimageimport import OWImportImages
 
-    from nn_suite.widgets.ow_image_features import OWImageFeatures
+    from orangecontrib.ai_suite.widgets.ow_image_features import OWImageFeatures
+    from orangecontrib.imageanalytics.widgets.owimageimport import OWImportImages
 
     classes = {
         "Import Images": OWImportImages,

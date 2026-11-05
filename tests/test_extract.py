@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from nn_kernel.features import (
+from orangecontrib.ai_suite.kernel.features import (
     GROUP_ORDER,
     FeatureOptions,
     all_feature_names,

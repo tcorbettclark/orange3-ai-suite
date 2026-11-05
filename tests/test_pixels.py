@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from nn_kernel.pixels import pixel_feature_names, pixel_features
+from orangecontrib.ai_suite.kernel.pixels import pixel_feature_names, pixel_features
 
 
 def test_pixel_feature_names_are_row_major():

@@ -6,7 +6,7 @@ The model is seeded so the layout is identical on every run.
 from AnyQt.QtCore import QRectF
 from AnyQt.QtGui import QColor, QPainter, QPixmap
 
-from nn_suite.widgets.ow_neural_network_viewer import EdgeItem
+from orangecontrib.ai_suite.widgets.ow_neural_network_viewer import EdgeItem
 
 
 def test_boxes_render_white_over_lines(widget, make_model):

@@ -7,7 +7,7 @@ assumptions (alphabetical tie-breaks would otherwise leak into the tests).
 
 import pytest
 
-from nn_kernel.lm import BOS, BOS_ID, UNK, UNK_ID, Tokenizer
+from orangecontrib.ai_suite.kernel.lm import BOS, BOS_ID, UNK, UNK_ID, Tokenizer
 
 CORPUS = ["Hello world!", "Don't stop; it's o’clock.", "AB ab ab"]
 

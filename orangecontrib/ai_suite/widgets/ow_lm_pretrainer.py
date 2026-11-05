@@ -1,6 +1,6 @@
 """LM Pre-trainer: pre-train a tiny language model on text data.
 
-A thin shell over :mod:`nn_kernel.lm`: options, a live loss plot and the
+A thin shell over :mod:`orangecontrib.ai_suite.kernel.lm`: options, a live loss plot and the
 checkpoint table. Training runs in a background QThread and streams per-epoch
 stats into pyqtgraph; all substance (tokenizer, windowing, Keras builders,
 sampling) lives in the kernel.
@@ -20,7 +20,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from nn_suite.adapters import checkpoint_table, table_texts
+from orangecontrib.ai_suite.adapters import checkpoint_table, table_texts
 
 ARCHITECTURE_LABELS = ["Bigram", "MLP-over-window", "LSTM"]
 ARCHITECTURE_VALUES = ["bigram", "mlp_window", "lstm"]
@@ -44,7 +44,7 @@ class TrainingWorker(QThread):
 
     def run(self):
         try:
-            from nn_kernel.lm import train_language_model  # lazy: Keras heavy
+            from orangecontrib.ai_suite.kernel.lm import train_language_model  # lazy: Keras heavy
 
             model = train_language_model(
                 self.texts,
@@ -107,7 +107,7 @@ class OWLMPretrainer(OWWidget):
 
     class Error(OWWidget.Error):
         keras_missing = Msg(
-            "Keras is not available. Install the [lm] extra: pip install orange3-nn-suite[lm]"
+            "Keras is not available. Install the [lm] extra: pip install orange3-ai-suite[lm]"
         )
         training_failed = Msg("Training failed:\n{}")
 
@@ -235,7 +235,7 @@ class OWLMPretrainer(OWWidget):
         self._train_curve.setData([], [])
         self._val_curve.setData([], [])
         self.status_label.setText("")
-        from nn_kernel.lm import Tokenizer  # pure Python; never imports Keras
+        from orangecontrib.ai_suite.kernel.lm import Tokenizer  # pure Python; never imports Keras
 
         options = self._collect_options()
         tokenizer = Tokenizer.from_corpus(

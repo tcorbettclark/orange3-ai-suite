@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 from Orange.data import ContinuousVariable, Domain, Table
 
-from nn_suite.adapters import table_texts
-from nn_suite.widgets.ow_lm_pretrainer import OWLMPretrainer, TrainingWorker
+from orangecontrib.ai_suite.adapters import table_texts
+from orangecontrib.ai_suite.widgets.ow_lm_pretrainer import OWLMPretrainer, TrainingWorker
 
 KERAS_AVAILABLE = importlib.util.find_spec("keras") is not None
 
@@ -139,7 +139,7 @@ def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
     def failing_train(*args, **kwargs):
         raise RuntimeError("kapow")
 
-    monkeypatch.setattr("nn_kernel.lm.train_language_model", failing_train)
+    monkeypatch.setattr("orangecontrib.ai_suite.kernel.lm.train_language_model", failing_train)
     w.epochs = 2
     w.run_training_blocking()
     assert w.Error.training_failed.is_shown()

@@ -19,7 +19,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from nn_suite.adapters import image_paths
+from orangecontrib.ai_suite.adapters import image_paths
 
 
 @dataclass
@@ -66,7 +66,7 @@ class PixelFeatureWorker(QThread):
         try:
             import cv2
 
-            from nn_kernel.pixels import pixel_features
+            from orangecontrib.ai_suite.kernel.pixels import pixel_features
 
             rows = []
             readable = []
@@ -139,7 +139,7 @@ class OWImagePixels(OWWidget):
         imageanalytics_missing = Msg("Orange3-ImageAnalytics is required (Options > Add-ons).")
         opencv_missing = Msg(
             "OpenCV is not available. Install the [image] extra: "
-            "pip install orange3-nn-suite[image]"
+            "pip install orange3-ai-suite[image]"
         )
         extraction_failed = Msg("Pixel extraction failed:\n{}")
 
@@ -297,7 +297,7 @@ class OWImagePixels(OWWidget):
         self.Error.extraction_failed(last)
 
     def _send_result(self, result: _PixelResult):
-        from nn_kernel.pixels import pixel_feature_names
+        from orangecontrib.ai_suite.kernel.pixels import pixel_feature_names
 
         self.Warning.rows_skipped(
             result.n_unreadable + result.skipped_no_path,

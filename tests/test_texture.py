@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, texture
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, texture
 from synth import cloud_image, uniform_image
 
 OPTS = FeatureOptions()

@@ -3,8 +3,8 @@
 import numpy as np
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.adapters import image_paths
-from nn_suite.widgets.ow_image_features import OWImageFeatures
+from orangecontrib.ai_suite.adapters import image_paths
+from orangecontrib.ai_suite.widgets.ow_image_features import OWImageFeatures
 
 rng = np.random.default_rng(0)
 
@@ -19,7 +19,7 @@ def test_image_paths_adapter(images_table, image_dir):
 
 
 def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
-    from nn_kernel.features import group_names  # default = A–F, colour excluded
+    from orangecontrib.ai_suite.kernel.features import group_names  # default = A–F, colour excluded
 
     expected = [n for g in ("A", "B", "C", "D", "E", "F") for n in group_names(g)]
 
@@ -180,7 +180,7 @@ def test_group_toggle_auto_applies(qapp, capture, images_table):
 def test_cache_reuses_features_for_groups_and_preprocessing(
     qapp, capture, images_table, monkeypatch
 ):
-    import nn_kernel.features as features_module
+    import orangecontrib.ai_suite.kernel.features as features_module
 
     calls = []
     original = features_module.extract_features
@@ -248,7 +248,7 @@ def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
 def test_wide_thumbnail_is_center_cropped(tmp_path):
     from PIL import Image
 
-    from nn_suite.widgets.ow_image_features import _read_thumbnail
+    from orangecontrib.ai_suite.widgets.ow_image_features import _read_thumbnail
 
     path = tmp_path / "wide.png"
     Image.fromarray(np.zeros((50, 100, 3), dtype=np.uint8)).save(path)

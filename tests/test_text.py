@@ -1,6 +1,6 @@
 """Plain-text cleaning, splitting and Q/A parsing."""
 
-from nn_kernel.text import (
+from orangecontrib.ai_suite.kernel.text import (
     CleanOptions,
     QAPair,
     clean_text,

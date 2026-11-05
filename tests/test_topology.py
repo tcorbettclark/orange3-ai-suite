@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, topology
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, topology
 from synth import digit8_image, ring_image, vertical_bar_image
 
 OPTS = FeatureOptions()

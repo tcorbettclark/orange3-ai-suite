@@ -8,7 +8,7 @@ within tolerance. A feature whose category flips on a 5-pixel shift is noise.
 import numpy as np
 import pytest
 
-from nn_kernel.features import FeatureOptions, extract_features
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, extract_features
 from synth import cloud_image, crop_shift, digit8_image, ring_image, shift_image
 
 COUNT_FEATURES = frozenset(

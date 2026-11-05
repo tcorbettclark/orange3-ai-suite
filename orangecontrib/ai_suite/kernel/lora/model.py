@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any
 
 _MLX_IMPORT_ERROR = (
-    "MLX not available - orange3-nn-suite[lora] requires macOS on Apple Silicon "
-    "(pip install orange3-nn-suite[lora])"
+    "MLX not available - orange3-ai-suite[lora] requires macOS on Apple Silicon "
+    "(pip install orange3-ai-suite[lora])"
 )
 
 _ADAPTER_FILES = ("adapters.safetensors", "adapter_config.json")

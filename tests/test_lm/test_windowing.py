@@ -7,8 +7,8 @@ vocabulary's internal sort order.
 import numpy as np
 import pytest
 
-from nn_kernel.lm import Tokenizer, make_windows, split_sentences
-from nn_kernel.lm.windowing import Windows
+from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows, split_sentences
+from orangecontrib.ai_suite.kernel.lm.windowing import Windows
 
 
 @pytest.fixture(scope="module")

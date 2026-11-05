@@ -44,8 +44,8 @@ import numpy as np
 
 BASE = "https://cloudatlas.wmo.int"
 UA = (
-    "orange3-nn-suite demo fetcher (educational, non-commercial; "
-    "https://github.com/tcorbettclark/orange3-nn-suite)"
+    "orange3-ai-suite demo fetcher (educational, non-commercial; "
+    "https://github.com/tcorbettclark/orange3-ai-suite)"
 )
 
 # genus label -> gallery API code

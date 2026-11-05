@@ -1,6 +1,6 @@
 """Hover: edge emphasis, node fill, label tint, exact restore."""
 
-from nn_suite.widgets.ow_neural_network_viewer import EdgeItem
+from orangecontrib.ai_suite.widgets.ow_neural_network_viewer import EdgeItem
 
 
 def _edges(widget):

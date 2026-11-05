@@ -1166,7 +1166,7 @@ wheels = [
 ]
 
 [[package]]
-name = "orange3-nn-suite"
+name = "orange3-ai-suite"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [

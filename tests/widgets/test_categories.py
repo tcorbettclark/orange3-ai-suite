@@ -9,7 +9,7 @@ def test_widget_category_layout():
     descriptions = {
         desc.name: desc.category
         for desc in discovery.iter_widget_descriptions(
-            "nn_suite.widgets", category_name="Language Models"
+            "orangecontrib.ai_suite.widgets", category_name="Language Models"
         )
     }
 

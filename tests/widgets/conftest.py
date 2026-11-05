@@ -114,7 +114,7 @@ def fire_hover():
 @pytest.fixture()
 def widget(qapp, make_model):
     """An OWNeuralNetworkViewer instance."""
-    from nn_suite.widgets.ow_neural_network_viewer import OWNeuralNetworkViewer
+    from orangecontrib.ai_suite.widgets.ow_neural_network_viewer import OWNeuralNetworkViewer
 
     w = OWNeuralNetworkViewer()
     w.show()

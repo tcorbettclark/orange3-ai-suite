@@ -3,7 +3,7 @@
 import numpy as np
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.widgets.ow_image_pixels import OWImagePixels
+from orangecontrib.ai_suite.widgets.ow_image_pixels import OWImagePixels
 
 
 def test_pixel_features_output(qapp, capture, images_table):

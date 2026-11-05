@@ -1,6 +1,6 @@
 """Hover interception by nodes, and pointing-hand cursors."""
 
-from nn_suite.widgets.ow_neural_network_viewer import EdgeItem, NodeItem
+from orangecontrib.ai_suite.widgets.ow_neural_network_viewer import EdgeItem, NodeItem
 
 
 def test_hover_targets_and_cursors(widget, make_model):

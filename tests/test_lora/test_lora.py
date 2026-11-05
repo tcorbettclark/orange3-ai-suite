@@ -1,4 +1,4 @@
-"""nn_kernel.lora tests.
+"""orangecontrib.ai_suite.kernel.lora tests.
 
 Data/artifact/metric-parsing tests always run; end-to-end training tests
 require the locally converted model (demo/fetch_britllm.py) — skipped
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from nn_kernel.lora import (
+from orangecontrib.ai_suite.kernel.lora import (
     LoRAAdapter,
     LoraData,
     LoRAModel,
@@ -134,7 +134,7 @@ def test_model_import_requires_apple(monkeypatch, tmp_path):
 def test_train_lora_tiny_run(tmp_path):
     """2 iterations on the converted 4-bit model: adapter produced, model
     generates, save/load round trip reproduces identical greedy output."""
-    from nn_kernel.lora import train_lora
+    from orangecontrib.ai_suite.kernel.lora import train_lora
 
     data = LoraData.from_texts([f"the quick brown fox jumped over fence {i}" for i in range(8)])
     adapter = train_lora(

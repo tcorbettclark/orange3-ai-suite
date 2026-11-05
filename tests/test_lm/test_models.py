@@ -16,9 +16,9 @@ pytest.importorskip("keras", reason="[lm] extra (Keras) not installed")
 
 import numpy as np
 
-from nn_kernel.lm import LanguageModel, Tokenizer, train_language_model
-from nn_kernel.lm.builders import ARCHITECTURES, build_model
-from nn_kernel.lm.models import _sample
+from orangecontrib.ai_suite.kernel.lm import LanguageModel, Tokenizer, train_language_model
+from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, build_model
+from orangecontrib.ai_suite.kernel.lm.models import _sample
 
 CORPUS = ["the cat sat on the mat. the cat saw the dog. a dog and a cat ran."]
 

@@ -1,4 +1,4 @@
-# orange3-nn-suite
+# orange3-ai-suite
 
 Teaching neural networks and language models inside
 [Orange](https://orangedatamining.com/). The add-on provides interpretable
@@ -12,13 +12,13 @@ and generations come back as corpora that Orange's text widgets can analyse.
 
 ## What is in the box
 
-- **`nn_kernel/`** - the substance. Pure Python, with no Orange or Qt imports:
-  image features, tokenizers and windowing, Keras model builders, sampling,
-  perplexity, and MLX LoRA wrappers. The same code runs in the widgets or in a
-  plain Python session.
-- **`nn_suite/`** - the Orange add-on. Nine widgets and the signal adapters that
-  convert between Orange objects and kernel types. The widgets are thin shells:
-  options, thumbnail grids, live plots and Orange signals.
+- **`orangecontrib/ai_suite/kernel/`** - the substance. Pure Python, with no
+  Orange or Qt imports: image features, tokenizers and windowing, Keras model
+  builders, sampling, perplexity, and MLX LoRA wrappers. The same code runs in
+  the widgets or in a plain Python session.
+- **`orangecontrib/ai_suite/`** - the Orange add-on. Nine widgets and the signal
+  adapters that convert between Orange objects and kernel types. The widgets
+  are thin shells: options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
   workflows.
 
@@ -62,7 +62,7 @@ Build and install a wheel:
 ```bash
 uv build
 uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
-    --no-deps dist/orange3_nn_suite-*.whl
+    --no-deps dist/orange3_ai_suite-*.whl
 ```
 
 ## Widgets
@@ -285,8 +285,8 @@ Experiments that the widgets make easy:
 ## Image feature groups
 
 All features are defined in the group modules and collected by
-`nn_kernel.features.registry`; each carries a human-auditable definition
-sentence.
+`orangecontrib.ai_suite.kernel.features.registry`; each carries a
+human-auditable definition sentence.
 
 | Group | Count | What it describes |
 |---|---|---|
@@ -302,7 +302,7 @@ Groups A-F run on a preprocessed luminance image. Group G reads colour
 directly and is off by default.
 
 ```python
-from nn_kernel.features import all_features, extract_features, get_feature
+from orangecontrib.ai_suite.kernel.features import all_features, extract_features, get_feature
 
 vec = extract_features(rgb_image, groups="ABCDEF")
 vec["hole_count"]                 # a feature value
@@ -316,7 +316,7 @@ all_features()                    # the full catalogue, in stable column order
 ### Language models
 
 ```python
-from nn_kernel.lm import Tokenizer, make_windows, train_language_model
+from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows, train_language_model
 
 tokenizer = Tokenizer.from_corpus(texts, "char")
 windows = make_windows(tokenizer, texts, context_size=16)
@@ -339,7 +339,7 @@ Python callables; the kernel never imports Qt.
 ### LoRA
 
 ```python
-from nn_kernel.lora import LoraData, LoraOptions, LoRAModel, train_lora
+from orangecontrib.ai_suite.kernel.lora import LoraData, LoraOptions, LoRAModel, train_lora
 
 data = LoraData.from_texts(corpus)        # or LoraData.from_pairs(pairs)
 adapter = train_lora(
@@ -382,7 +382,7 @@ uv run python demo/make_workflows.py
 ## Verification
 
 - Kernel tests run in plain Python, with no Orange and no Qt. They are the
-  proof that `nn_kernel` stays independent.
+  proof that `orangecontrib.ai_suite.kernel` stays independent.
 - Widget tests run in the Orange interpreter with Qt offscreen and cover the
   signal adapters, widget state, model persistence and the viewer's rendering.
 - End-to-end model loads are marked `slow` and excluded by default.
@@ -392,8 +392,8 @@ uv run python demo/make_workflows.py
 Run the full verification from the repository root:
 
 ```bash
-uvx ruff check nn_kernel nn_suite demo tests conftest.py
-uvx ruff format --check nn_kernel nn_suite demo tests conftest.py
+uvx ruff check orangecontrib demo tests conftest.py
+uvx ruff format --check orangecontrib demo tests conftest.py
 
 uv run pytest -q
 uv run pytest -q -m slow            # kernel, including slow model round trips
@@ -409,16 +409,20 @@ run unless the converted MLX model is present.
 ## Layout
 
 ```
-nn_kernel/
-  features/   preprocessing, registry, groups A-G, extraction front door
-  lm/         tokenizer, windowing, vocab statistics, Keras builders,
-              training, LanguageModel with embedded tokenizer
-  lora/       LoRA data formats, MLX training subprocess, artifact/model objects
-nn_suite/
-  adapters.py Orange <-> kernel conversion
-  widgets/    the eight Orange widgets and their icons
-demo/         corpora, fetchers, generated .ows workflows
-tests/        kernel tests + offscreen widget tests
+orangecontrib/
+  ai_suite/
+    __init__.py
+    adapters.py Orange <-> kernel conversion
+    kernel/
+      features/   preprocessing, registry, groups A-G, extraction front door
+      lm/         tokenizer, windowing, vocab statistics, Keras builders,
+                  training, LanguageModel with embedded tokenizer
+      lora/       LoRA data formats, MLX training subprocess, artifact/model objects
+      pixels.py   luminance grid features
+      text.py     text loading and corpus helpers
+    widgets/      the nine Orange widgets and their icons
+demo/             corpora, fetchers, generated .ows workflows
+tests/            kernel tests + offscreen widget tests
 ```
 
 ## License

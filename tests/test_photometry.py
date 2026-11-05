@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, photometry
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, photometry
 from synth import uniform_image
 
 OPTS = FeatureOptions()

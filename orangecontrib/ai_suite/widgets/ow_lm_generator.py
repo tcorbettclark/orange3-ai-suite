@@ -16,7 +16,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from nn_suite.adapters import generations_table
+from orangecontrib.ai_suite.adapters import generations_table
 
 
 class OWLMGenerator(OWWidget):

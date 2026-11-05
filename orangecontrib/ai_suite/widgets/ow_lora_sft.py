@@ -1,13 +1,13 @@
 """LoRA SFT: supervised fine-tuning on prompt/response pairs.
 
-A thin shell over :mod:`nn_kernel.lora`; the shared training UI lives in
+A thin shell over :mod:`orangecontrib.ai_suite.kernel.lora`; the shared training UI lives in
 :mod:`._lora_base`. This widget supplies the supervised data contract: prompt
 and completion columns, with the prompt masked out of the loss.
 """
 
 from __future__ import annotations
 
-from nn_suite.adapters import table_pairs
+from orangecontrib.ai_suite.adapters import table_pairs
 
 from ._lora_base import LoRATrainerBase
 
@@ -48,7 +48,7 @@ class OWLoRASFT(LoRATrainerBase):
     )
 
     def _make_lora_data(self):
-        from nn_kernel.lora import LoraData
+        from orangecontrib.ai_suite.kernel.lora import LoraData
 
         return LoraData.from_pairs(table_pairs(self.data))
 

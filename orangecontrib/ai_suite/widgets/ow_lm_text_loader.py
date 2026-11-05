@@ -30,7 +30,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Msg, Output, OWWidget
 
-from nn_kernel.text import (
+from orangecontrib.ai_suite.kernel.text import (
     CleanOptions,
     clean_text,
     parse_qa,

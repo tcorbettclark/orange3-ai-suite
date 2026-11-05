@@ -17,7 +17,7 @@ from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.widget import Input, Msg, OWWidget
 
-from nn_suite.adapters import table_texts
+from orangecontrib.ai_suite.adapters import table_texts
 
 
 def _fill_table(table_widget: QTableWidget, rows: list[tuple]) -> None:
@@ -103,7 +103,7 @@ class OWLMVocabViewer(OWWidget):
         if table is not None:
             try:
                 texts = table_texts(table)
-                from nn_kernel.lm import Tokenizer  # kernel import; pure Python
+                from orangecontrib.ai_suite.kernel.lm import Tokenizer  # kernel import; pure Python
 
                 self._char_tokenizer = Tokenizer.from_corpus(texts, "char")
                 self._word_tokenizer = Tokenizer.from_corpus(texts, "word")
@@ -115,7 +115,7 @@ class OWLMVocabViewer(OWWidget):
 
     def refresh(self):
         if self._model_tokenizer is not None:
-            from nn_kernel.lm import vocab_stats
+            from orangecontrib.ai_suite.kernel.lm import vocab_stats
 
             self._show_tokenizer(self._model_tokenizer, self.model_table)
             stats = vocab_stats(self._model_tokenizer)

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, colour, extract_features
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, colour, extract_features
 
 OPTS = FeatureOptions()
 
@@ -64,6 +64,6 @@ def test_extraction_includes_colour_only_when_asked():
 
 
 def test_colour_group_off_by_default():
-    from nn_kernel.features import DEFAULT_GROUPS
+    from orangecontrib.ai_suite.kernel.features import DEFAULT_GROUPS
 
     assert "G" not in DEFAULT_GROUPS

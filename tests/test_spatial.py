@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nn_kernel.features import FeatureOptions, spatial
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, spatial
 from synth import ellipse_blob_image, ring_image, uniform_image
 
 OPTS = FeatureOptions()

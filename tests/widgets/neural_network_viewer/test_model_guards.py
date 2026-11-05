@@ -4,7 +4,7 @@ the placeholder text instead of raising inside the input handler."""
 
 import numpy as np
 
-from nn_suite.widgets.ow_neural_network_viewer import EdgeItem, NodeItem
+from orangecontrib.ai_suite.widgets.ow_neural_network_viewer import EdgeItem, NodeItem
 
 
 class _CoefsOnly:

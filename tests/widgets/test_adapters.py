@@ -3,7 +3,7 @@
 import numpy as np
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.adapters import (
+from orangecontrib.ai_suite.adapters import (
     checkpoint_table,
     generations_strings,
     generations_table,

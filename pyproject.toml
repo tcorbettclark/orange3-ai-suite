@@ -1,17 +1,17 @@
-# orange3-nn-suite packaging.
+# orange3-ai-suite packaging.
 #
 # Dependency floors are the versions used for development. The MLX extra is
 # pinned exactly: the tuner internals are less stable than Keras's fit.
 #
-# Layout: nn_kernel is a plain in-repo package bundled in this single
-# distribution - one wheel, one install, three toolbox categories.
+# Layout: orangecontrib.ai_suite bundles the Orange widgets and a plain-Python
+# kernel in one distribution - one wheel, one install, three toolbox categories.
 
 [build-system]
 requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "orange3-nn-suite"
+name = "orange3-ai-suite"
 version = "0.0.1"
 description = "Teaching neural networks and LLMs inside Orange: interpretable image features, tiny Keras language models, MLX LoRA fine-tuning."
 readme = "README.md"
@@ -29,7 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # One extra per capability; widgets degrade gracefully with an "install
-# orange3-nn-suite[image]" style message.
+# orange3-ai-suite[image]" style message.
 image = [
     "opencv-python-headless>=4.12,<5",
 ]
@@ -50,15 +50,15 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["nn_kernel", "nn_suite"]
-# nn_suite is a plain top-level package (no 'orangecontrib' namespace). Orange
+packages = ["orangecontrib"]
+# orangecontrib is a PEP 420 namespace shared with other add-ons; Orange
 # >= 3.38 discovers add-ons through entry points.
 
 [project.entry-points."orange.widgets"]
-"Language Models" = "nn_suite.widgets"
+"Language Models" = "orangecontrib.ai_suite.widgets"
 
 [project.entry-points."Orange.widgets"]
-"Language Models" = "nn_suite.widgets"
+"Language Models" = "orangecontrib.ai_suite.widgets"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -84,4 +84,4 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
 ignore = ["RUF001", "RUF003", "RUF005"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["nn_kernel", "nn_suite", "synth"]
+known-first-party = ["orangecontrib", "synth"]

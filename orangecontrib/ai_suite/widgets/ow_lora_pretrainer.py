@@ -1,13 +1,13 @@
 """LoRA Pre-trainer: continue pre-training a base LLM on raw text.
 
-A thin shell over :mod:`nn_kernel.lora`; the shared training UI lives in
+A thin shell over :mod:`orangecontrib.ai_suite.kernel.lora`; the shared training UI lives in
 :mod:`._lora_base`. This widget supplies the continued-pre-training data
 contract: one document per row, self-supervised next-token loss.
 """
 
 from __future__ import annotations
 
-from nn_suite.adapters import table_texts
+from orangecontrib.ai_suite.adapters import table_texts
 
 from ._lora_base import LoRATrainerBase
 
@@ -43,7 +43,7 @@ class OWLoRAPretrainer(LoRATrainerBase):
     )
 
     def _make_lora_data(self):
-        from nn_kernel.lora import LoraData
+        from orangecontrib.ai_suite.kernel.lora import LoraData
 
         return LoraData.from_texts(table_texts(self.data))
 

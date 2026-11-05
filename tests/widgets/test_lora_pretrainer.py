@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
-from nn_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
+from orangecontrib.ai_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
 
 MLX_OK = importlib.util.find_spec("mlx") is not None
 

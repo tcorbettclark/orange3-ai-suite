@@ -1,6 +1,6 @@
 """Image Features: interpretable features for image classification.
 
-A thin shell over :mod:`nn_kernel.features`. The widget adds preprocessing and
+A thin shell over :mod:`orangecontrib.ai_suite.kernel.features`. The widget adds preprocessing and
 group options, a thumbnail grid with a feature-values panel, and the Orange
 signal adapters.
 
@@ -37,7 +37,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from nn_suite.adapters import image_paths
+from orangecontrib.ai_suite.adapters import image_paths
 
 GROUP_LABELS = (
     ("A", "A: global photometry"),
@@ -136,7 +136,7 @@ class ImageExtractionWorker(QThread):
         try:
             import cv2
 
-            from nn_kernel.features import all_feature_names, extract_features
+            from orangecontrib.ai_suite.kernel.features import all_feature_names, extract_features
 
             image_cache = self._image_cache
             if image_cache is None:
@@ -300,7 +300,7 @@ class OWImageFeatures(OWWidget):
         imageanalytics_missing = Msg("Orange3-ImageAnalytics is required (Options > Add-ons).")
         opencv_missing = Msg(
             "OpenCV is not available. Install the [image] extra: "
-            "pip install orange3-nn-suite[image]"
+            "pip install orange3-ai-suite[image]"
         )
         extraction_failed = Msg("Feature extraction failed:\n{}")
 
@@ -458,7 +458,7 @@ class OWImageFeatures(OWWidget):
     def _setup_feature_panel(self, panel):
         import pyqtgraph as pg
 
-        from nn_kernel.features import features_of_group
+        from orangecontrib.ai_suite.kernel.features import features_of_group
 
         self._panel_title = QLabel("No image selected.")
         title_font = self._panel_title.font()
@@ -630,7 +630,7 @@ class OWImageFeatures(OWWidget):
             self._histogram_caption.setText("")
             self._clear_histogram()
             return
-        from nn_kernel.features import get_feature
+        from orangecontrib.ai_suite.kernel.features import get_feature
 
         self._feature_definition.setText(get_feature(name).definition)
         self._update_histogram(name)
@@ -644,7 +644,7 @@ class OWImageFeatures(OWWidget):
     def _update_histogram(self, feature_name: str):
         import pyqtgraph as pg
 
-        from nn_kernel.features import get_feature
+        from orangecontrib.ai_suite.kernel.features import get_feature
 
         plot = self._histogram.getPlotItem()
         self._clear_histogram()
@@ -812,7 +812,7 @@ class OWImageFeatures(OWWidget):
                     self._on_thumbnails_loaded(generation, batch)
 
     def _feature_options(self):
-        from nn_kernel.features import FeatureOptions
+        from orangecontrib.ai_suite.kernel.features import FeatureOptions
 
         return FeatureOptions(
             working_size=self.working_size,
@@ -991,7 +991,7 @@ class OWImageFeatures(OWWidget):
         self._send_selected()
 
     def _send_features(self):
-        from nn_kernel.features import group_names
+        from orangecontrib.ai_suite.kernel.features import group_names
 
         image_cache = self._image_cache
         feature_cache = self._feature_cache

@@ -1,6 +1,6 @@
 """Widget-side colour shortcut toggle (the 40-column demo)."""
 
-from nn_suite.widgets.ow_image_features import OWImageFeatures
+from orangecontrib.ai_suite.widgets.ow_image_features import OWImageFeatures
 
 
 def test_widget_colour_toggle_makes_40_columns(qapp, capture, images_table):
@@ -15,6 +15,6 @@ def test_widget_colour_toggle_makes_40_columns(qapp, capture, images_table):
     w.commit.now()
     w.wait_for_extraction()
     out = features_sent[-1]
-    from nn_kernel.features import all_feature_names
+    from orangecontrib.ai_suite.kernel.features import all_feature_names
 
     assert [v.name for v in out.domain.attributes] == list(all_feature_names())

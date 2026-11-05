@@ -1,6 +1,6 @@
 """LM Vocab Viewer widget: read-only, model-or-data input, NO outputs."""
 
-from nn_suite.widgets.ow_lm_vocab_viewer import OWLMVocabViewer
+from orangecontrib.ai_suite.widgets.ow_lm_vocab_viewer import OWLMVocabViewer
 
 
 class NoTokenizerModel:
@@ -24,7 +24,7 @@ def test_data_input_builds_both_tokenizer_views(qapp, text_table, texts):
 
 
 def test_model_input_preferred_over_data(qapp, text_table):
-    from nn_kernel.lm import Tokenizer
+    from orangecontrib.ai_suite.kernel.lm import Tokenizer
 
     model = type("M", (), {})()
     model.tokenizer = Tokenizer.from_corpus(["hello world"], "word")
