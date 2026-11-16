@@ -236,10 +236,14 @@ class Tokenizer(ABC):
         """Text -> token ids; out-of-vocabulary items map to ``<unk>``."""
         return [self._token_to_id.get(t, UNK_ID) for t in self.segment(text)]
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def segment(text: str) -> list[str]:
-        """Split text into token strings, before vocabulary lookup."""
+    def segment(cls, text: str) -> list[str]:
+        """Split text into token strings, before vocabulary lookup.
+
+        A level-level operation, not an instance one: it is what
+        :meth:`from_corpus` uses to count tokens before any instance exists.
+        """
 
     @abstractmethod
     def decode(self, ids: Sequence[int]) -> str:
@@ -329,8 +333,8 @@ class CharTokenizer(Tokenizer):
 
     level: ClassVar[str] = "char"
 
-    @staticmethod
-    def segment(text: str) -> list[str]:
+    @classmethod
+    def segment(cls, text: str) -> list[str]:
         return list(text)
 
     def decode(self, ids: Sequence[int]) -> str:
@@ -345,9 +349,9 @@ class WordTokenizer(Tokenizer):
     # Words with internal apostrophes, then any single non-word non-space char.
     _PATTERN: ClassVar[re.Pattern] = re.compile(r"\w+(?:['’]\w+)*|[^\w\s]", re.UNICODE)
 
-    @staticmethod
-    def segment(text: str) -> list[str]:
-        return WordTokenizer._PATTERN.findall(text)
+    @classmethod
+    def segment(cls, text: str) -> list[str]:
+        return cls._PATTERN.findall(text)
 
     def decode(self, ids: Sequence[int]) -> str:
         tokens = [self.tokens[i] for i in map(int, ids) if i != BOS_ID]
