@@ -30,14 +30,14 @@ def test_bos_padding_and_eos_target():
         np.array([[0, 0, 0], [0, 0, A], [0, A, B], [A, B, C]], dtype=np.int32),
     )
     assert np.array_equal(windows.targets, np.array([A, B, C, EOS], dtype=np.int32))
-    assert windows.sentence_lengths == (4,)  # 3 tokens + 1 EOS target
+    assert windows.unit_lengths == (4,)  # 3 tokens + 1 EOS target
     assert windows.context_size == 3
 
 
 def test_windows_never_cross_units():
     windows = make_windows([A, B, C, EOS, D, E, F, EOS], context_size=3)
     assert len(windows) == 8
-    assert windows.sentence_lengths == (4, 4)
+    assert windows.unit_lengths == (4, 4)
     # no id from one unit appears in the other's windows
     assert not set(windows.contexts[4:].ravel()) & {A, B, C}
     assert not set(windows.contexts[:4].ravel()) & {D, E, F}
@@ -76,7 +76,7 @@ def test_context_size_one():
 
 def test_single_token_units():
     windows = make_windows([A, EOS, B, EOS], context_size=2)
-    assert windows.sentence_lengths == (2, 2)
+    assert windows.unit_lengths == (2, 2)
     # each unit: [B,B]->token, [B,token]->EOS
     assert np.array_equal(windows.contexts, [[0, 0], [0, A], [0, 0], [0, B]])
     assert np.array_equal(windows.targets, [A, EOS, B, EOS])
@@ -109,7 +109,7 @@ def test_encoded_corpus_needs_no_text():
     stream = tok.encode_corpus(["AB.", "CD."])
     assert stream == tok.encode("AB.") + tok.encode("CD.")
     windows = make_windows(stream, context_size=3)
-    assert windows.sentence_lengths == (4, 4)
+    assert windows.unit_lengths == (4, 4)
     assert len(windows) == len(stream)
     assert np.array_equal(windows.contexts[4], [BOS, BOS, BOS])
 
@@ -119,7 +119,7 @@ def test_documents_are_not_merged_into_one_unit():
     # documents, concatenating their streams cannot.
     tok = Tokenizer.from_corpus(["AB", "CD"], "char")
     windows = make_windows(tok.encode_corpus(["AB", "CD"]), context_size=1)
-    assert windows.sentence_lengths == (3, 3)
+    assert windows.unit_lengths == (3, 3)
 
 
 # ---- splitting -------------------------------------------------------------
@@ -133,9 +133,9 @@ def twelve_units() -> Windows:
 def test_split_is_unit_disjoint_deterministic_and_complete():
     windows = twelve_units()
     train, val = windows.split(val_fraction=0.25, seed=1)
-    assert len(val.sentence_lengths) == max(1, round(12 * 0.25)) == 3
-    assert sum(train.sentence_lengths) == len(train)
-    assert sum(val.sentence_lengths) == len(val)
+    assert len(val.unit_lengths) == max(1, round(12 * 0.25)) == 3
+    assert sum(train.unit_lengths) == len(train)
+    assert sum(val.unit_lengths) == len(val)
     assert len(train) + len(val) == len(windows)
 
     # complete partition: as multisets, (context, target) rows are preserved
@@ -162,16 +162,84 @@ def test_split_fraction_validation():
 def test_split_caps_validation_to_leave_training_rows():
     windows = make_windows([A, B, EOS, C, D, EOS], context_size=1)
     train, val = windows.split(val_fraction=0.99)
-    assert len(train.sentence_lengths) == 1
-    assert len(val.sentence_lengths) == 1
+    assert len(train.unit_lengths) == 1
+    assert len(val.unit_lengths) == 1
     assert len(train) > 0
 
 
-def test_windows_consistency_guard():
-    with pytest.raises(ValueError, match="sentence_lengths"):
+# ---- structural guards: unit structure lives in the targets ---------------
+
+
+def test_targets_must_end_with_eos():
+    with pytest.raises(ValueError, match="must end with <eos>"):
         Windows(
-            contexts=np.zeros((4, 2), dtype=np.int32),
-            targets=np.zeros(4, dtype=np.int32),
+            contexts=np.zeros((2, 2), dtype=np.int32),
+            targets=np.array([3, 4], dtype=np.int32),  # unterminated
             context_size=2,
-            sentence_lengths=(3, 3),
         )
+
+
+def test_contexts_shape_is_checked():
+    with pytest.raises(ValueError, match="shaped"):
+        Windows(
+            contexts=np.zeros((2, 3), dtype=np.int32),
+            targets=np.array([3, EOS], dtype=np.int32),
+            context_size=2,
+        )
+
+
+def test_unit_lengths_are_derived_from_targets():
+    # Nothing is stored: the EOS targets are the only record of unit structure.
+    windows = Windows(
+        contexts=np.zeros((5, 1), dtype=np.int32),
+        targets=np.array([3, EOS, 4, 5, EOS], dtype=np.int32),
+        context_size=1,
+    )
+    assert windows.unit_lengths == (2, 3)
+    assert sum(windows.unit_lengths) == len(windows)
+    assert "unit_lengths" not in vars(windows)
+
+
+# ---- split keying: content, not corpus order ------------------------------
+
+
+def _val_first_targets(stream, seed=0, val_fraction=0.25):
+    windows = make_windows(stream, 1)
+    _, val = windows.split(val_fraction=val_fraction, seed=seed)
+    starts = [0] + [i + 1 for i, t in enumerate(val.targets[:-1]) if t == EOS]
+    return [int(val.targets[s]) for s in starts]
+
+
+def test_split_is_independent_of_corpus_order():
+    # Same units delivered in a different order: the same units are held out.
+    units = [[3, 4], [5, 6], [7, 8], [9, 10]]
+    stream = [x for unit in units for x in (*unit, EOS)]
+    reversed_stream = [x for unit in reversed(units) for x in (*unit, EOS)]
+    assert _val_first_targets(stream) == _val_first_targets(reversed_stream)
+
+
+def test_identical_units_are_never_split():
+    # A duplicated unit hashes alike, so both copies land on the same side.
+    stream = [x for u in ([3, 4], [5, 6], [3, 4], [7, 8]) for x in (*u, EOS)]
+    for seed in range(20):
+        windows = make_windows(stream, 1)
+        _train, val = windows.split(val_fraction=0.5, seed=seed)
+        in_val = sum(1 for t in val.targets[::3] if int(t) == 3)
+        assert in_val in (0, 2), f"seed {seed} split the duplicate: {in_val} in validation"
+
+
+def test_split_honours_the_ratio_when_every_unit_is_identical():
+    # Keeping duplicates apart is impossible here, and a one-unit validation set
+    # would be useless, so the ratio wins and training still keeps a unit.
+    stream = [x for _ in range(3) for x in (3, 4, EOS)]
+    train, val = make_windows(stream, 1).split(val_fraction=0.99)
+    assert len(val.unit_lengths) == 2
+    assert len(train.unit_lengths) == 1
+
+
+def test_split_seed_changes_the_assignment():
+    stream = [x for i in range(12) for x in (i + 3, i + 4, EOS)]
+    windows = make_windows(stream, 2)
+    _, first = windows.split(val_fraction=0.25, seed=0)
+    _, second = windows.split(val_fraction=0.25, seed=1)
+    assert not np.array_equal(first.targets, second.targets)

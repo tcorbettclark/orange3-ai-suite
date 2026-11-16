@@ -1,12 +1,13 @@
 """Window construction for next-token training pairs, in the token domain.
 
-The input is a BOS-marked token stream - what ``Tokenizer.encode`` /
+The input is an EOS-terminated token stream - what ``Tokenizer.encode`` /
 ``Tokenizer.encode_corpus`` produce - so this module deals in integers only:
 no text, no tokenizer, no vocabulary.
 
 The stream is self-describing: EOS closes every unit, so unit structure travels
 inside the data and windows cannot cross a boundary even by accident. Nothing
-here needs a parallel list of unit lengths.
+here needs a parallel list of unit lengths; they are derived from the EOS
+targets in :attr:`Windows.unit_lengths`.
 
 For a unit with ids s1..sm and context size k, the windower builds
 ``[BOS, s1..sm, EOS]``. The window for each target is the last k tokens before
@@ -19,8 +20,10 @@ not data.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 
 import numpy as np
 
@@ -31,58 +34,105 @@ from .tokenizer import BOS_ID, EOS_ID
 class Windows:
     """All (context, target) training pairs of a corpus, unit-disjoint.
 
-    ``sentence_lengths`` records how many windows each unit contributed, in
-    corpus order, so the train/validation split can happen at unit level: no
-    unit contributes windows to both sets. (The field name is historical - the
-    unit is a sentence today; see the module docstring.)
+    Unit structure is not stored: every unit's last window predicts EOS, so the
+    boundaries are recoverable from ``targets`` (see :attr:`unit_lengths`).
+    That keeps one source of truth, and makes an inconsistent object
+    unrepresentable rather than merely validated.
     """
 
     contexts: np.ndarray  # (N, k) int32
-    targets: np.ndarray  # (N,) int32
+    targets: np.ndarray  # (N,) int32, one EOS per unit
     context_size: int
-    sentence_lengths: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        self.contexts = np.asarray(self.contexts, dtype=np.int32)
+        self.targets = np.asarray(self.targets, dtype=np.int32)
+        if self.contexts.shape != (len(self.targets), self.context_size):
+            raise ValueError("contexts must be shaped (n_windows, context_size)")
+        if len(self.targets) and int(self.targets[-1]) != EOS_ID:
+            raise ValueError("targets must end with <eos>: every unit is terminated")
 
     def __len__(self) -> int:
         return len(self.targets)
 
-    def __post_init__(self) -> None:
-        if len(self.sentence_lengths) and sum(self.sentence_lengths) != len(self):
-            raise ValueError("sentence_lengths do not sum to the number of windows")
+    # ---- unit structure, derived -------------------------------------------
+
+    def _offsets(self) -> np.ndarray:
+        """Window index where each unit starts, plus a trailing sentinel."""
+        return np.concatenate(([0], np.flatnonzero(self.targets == EOS_ID) + 1))
+
+    @property
+    def unit_lengths(self) -> tuple[int, ...]:
+        """Windows contributed by each unit, in order (tokens + its EOS)."""
+        return tuple(int(b - a) for a, b in pairwise(self._offsets()))
+
+    def _content_keys(self, seed: int) -> list[bytes]:
+        """One salted hash per unit, computed from the unit's own ids."""
+        salt = np.uint64(seed).tobytes()
+        return [
+            hashlib.blake2b(salt + self.targets[a:b].tobytes(), digest_size=8).digest()
+            for a, b in pairwise(self._offsets())
+        ]
+
+    # ---- splitting ---------------------------------------------------------
 
     def split(self, val_fraction: float = 0.1, seed: int = 0) -> tuple[Windows, Windows]:
-        """Sentence-level train/validation split, deterministic under a seed."""
+        """Unit-level train/validation split, deterministic under a seed.
+
+        Units are selected by a salted hash of their own ids, in key order, so
+        the split is a function of ``(seed, the set of units)`` - never of the
+        order the corpus arrived in. Reordering or re-fetching documents cannot
+        change it, and appending data does not move existing assignments.
+
+        Selection is atomic per key: two units with identical ids hash alike and
+        are therefore always assigned together, so a sentence can never appear
+        in both train and validation. Atomicity can overshoot ``val_fraction``
+        when a large group is taken, and if *every* unit is identical the ratio
+        wins instead - duplicates then straddle the split, which is unavoidable
+        when there is only one distinct unit in the corpus.
+        """
         if not 0.0 < val_fraction < 1.0:
             raise ValueError("val_fraction must be strictly between 0 and 1")
-        n = len(self.sentence_lengths)
+        n = len(self._offsets()) - 1
         if n < 2:
-            raise ValueError("need at least 2 sentences to split")
-        order = np.random.default_rng(seed).permutation(n)
-        n_val = min(max(1, round(n * val_fraction)), n - 1)
-        offsets = np.concatenate([[0], np.cumsum(self.sentence_lengths)])
+            raise ValueError("need at least 2 units to split")
 
-        def gather(indices: np.ndarray) -> Windows:
-            if len(indices) == 0:
-                return Windows(
-                    contexts=np.empty((0, self.context_size), dtype=np.int32),
-                    targets=np.empty((0,), dtype=np.int32),
-                    context_size=self.context_size,
-                    sentence_lengths=(),
-                )
-            starts = offsets[indices]
-            ends = offsets[indices + 1]
-            lengths = (ends - starts).astype(int)
+        groups: dict[bytes, list[int]] = {}
+        for index, key in enumerate(self._content_keys(seed)):
+            groups.setdefault(key, []).append(index)
+
+        target = min(max(1, round(n * val_fraction)), n - 1)
+        val_units: list[int] = []
+        for key in sorted(groups):
+            group = groups[key]
+            if len(val_units) >= target or len(val_units) + len(group) >= n:
+                break  # enough held out, and training keeps at least one unit
+            val_units.extend(group)
+        if not val_units:
+            # Every unit is identical: keeping duplicates apart would leave a
+            # one-unit validation set, which is useless. Honour the ratio and
+            # accept the overlap - it is unavoidable here.
+            val_units = list(groups[sorted(groups)[0]][:target])
+
+        is_val = np.zeros(n, dtype=bool)
+        is_val[val_units] = True
+        return self._gather(np.flatnonzero(~is_val)), self._gather(np.flatnonzero(is_val))
+
+    def _gather(self, units: np.ndarray) -> Windows:
+        """A new Windows holding just the given units, in the order given."""
+        offsets = self._offsets()
+        if len(units) == 0:
             return Windows(
-                contexts=np.concatenate(
-                    [self.contexts[s:e] for s, e in zip(starts, ends, strict=True)]
-                ),
-                targets=np.concatenate(
-                    [self.targets[s:e] for s, e in zip(starts, ends, strict=True)]
-                ),
+                contexts=np.empty((0, self.context_size), dtype=np.int32),
+                targets=np.empty((0,), dtype=np.int32),
                 context_size=self.context_size,
-                sentence_lengths=tuple(int(v) for v in lengths),
             )
-
-        return gather(order[n_val:]), gather(order[:n_val])
+        slices = [slice(offsets[u], offsets[u + 1]) for u in units]
+        return Windows(
+            contexts=np.concatenate([self.contexts[s] for s in slices]),
+            targets=np.concatenate([self.targets[s] for s in slices]),
+            context_size=self.context_size,
+        )
 
 
 def make_windows(stream: Sequence[int], context_size: int) -> Windows:
@@ -123,9 +173,4 @@ def make_windows(stream: Sequence[int], context_size: int) -> Windows:
             targets[row] = seq[i]
             row += 1
 
-    return Windows(
-        contexts=contexts,
-        targets=targets,
-        context_size=context_size,
-        sentence_lengths=tuple(int(v) + 1 for v in ends - starts),
-    )
+    return Windows(contexts=contexts, targets=targets, context_size=context_size)
