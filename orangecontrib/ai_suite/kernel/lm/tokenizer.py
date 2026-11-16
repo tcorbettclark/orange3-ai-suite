@@ -55,6 +55,7 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
+from itertools import pairwise
 from typing import ClassVar
 
 BOS = "<bos>"
@@ -333,7 +334,7 @@ class CharTokenizer(Tokenizer):
         return list(text)
 
     def decode(self, ids: Sequence[int]) -> str:
-        return "".join(self.tokens[int(i)] for i in ids if int(i) != BOS_ID)
+        return "".join(self.tokens[i] for i in map(int, ids) if i != BOS_ID)
 
 
 class WordTokenizer(Tokenizer):
@@ -349,14 +350,15 @@ class WordTokenizer(Tokenizer):
         return WordTokenizer._PATTERN.findall(text)
 
     def decode(self, ids: Sequence[int]) -> str:
-        out = ""
-        for i in ids:
-            i = int(i)
-            if i == BOS_ID:
-                continue
-            token = self.tokens[i]
-            if not out or out[-1] in _ATTACH_NEXT or token in _ATTACH_PREV:
-                out += token
-            else:
-                out += " " + token
-        return out
+        tokens = [self.tokens[i] for i in map(int, ids) if i != BOS_ID]
+        if not tokens:
+            return ""
+        # Each token after the first either attaches to the previous one
+        # (closing punctuation, or the previous token opens a quote) or starts
+        # a new space-separated word. Pieces then join in one pass, so decoding
+        # is linear regardless of whether the buffer is aliased.
+        pieces = [tokens[0]] + [
+            token if prev[-1] in _ATTACH_NEXT or token in _ATTACH_PREV else " " + token
+            for prev, token in pairwise(tokens)
+        ]
+        return "".join(pieces)
