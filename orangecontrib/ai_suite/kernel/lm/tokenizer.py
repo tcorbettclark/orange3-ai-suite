@@ -8,16 +8,18 @@ vocabulary travels with the weights.
 
 Levels
 ------
-Two concrete levels, each with its own segmentation and its own ``decode``
-(they are different algorithms, not one algorithm with a flag):
+Two concrete levels, each with its own segmentation and its own inside-a-unit
+rendering (they are different algorithms, not one algorithm with a flag):
 
 - :class:`CharTokenizer` - every character is a token (spaces included - word
-  boundaries matter at char level); ``decode`` concatenates, rendering the
-  sentence separator as one space.
+  boundaries matter at char level); rendering a unit is concatenation.
 - :class:`WordTokenizer` - dependency-free regex tokens: words with internal
   apostrophes ("don't", Shakespeare's "o'er", both quote styles) plus every
   non-word non-space character as its own token. Whitespace is dropped, case is
-  preserved, and ``decode`` re-inserts spaces except around punctuation.
+  preserved, and rendering a unit re-inserts spaces except around punctuation.
+
+``decode`` itself is shared: it splits on EOS, renders each unit with the
+level's rule and joins the results with one space (see :meth:`Tokenizer.decode`).
 
 Use :meth:`Tokenizer.from_corpus` to build either level.
 
@@ -37,19 +39,30 @@ order.
 
 Special tokens (ids fixed across levels)
 ----------------------------------------
-- id 0 = ``<bos>``: sentence-start marker, emitted by :meth:`Tokenizer.encode`
-  before every sentence, and the context-window pad, so early positions with
-  short context are trainable. Because the marker travels in the stream, the
-  token domain is self-describing: ``[BOS, s1..sm, BOS, t1..tn]`` carries its
-  own sentence structure and nothing downstream needs the text again. It is
-  also indistinguishable from padding by design - both mean "nothing came
-  before". Never a pruning casualty, and never a target: ``encode`` only puts
-  it at sentence starts, and windowing never predicts index 0 of a sentence.
+``BOS``/``EOS`` are **beginning/end of sequence** - not of sentence. The
+sequence is the training unit, and today a unit is a sentence because that is
+where windowing splits; ``[s1..sm, EOS, t1..tn, EOS]`` therefore marks sentence
+ends. If the unit later becomes a Q/A field or a document, EOS moves to that
+end and nothing here is renamed. (Real LMs use EOS the same way: it ends a
+document or a turn, not a sentence.)
+
+- id 0 = ``<bos>``: the start-of-sequence marker, meaning "nothing came
+  before". ``encode`` never emits it: the window builder prepends it as the
+  start of a unit's context and uses it as the left pad, so early positions
+  with short context stay trainable rather than being thrown away. Never a
+  target, and never a pruning casualty.
 - id 1 = ``<unk>``: out-of-vocabulary input (unknown words at word level,
   unknown characters at char level, or tokens removed by pruning).
+- id 2 = ``<eos>``: closes every unit, emitted by :meth:`Tokenizer.encode`. It
+  is the only special that travels in the stream, which is what makes the token
+  domain self-describing - nothing downstream needs the text again, and
+  "is this text finished?" becomes answerable from the tokens alone. A target
+  at every unit end, so generation can learn to stop.
 
-Both specials always survive pruning, and a pruning step that would remove
-every real token raises instead of returning a degenerate vocabulary.
+Ends travel as data, starts do not: a stream has to say that it finished, while
+the beginning of a window is always "the start of what I have". All specials
+survive pruning, and a pruning step that would remove every real token raises
+instead of returning a degenerate vocabulary.
 """
 
 from __future__ import annotations
@@ -67,9 +80,11 @@ from ..text import split_sentences
 
 BOS = "<bos>"
 UNK = "<unk>"
+EOS = "<eos>"
 BOS_ID = 0
 UNK_ID = 1
-SPECIAL_TOKENS = (BOS, UNK)
+EOS_ID = 2
+SPECIAL_TOKENS = (BOS, UNK, EOS)
 
 # In word-level decode these tokens close the previous token (no space before).
 _ATTACH_PREV = set(".,;:!?…)]}%'’\"”»")
@@ -239,35 +254,40 @@ class Tokenizer(ABC):
 
     # ---- encoding / decoding ----------------------------------------------
     #
-    # encode() is the single text -> token transition, and it emits sentence
-    # structure as data: a BOS before every sentence. After it the stream is
-    # self-describing - no caller needs the text, and none needs a parallel
-    # list of sentence lengths.
+    # encode() is the single text -> token transition, and it marks the END of
+    # every unit with EOS. Starts are not marked in the stream: the window
+    # builder prepends BOS as the start-of-context marker, so ends travel as
+    # data while starts are context construction. That asymmetry is deliberate -
+    # a stream must say that it finished, while the beginning is always "the
+    # start of what I have".
 
     def encode(self, text: str) -> list[int]:
-        """Text -> a token-id stream with a BOS before every sentence.
+        """Text -> a token-id stream where every unit ends with EOS.
 
-        Sentence boundaries are detected on the raw text
+        A unit is one sentence, for the same reason windowing splits there:
+        training, evaluation and generation share one unit, so changing it
+        changes all three together. Boundaries are detected on the raw text
         (:func:`~orangecontrib.ai_suite.kernel.text.split_sentences`), because
-        tokenization discards the whitespace those rules depend on. A leading
-        BOS appears even for a single sentence, so a stream always starts with
-        one; ``decode`` drops BOS, so ``decode(encode(t))`` still round-trips.
-        Out-of-vocabulary items map to ``<unk>``.
+        tokenization discards the whitespace those rules depend on.
+
+        No BOS is emitted - see the section comment. Out-of-vocabulary items
+        map to ``<unk>``; ``decode`` drops both specials, so
+        ``decode(encode(t))`` round-trips within the normalisation below.
         """
         stream: list[int] = []
         for sentence in split_sentences(text):
             ids = [self._token_to_id.get(t, UNK_ID) for t in self.segment(sentence)]
             if ids:
-                stream.append(BOS_ID)
                 stream.extend(ids)
+                stream.append(EOS_ID)
         return stream
 
     def encode_corpus(self, texts: Iterable[str]) -> list[int]:
-        """Documents -> one marked stream, in corpus order.
+        """Documents -> one terminated stream, in corpus order.
 
         Concatenating *encoded* documents (not the texts) is what stops the
-        last sentence of one document running into the first of the next:
-        every sentence carries its own leading BOS.
+        last unit of one document running into the first of the next: every
+        unit is closed by its own EOS.
         """
         return [i for text in texts for i in self.encode(text)]
 
@@ -280,9 +300,25 @@ class Tokenizer(ABC):
         :meth:`from_corpus` uses to count tokens before any instance exists.
         """
 
-    @abstractmethod
     def decode(self, ids: Sequence[int]) -> str:
-        """Token ids -> text. ``<bos>`` markers are dropped; ``<unk>`` shows literally."""
+        """Token ids -> text: units rendered independently, joined by one space.
+
+        Both specials are dropped, so ``<eos>`` closes a unit rather than
+        appearing in the text. The separator between units is not a token, so a
+        newline or a run of spaces comes back as a single space. ``<unk>``
+        shows literally.
+        """
+        units: list[list[int]] = [[]]
+        for i in map(int, ids):
+            if i == EOS_ID:
+                units.append([])
+            elif i != BOS_ID:
+                units[-1].append(i)
+        return " ".join(text for text in map(self._decode_unit, units) if text)
+
+    @abstractmethod
+    def _decode_unit(self, ids: Sequence[int]) -> str:
+        """Render one unit (no specials present) as text."""
 
     # ---- reporting ---------------------------------------------------------
     #
@@ -299,7 +335,7 @@ class Tokenizer(ABC):
         return {
             "level": self.level,
             "vocab_size": self.vocab_size,
-            "special_tokens": (self.token(BOS_ID), self.token(UNK_ID)),
+            "special_tokens": tuple(self.token(i) for i in range(self.n_special)),
             "longest_tokens": by_length[:10],
             "mean_token_length": (sum(lengths) / n) if n else 0.0,
             "single_occurrence_fraction": (sum(1 for _, c in real if c == 1) / n if n else 0.0),
@@ -372,21 +408,8 @@ class CharTokenizer(Tokenizer):
     def segment(cls, text: str) -> list[str]:
         return list(text)
 
-    def decode(self, ids: Sequence[int]) -> str:
-        """Token ids -> text.
-
-        Concatenation, so within a sentence this round-trips exactly. A
-        non-leading BOS renders as one space: the sentence separator is not a
-        token, so a newline or a run of spaces comes back as a single space.
-        """
-        pieces: list[str] = []
-        for i in map(int, ids):
-            if i == BOS_ID:
-                if pieces:
-                    pieces.append(" ")
-            else:
-                pieces.append(self.tokens[i])
-        return "".join(pieces)
+    def _decode_unit(self, ids: Sequence[int]) -> str:
+        return "".join(self.tokens[i] for i in ids)
 
 
 class WordTokenizer(Tokenizer):
@@ -401,8 +424,8 @@ class WordTokenizer(Tokenizer):
     def segment(cls, text: str) -> list[str]:
         return cls._PATTERN.findall(text)
 
-    def decode(self, ids: Sequence[int]) -> str:
-        tokens = [self.tokens[i] for i in map(int, ids) if i != BOS_ID]
+    def _decode_unit(self, ids: Sequence[int]) -> str:
+        tokens = [self.tokens[i] for i in ids]
         if not tokens:
             return ""
         # Each token after the first either attaches to the previous one

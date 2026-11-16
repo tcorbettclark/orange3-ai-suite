@@ -9,6 +9,8 @@ widget layer's optional ``[lm]`` extra genuinely optional.
 from .tokenizer import (
     BOS,
     BOS_ID,
+    EOS,
+    EOS_ID,
     UNK,
     UNK_ID,
     CharTokenizer,
@@ -40,6 +42,8 @@ __all__ = [
     "ARCHITECTURES",
     "BOS",
     "BOS_ID",
+    "EOS",
+    "EOS_ID",
     "UNK",
     "UNK_ID",
     "CharTokenizer",

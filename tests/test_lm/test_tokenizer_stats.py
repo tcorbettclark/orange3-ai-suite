@@ -48,7 +48,7 @@ def test_stats(word_tok):
     s = word_tok.stats()
     assert s["level"] == "word"
     assert s["vocab_size"] == word_tok.vocab_size
-    assert s["special_tokens"] == ("<bos>", "<unk>")
+    assert s["special_tokens"] == ("<bos>", "<unk>", "<eos>")
     longest = s["longest_tokens"]
     assert all(len(longest[i][0]) >= len(longest[i + 1][0]) for i in range(len(longest) - 1))
     assert 0.0 <= s["single_occurrence_fraction"] <= 1.0

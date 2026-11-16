@@ -13,6 +13,8 @@ import pytest
 from orangecontrib.ai_suite.kernel.lm import (
     BOS,
     BOS_ID,
+    EOS,
+    EOS_ID,
     UNK,
     UNK_ID,
     CharTokenizer,
@@ -27,8 +29,9 @@ def test_special_ids_fixed():
     tok = Tokenizer.from_corpus(CORPUS, "char")
     assert tok.token(BOS_ID) == BOS and tok.token(UNK_ID) == UNK
     assert tok.is_special(BOS_ID) and tok.is_special(UNK_ID)
-    assert not tok.is_special(2)
-    assert tok.counts[BOS_ID] == 0 and tok.counts[UNK_ID] == 0
+    assert not tok.is_special(3)
+    assert tok.counts[BOS_ID] == 0 and tok.counts[UNK_ID] == 0 and tok.counts[EOS_ID] == 0
+    assert tok.token(EOS_ID) == EOS and tok.is_special(EOS_ID)
 
 
 def test_levels_catalogue():
@@ -53,22 +56,22 @@ def test_levels_are_classes():
 def test_char_level_excludes_nothing():
     tok = Tokenizer.from_corpus(["a b"], "char")
     ids = tok.encode("a b")
-    assert ids[0] == BOS_ID
-    assert len(ids) == 4  # <bos> + 'a', ' ', 'b'
+    assert len(ids) == 4  # 'a', ' ', 'b' + <eos>
+    assert ids[-1] == EOS_ID
     assert tok.decode(ids) == "a b"
-    assert tok.vocab_size == 2 + 3  # <bos>, <unk>, 'a', ' ', 'b'
+    assert tok.vocab_size == 3 + 3  # <bos>, <unk>, 'a', ' ', 'b'
 
 
 def test_word_level_apostrophes_and_punctuation():
     tok = Tokenizer.from_corpus(CORPUS, "word")
     tokens = [tok.token(i) for i in tok.encode("Don't stop; it's o’clock.")]
-    assert tokens == [BOS, "Don't", "stop", ";", "it's", "o’clock", "."]
+    assert tokens == ["Don't", "stop", ";", "it's", "o’clock", ".", EOS]
 
 
 def test_word_level_preserves_case():
     tok = Tokenizer.from_corpus(["AB ab"], "word")
     assert tok.index("AB") != tok.index("ab")
-    assert tok.vocab_size == 2 + 2
+    assert tok.vocab_size == 3 + 2
 
 
 def test_char_round_trip_exact_within_sentence():
@@ -102,14 +105,14 @@ def test_word_round_trip_punctuation_spacing():
 def test_unknown_maps_to_unk():
     char_tok = Tokenizer.from_corpus(["ab"], "char")
     word_tok = Tokenizer.from_corpus(["ab"], "word")
-    assert char_tok.encode("a¥")[-1] == UNK_ID
-    assert word_tok.encode("ab surprise")[-1] == UNK_ID
+    assert char_tok.encode("a¥")[-2] == UNK_ID  # [-1] is the unit's <eos>
+    assert word_tok.encode("ab surprise")[-2] == UNK_ID
     assert UNK in word_tok.decode(word_tok.encode("¥"))
 
 
 def test_counts_aligned_with_tokens():
     tok = Tokenizer.from_corpus(CORPUS, "char")
-    total = sum(1 for t in CORPUS for i in tok.encode(t) if i != BOS_ID)
+    total = sum(1 for t in CORPUS for i in tok.encode(t) if i != EOS_ID)
     assert sum(tok.counts) == total
     assert tok.counts[0] == 0
     assert tok.total_token_count == total
@@ -119,20 +122,20 @@ def test_counts_aligned_with_tokens():
 # ---- encode emits sentence structure ---------------------------------------
 
 
-def test_encode_marks_every_sentence():
+def test_encode_ends_every_unit_with_eos():
     tok = Tokenizer.from_corpus(["AB. CD."], "char")
     A, B, C, D, DOT = (tok.index(c) for c in "ABCD.")
-    assert tok.encode("AB. CD.") == [BOS_ID, A, B, DOT, BOS_ID, C, D, DOT]
-    assert tok.encode("AB") == [BOS_ID, A, B]  # single sentence is still marked
+    assert tok.encode("AB. CD.") == [A, B, DOT, EOS_ID, C, D, DOT, EOS_ID]
+    assert tok.encode("AB") == [A, B, EOS_ID]  # a unit always terminates
     assert tok.encode("") == []
     assert tok.encode("   \n") == []
-    assert BOS not in tok.encode("AB")[1:]  # BOS only at sentence starts
+    assert BOS_ID not in tok.encode("AB")  # starts are context, not data
 
 
 def test_encode_corpus_concatenates_documents():
     tok = Tokenizer.from_corpus(["AB", "CD"], "char")
     A, B, C, D = (tok.index(c) for c in "ABCD")
-    assert tok.encode_corpus(["AB", "CD"]) == [BOS_ID, A, B, BOS_ID, C, D]
+    assert tok.encode_corpus(["AB", "CD"]) == [A, B, EOS_ID, C, D, EOS_ID]
     assert tok.encode_corpus([]) == []
     assert tok.encode_corpus(["AB"]) == tok.encode("AB")
 
@@ -172,7 +175,7 @@ def test_keep_top():
     corpus = ["aa bb cc dd ee", "aa aa bb bb"]  # aa:3 bb:3 cc/dd/ee:1
     tok = Tokenizer.from_corpus(corpus, "word")
     pruned = tok.keep_top(3)
-    assert pruned.vocab_size == 3 + 2
+    assert pruned.vocab_size == 3 + 3
     assert [t for t, _ in pruned.ranked_counts()] == ["aa", "bb", "cc"]  # tie alphabetical
     assert UNK_ID in pruned.encode("dd")  # least frequent -> <unk>
     assert UNK_ID not in pruned.encode("aa")
@@ -198,9 +201,9 @@ def test_shares_stay_corpus_relative_across_pruning():
 def test_pruning_keeps_specials_and_returns_new_objects():
     tok = Tokenizer.from_corpus(["a b c"], "word")
     pruned = tok.keep_top(1)
-    assert pruned.tokens[:2] == (BOS, UNK)
-    assert pruned.is_special(BOS_ID) and pruned.is_special(UNK_ID)
-    assert tok.vocab_size == 5  # untouched: pruning is pure
+    assert pruned.tokens[:3] == (BOS, UNK, EOS)
+    assert all(pruned.is_special(i) for i in range(3))
+    assert tok.vocab_size == 6  # untouched: pruning is pure
     assert isinstance(pruned, WordTokenizer)
 
 
@@ -240,10 +243,10 @@ def test_dict_round_trip():
 
 def test_from_dict_preserves_order_and_tolerates_old_saves():
     # Saved order is what ids were trained against, so it must never be re-sorted.
-    data = {"level": "word", "tokens": [BOS, UNK, "z", "a"], "counts": [0, 0, 1, 2]}
+    data = {"level": "word", "tokens": [BOS, UNK, EOS, "z", "a"], "counts": [0, 0, 0, 1, 2]}
     tok = Tokenizer.from_dict(data)
-    assert tok.tokens == (BOS, UNK, "z", "a")
-    assert tok.index("z") == 2
+    assert tok.tokens == (BOS, UNK, EOS, "z", "a")
+    assert tok.index("z") == 3
     assert tok.total_token_count == 3  # absent key -> retained sum
 
 
@@ -251,8 +254,8 @@ def test_error_paths():
     with pytest.raises(ValueError, match="no tokens"):
         Tokenizer.from_corpus(["", "   \n"], "word")
     with pytest.raises(ValueError, match="duplicate"):
-        CharTokenizer(tokens=(BOS, UNK, BOS), counts=(0, 0, 1))
+        CharTokenizer(tokens=(BOS, UNK, EOS, BOS), counts=(0, 0, 0, 1))
     with pytest.raises(ValueError, match="special tokens"):
-        CharTokenizer(tokens=("a", UNK), counts=(1, 0))
+        CharTokenizer(tokens=("a", UNK, EOS), counts=(1, 0, 0))
     with pytest.raises(ValueError, match="same length"):
-        CharTokenizer(tokens=(BOS, UNK, "a"), counts=(0, 0))
+        CharTokenizer(tokens=(BOS, UNK, EOS, "a"), counts=(0, 0, 0))

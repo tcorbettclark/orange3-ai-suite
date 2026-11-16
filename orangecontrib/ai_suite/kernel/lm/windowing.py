@@ -4,15 +4,17 @@ The input is a BOS-marked token stream - what ``Tokenizer.encode`` /
 ``Tokenizer.encode_corpus`` produce - so this module deals in integers only:
 no text, no tokenizer, no vocabulary.
 
-The stream is self-describing. A BOS before every sentence means sentence
-structure travels inside the data, so windows cannot cross a sentence boundary
-even by accident, and nothing here needs a parallel list of sentence lengths.
+The stream is self-describing: EOS closes every unit, so unit structure travels
+inside the data and windows cannot cross a boundary even by accident. Nothing
+here needs a parallel list of unit lengths.
 
-For a sentence with ids s1..sm and context size k, the stream carries
-``[BOS, s1..sm]``. The window for target s_i is the last k tokens before it,
-left-padded with BOS: the first window is all-BOS, and only from window k+1
-onwards is the context fully real tokens. BOS is never a target, which is what
-lets generation treat a sampled BOS as "stop".
+For a unit with ids s1..sm and context size k, the windower builds
+``[BOS, s1..sm, EOS]``. The window for each target is the last k tokens before
+it, left-padded with BOS: the first window is all-BOS, and only from window k+1
+onwards is the context fully real tokens. Targets are s1..sm followed by EOS,
+so a unit contributes m+1 windows and the stream contributes exactly
+``len(stream)`` of them. BOS is never a target - it is context construction,
+not data.
 """
 
 from __future__ import annotations
@@ -22,16 +24,17 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .tokenizer import BOS_ID
+from .tokenizer import BOS_ID, EOS_ID
 
 
 @dataclass
 class Windows:
-    """All (context, target) training pairs of a corpus, sentence-disjoint.
+    """All (context, target) training pairs of a corpus, unit-disjoint.
 
-    ``sentence_lengths`` records how many windows each sentence contributed,
-    in corpus order, so the train/validation split can happen at sentence
-    level: no sentence contributes windows to both sets.
+    ``sentence_lengths`` records how many windows each unit contributed, in
+    corpus order, so the train/validation split can happen at unit level: no
+    unit contributes windows to both sets. (The field name is historical - the
+    unit is a sentence today; see the module docstring.)
     """
 
     contexts: np.ndarray  # (N, k) int32
@@ -83,14 +86,14 @@ class Windows:
 
 
 def make_windows(stream: Sequence[int], context_size: int) -> Windows:
-    """Build all next-token windows of a BOS-marked token stream.
+    """Build all next-token windows of an EOS-terminated token stream.
 
-    The stream is split on ``BOS_ID``; each piece is one sentence and is
-    windowed independently, with BOS as the left pad. Every window of every
-    sentence is known in advance - ``len(stream)`` minus one per sentence - so
-    the result is preallocated.
+    The stream is split on ``EOS_ID``; each piece is one unit and is windowed
+    independently, with BOS as the start-of-context marker and the left pad, and
+    with EOS as its final target. Every token in the stream is predicted exactly
+    once, so the result is preallocated to ``len(stream)`` rows.
 
-    A stream that does not start with BOS, or that has two BOS in a row, is
+    A stream that does not end with EOS, or that contains two EOS in a row, is
     rejected: it can only come from something that did not encode a document.
     """
     if int(context_size) < 1:
@@ -98,31 +101,31 @@ def make_windows(stream: Sequence[int], context_size: int) -> Windows:
     context_size = int(context_size)
 
     ids = np.asarray(stream, dtype=np.int32)
-    starts = np.flatnonzero(ids == BOS_ID)
-    if len(starts) == 0 or starts[0] != 0:
+    ends = np.flatnonzero(ids == EOS_ID)
+    if len(ends) == 0 or ends[-1] != len(ids) - 1:
         raise ValueError(
-            "stream must start with <bos>: BOS marks every sentence start, "
-            "so this only accepts a stream from Tokenizer.encode"
+            "stream must end with <eos>: every unit is terminated, so this only "
+            "accepts a stream from Tokenizer.encode"
         )
-    ends = np.append(starts[1:], len(ids))
-    lengths = ends - starts - 1
-    if (lengths < 1).any():
-        raise ValueError("stream has an empty sentence (two <bos> in a row)")
+    starts = np.concatenate(([0], ends[:-1] + 1))
+    if (ends - starts < 1).any():
+        raise ValueError("stream has an empty unit (two <eos> in a row)")
 
-    contexts = np.full((len(ids) - len(starts), context_size), BOS_ID, dtype=np.int32)
-    targets = np.empty(len(contexts), dtype=np.int32)
+    contexts = np.full((len(ids), context_size), BOS_ID, dtype=np.int32)
+    targets = np.empty(len(ids), dtype=np.int32)
     row = 0
     for start, end in zip(starts, ends, strict=True):
-        sentence = ids[start:end]  # begins with BOS by construction
-        for i in range(1, len(sentence)):
+        # BOS opens the unit's context; EOS is its last target.
+        seq = np.concatenate(([BOS_ID], ids[start:end], [EOS_ID]))
+        for i in range(1, len(seq)):
             lo = max(0, i - context_size)
-            contexts[row, context_size - (i - lo) :] = sentence[lo:i]
-            targets[row] = sentence[i]
+            contexts[row, context_size - (i - lo) :] = seq[lo:i]
+            targets[row] = seq[i]
             row += 1
 
     return Windows(
         contexts=contexts,
         targets=targets,
         context_size=context_size,
-        sentence_lengths=tuple(int(v) for v in lengths),
+        sentence_lengths=tuple(int(v) + 1 for v in ends - starts),
     )
