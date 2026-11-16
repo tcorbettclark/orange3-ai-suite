@@ -1,18 +1,19 @@
-"""Language-model kernel: tokenizers, windowing, vocab statistics and the
-Keras model ladder.
+"""Language-model kernel: tokenizers (with their statistics), windowing and
+the Keras model ladder.
 
 The Keras-dependent names (builders, training, ``LanguageModel``) resolve
-lazily, so importing the tokenizer or the vocab-viewer logic never pulls in
-TensorFlow. That keeps the widget layer's optional ``[lm]`` extra genuinely
-optional.
+lazily, so importing the tokenizer never pulls in TensorFlow. That keeps the
+widget layer's optional ``[lm]`` extra genuinely optional.
 """
 
-from .tokenizer import BOS, BOS_ID, UNK, UNK_ID, Tokenizer
-from .vocab import (
-    frequency_table,
-    side_by_side,
-    vocab_stats,
-    zipf_summary,
+from .tokenizer import (
+    BOS,
+    BOS_ID,
+    UNK,
+    UNK_ID,
+    CharTokenizer,
+    Tokenizer,
+    WordTokenizer,
 )
 from .windowing import Windows, make_windows, split_sentences
 
@@ -41,16 +42,14 @@ __all__ = [
     "BOS_ID",
     "UNK",
     "UNK_ID",
+    "CharTokenizer",
     "LanguageModel",
     "Tokenizer",
     "Windows",
+    "WordTokenizer",
     "build_model",
     "compile_model",
-    "frequency_table",
     "make_windows",
-    "side_by_side",
     "split_sentences",
     "train_language_model",
-    "vocab_stats",
-    "zipf_summary",
 ]

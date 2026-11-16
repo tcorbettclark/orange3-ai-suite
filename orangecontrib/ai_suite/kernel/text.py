@@ -1,8 +1,8 @@
 """Plain-text helpers: cleaning, row splitting and Q/A parsing.
 
 This module is deliberately independent of Orange and Qt. It works on strings
-and returns immutable results so the widget layer only has to handle files,
-previews and Tables.
+and returns immutable results, so callers only have to deal with files and
+previews.
 """
 
 from __future__ import annotations

@@ -87,8 +87,9 @@ class LanguageModel:
     def perplexity(self, texts: Iterable[str], batch_size: int = 256) -> dict[str, float]:
         """Loss and perplexity (e^loss) over the windows of the given texts.
 
-        This is the in-domain / out-of-domain number used by the evaluation
-        widgets: the single-domain limitation as a chart.
+        Run it on the training corpus and on unrelated text to get the
+        in-domain / out-of-domain pair: a single-domain model looks good only on
+        the domain it was trained on.
         """
         windows = make_windows(self.tokenizer, texts, self.context_size)
         # bigram consumes only the last token of a window (builders.py)

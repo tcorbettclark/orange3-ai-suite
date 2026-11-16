@@ -319,6 +319,7 @@ all_features()                    # the full catalogue, in stable column order
 from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows, train_language_model
 
 tokenizer = Tokenizer.from_corpus(texts, "char")
+tokenizer = tokenizer.keep_top(2000)       # or .drop_rare(min_count=3); pure, chainable
 windows = make_windows(tokenizer, texts, context_size=16)
 train, valid = windows.split(val_fraction=0.1, seed=0)
 
@@ -415,7 +416,7 @@ orangecontrib/
     adapters.py Orange <-> kernel conversion
     kernel/
       features/   preprocessing, registry, groups A-G, extraction front door
-      lm/         tokenizer, windowing, vocab statistics, Keras builders,
+      lm/         tokenizer (with its stats), windowing, Keras builders,
                   training, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects
       pixels.py   luminance grid features

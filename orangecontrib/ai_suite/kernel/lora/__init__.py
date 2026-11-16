@@ -7,7 +7,7 @@ Design rules:
 - an adapter is serialised with its base-model reference as one artifact, so
   adapter/base mismatches cannot happen;
 - models expose the same ``generate(prompt, temperature)`` convention as the
-  Keras ``LanguageModel``, so the LM Generator widget is model-agnostic;
+  Keras ``LanguageModel``, so consumers can treat both model types alike;
 - an adapter on/off switch gives the before/after comparison on the identical
   base model;
 - MLX is Apple-Silicon-only: every import is guarded, and other machines get a

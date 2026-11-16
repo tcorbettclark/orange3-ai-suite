@@ -1,9 +1,9 @@
 """Training entry point: corpus + options -> a :class:`LanguageModel`.
 
 Training always uses a sentence-level train/validation split; train/validation
-divergence is the overfitting lesson on a tiny corpus. The optimizer is Adam.
-The kernel accepts a plain per-epoch hook, so the widget layer can stream
-loss/perplexity without the kernel ever seeing Qt.
+divergence is the overfitting signal on a tiny corpus. The optimizer is Adam.
+Training accepts a plain per-epoch hook, so streaming loss/perplexity anywhere
+is the caller's business - the kernel never needs to know about it.
 """
 
 from __future__ import annotations
@@ -43,11 +43,11 @@ def train_language_model(
     """Build windows, split by sentence, train, and return a LanguageModel.
 
     ``stop_requested`` is checked after every epoch; when it returns True the
-    Keras loop stops cleanly (the widget's Stop button).
+    Keras loop stops cleanly (cooperative cancellation by the caller).
 
     When ``sample_temperature`` is not None, the hook's stats dict also carries
     ``"sample"`` - text generated from ``sample_prompt`` with the in-training
-    model at each epoch (the checkpoint table).
+    model at each epoch (a per-epoch snapshot of current behaviour).
     """
     if architecture not in ARCHITECTURES:
         raise ValueError(f"architecture must be one of {ARCHITECTURES}, got {architecture!r}")

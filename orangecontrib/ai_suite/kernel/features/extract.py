@@ -69,7 +69,7 @@ def extract_features(
     ----------
     image:
         RGB(A) or grayscale array; channel order is RGB (convert OpenCV's BGR
-        in the widget adapter before calling).
+        before calling).
     options:
         :class:`FeatureOptions`; defaults applied when None.
     groups:

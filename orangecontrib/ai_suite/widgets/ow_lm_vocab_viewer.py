@@ -115,14 +115,14 @@ class OWLMVocabViewer(OWWidget):
 
     def refresh(self):
         if self._model_tokenizer is not None:
-            from orangecontrib.ai_suite.kernel.lm import vocab_stats
-
             self._show_tokenizer(self._model_tokenizer, self.model_table)
-            stats = vocab_stats(self._model_tokenizer)
+            stats = self._model_tokenizer.stats()
+            dropped = stats["dropped_occurrences"]
             self.summary_label.setText(
                 f"{stats['level']}-level, vocab {stats['vocab_size']} "
                 f"(incl. specials), mean token length {stats['mean_token_length']:.2f}, "
                 f"hapax fraction {stats['single_occurrence_fraction']:.0%}"
+                + (f", {dropped} corpus tokens dropped" if dropped else "")
             )
             self._tabs.setCurrentWidget(self.model_table)
         elif self._char_tokenizer is not None:
@@ -142,10 +142,12 @@ class OWLMVocabViewer(OWWidget):
 
     @staticmethod
     def _show_tokenizer(tokenizer, table: QTableWidget) -> None:
-        _fill_table(
-            table,
-            [(tokenizer.token(i), i, tokenizer.counts[i]) for i in range(tokenizer.vocab_size)],
-        )
+        """Rows in rank order: vocabulary order is meaningless, frequency is not."""
+        specials = [
+            (tokenizer.token(i), i, tokenizer.counts[i]) for i in range(tokenizer.n_special)
+        ]
+        ranked = [(tok, tokenizer.index(tok), count) for tok, count in tokenizer.ranked_counts()]
+        _fill_table(table, specials + ranked)
 
 
 if __name__ == "__main__":  # pragma: no cover - dev preview

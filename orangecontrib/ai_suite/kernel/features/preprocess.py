@@ -18,8 +18,8 @@ from .options import FeatureOptions
 
 _EPS = 1e-12
 
-# ITU-R BT.601 luma weights, RGB channel order. The widget adapter converts
-# OpenCV's BGR before calling the kernel.
+# ITU-R BT.601 luma weights, RGB channel order. Callers must convert OpenCV's
+# BGR first - the kernel never guesses channel order.
 _LUMA = (0.299, 0.587, 0.114)
 
 
@@ -41,7 +41,7 @@ def to_luminance(image: np.ndarray) -> np.ndarray:
     if img.shape[-1] != 3:
         raise ValueError(
             f"expected 1, 3 or 4 channels, got {img.shape[-1]} - pass RGB "
-            "(convert OpenCV BGR to RGB in the widget adapter before calling)"
+            "(convert OpenCV BGR to RGB before calling)"
         )
     r = img[..., 0].astype(np.float64)
     g = img[..., 1].astype(np.float64)

@@ -10,8 +10,8 @@ Two data formats teach two distinct lessons through one mechanism:
    masks the prompt tokens, so loss is computed on the completion only.
 
 Training runs ``python -m mlx_lm lora`` in a subprocess. Its stdout is parsed
-into metric dicts for the widget's live loss curve, and ``stop_requested``
-terminates the child process cleanly (the widget's Stop button).
+into per-iteration metric dicts, and ``stop_requested`` terminates the child
+process cleanly.
 """
 
 from __future__ import annotations

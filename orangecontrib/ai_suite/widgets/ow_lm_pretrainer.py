@@ -5,8 +5,8 @@ checkpoint table. Training runs in a background QThread and streams per-epoch
 stats into pyqtgraph; all substance (tokenizer, windowing, Keras builders,
 sampling) lives in the kernel.
 
-The kernel is imported lazily, so a missing ``[lm]`` extra shows an install
-hint instead of crashing the canvas.
+The kernel's Keras-dependent parts are imported lazily, so a missing ``[lm]``
+extra shows an install hint instead of crashing the canvas.
 """
 
 from __future__ import annotations
@@ -21,11 +21,15 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import checkpoint_table, table_texts
+from orangecontrib.ai_suite.kernel.lm import Tokenizer
 
 ARCHITECTURE_LABELS = ["Bigram", "MLP-over-window", "LSTM"]
 ARCHITECTURE_VALUES = ["bigram", "mlp_window", "lstm"]
-LEVEL_LABELS = ["Char level", "Word level"]
-LEVEL_VALUES = ["char", "word"]
+# Level identifiers come from the kernel, so the dropdown cannot drift from the
+# classes; only the short label formatting is decided here.
+LEVELS = Tokenizer.levels()
+LEVEL_VALUES = [name for name, _ in LEVELS]
+LEVEL_LABELS = [f"{name.capitalize()} level" for name, _ in LEVELS]
 
 
 class TrainingWorker(QThread):
@@ -214,7 +218,7 @@ class OWLMPretrainer(OWWidget):
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,
             "validation_fraction": self.validation_fraction,
-            "max_vocab": self.max_vocab or None,
+            "max_vocab": self.max_vocab,  # 0 = all
             "seed": 0,
             "sample_prompt": self.sample_prompt,
             "sample_temperature": self.sample_temperature if self.store_samples else None,
@@ -235,14 +239,12 @@ class OWLMPretrainer(OWWidget):
         self._train_curve.setData([], [])
         self._val_curve.setData([], [])
         self.status_label.setText("")
-        from orangecontrib.ai_suite.kernel.lm import Tokenizer  # pure Python; never imports Keras
 
         options = self._collect_options()
-        tokenizer = Tokenizer.from_corpus(
-            self.texts,
-            options.pop("tokenizer_level"),
-            max_vocab=options["max_vocab"],
-        )
+        tokenizer = Tokenizer.from_corpus(self.texts, options.pop("tokenizer_level"))
+        max_vocab = options.pop("max_vocab")
+        if max_vocab:
+            tokenizer = tokenizer.keep_top(max_vocab)  # real tokens, specials always kept
         worker = TrainingWorker(self.texts, tokenizer, options)
         worker.epoch_signal.connect(self._on_epoch)
         worker.finished_ok.connect(self._on_done)
