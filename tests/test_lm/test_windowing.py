@@ -1,124 +1,127 @@
 """Windowing tests — BOS/padding semantics and sentence-boundary discipline.
 
-Expected token ids are derived via ``tok.index(...)``; nothing assumes the
-vocabulary's internal sort order.
+``make_windows`` takes a BOS-marked token stream, so every case is tested on
+hand-written integers: no vocabulary, no corpus, no tokenizer. The expected
+arrays are the ones the old text-taking implementation produced, which is what
+makes this a refactor rather than a change of behaviour.
 """
 
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows, split_sentences
+from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows
 from orangecontrib.ai_suite.kernel.lm.windowing import Windows
 
-
-@pytest.fixture(scope="module")
-def char_tok():
-    return Tokenizer.from_corpus(["ABCD.", "EFGHI.", "AB. CD."], "char")
+BOS = 0
 
 
-def test_sentence_splitting_basics():
-    assert split_sentences("Hi! You are... ok? Yes.") == [
-        "Hi!",
-        "You are...",
-        "ok?",
-        "Yes.",
-    ]
-    assert split_sentences("AB.\nCD.") == ["AB.", "CD."]  # newline = hard break
-    assert split_sentences("no terminator here") == ["no terminator here"]
-    assert split_sentences("What?! No.") == ["What?!", "No."]
-    assert split_sentences("") == []
-    assert split_sentences("Dr. Who") == ["Dr.", "Who"]  # accepted limitation
+# ---- window arithmetic -----------------------------------------------------
 
 
-def test_bos_padding_sequence_start(char_tok):
-    A, B, DOT = (char_tok.index(c) for c in "AB.")
-    windows = make_windows(char_tok, ["AB."], context_size=3)
-    # sentence ids: A B . ; seq = [BOS, A, B, .]
-    # i=1: [B,B,B] -> A ; i=2: [B,B,A] -> B ; i=3: [B,A,B] -> .
+def test_bos_padding_sequence_start():
+    # [BOS, 2, 3, 4] with k=3: [B,B,B]->2, [B,B,2]->3, [B,2,3]->4
+    windows = make_windows([BOS, 2, 3, 4], context_size=3)
     assert np.array_equal(
-        windows.contexts, np.array([[0, 0, 0], [0, 0, A], [0, A, B]], dtype=np.int32)
+        windows.contexts, np.array([[0, 0, 0], [0, 0, 2], [0, 2, 3]], dtype=np.int32)
     )
-    assert np.array_equal(windows.targets, np.array([A, B, DOT], dtype=np.int32))
+    assert np.array_equal(windows.targets, np.array([2, 3, 4], dtype=np.int32))
     assert windows.sentence_lengths == (3,)
+    assert windows.context_size == 3
 
 
-def test_windows_never_cross_sentences(char_tok):
-    A, C, E = (char_tok.index(c) for c in "ACE")
-    windows = make_windows(char_tok, ["AB.", "CD."], context_size=3)
+def test_windows_never_cross_sentences():
+    windows = make_windows([BOS, 2, 3, 4, BOS, 5, 6, 7], context_size=3)
     assert len(windows) == 6
     assert windows.sentence_lengths == (3, 3)
-    # sentence-2 windows never mention sentence-1-only letters and vice versa
-    assert A not in windows.contexts[3:].ravel()
-    assert C not in windows.contexts[:3].ravel()
-    assert E not in windows.contexts.ravel()  # EFGHI wasn't in this corpus
+    # no id from one sentence appears in the other's windows
+    assert not set(windows.contexts[3:].ravel()) & {2, 3, 4}
+    assert not set(windows.contexts[:3].ravel()) & {5, 6, 7}
     # the first context of sentence 2 is all-BOS, not a tail of sentence 1
-    assert np.array_equal(windows.contexts[3], [0, 0, 0])
-    # sentence 2 predicts exactly its own tokens
-    assert np.array_equal(
-        windows.targets[3:],
-        np.array([char_tok.index(c) for c in "CD."], dtype=np.int32),
-    )
+    assert np.array_equal(windows.contexts[3], [BOS, BOS, BOS])
+    assert np.array_equal(windows.targets[3:], np.array([5, 6, 7], dtype=np.int32))
 
 
-def test_window_sliding_within_sentence(char_tok):
-    BOS, A, B, C, D, DOT = (
-        0,
-        char_tok.index("A"),
-        char_tok.index("B"),
-        char_tok.index("C"),
-        char_tok.index("D"),
-        char_tok.index("."),
-    )
-    windows = make_windows(char_tok, ["ABCD."], context_size=2)
-    # seq [BOS A B C D .] with k=2:
-    # [B B]->A, [B A]->B, [A B]->C, [B C]->D, [C D]->.
+def test_window_sliding_within_sentence():
+    windows = make_windows([BOS, 2, 3, 4, 5, 6], context_size=2)
+    # [B B]->2, [B 2]->3, [2 3]->4, [3 4]->5, [4 5]->6
     assert np.array_equal(
         windows.contexts,
-        np.array([[BOS, BOS], [BOS, A], [A, B], [B, C], [C, D]], dtype=np.int32),
+        np.array([[0, 0], [0, 2], [2, 3], [3, 4], [4, 5]], dtype=np.int32),
     )
-    assert np.array_equal(windows.targets, np.array([A, B, C, D, DOT], dtype=np.int32))
+    assert np.array_equal(windows.targets, np.array([2, 3, 4, 5, 6], dtype=np.int32))
 
 
-def test_large_context_all_bos_fill(char_tok):
-    A, B = (char_tok.index(c) for c in "AB")
-    windows = make_windows(char_tok, ["AB."], context_size=10)
+def test_large_context_all_bos_fill():
+    windows = make_windows([BOS, 2, 3, 4], context_size=10)
     assert windows.contexts.shape == (3, 10)
-    # window for position 3: 7 BOS pads + the 3 preceding tokens [BOS, A, B]
+    # window for the third target: 7 BOS pads + [BOS, 2, 3]
     assert np.array_equal(windows.contexts[2, :7], np.zeros(7, dtype=np.int32))
-    assert np.array_equal(windows.contexts[2, 7:], np.array([0, A, B], dtype=np.int32))
-    assert windows.targets[2] == char_tok.index(".")
+    assert np.array_equal(windows.contexts[2, 7:], np.array([0, 2, 3], dtype=np.int32))
+    assert windows.targets[2] == 4
 
 
-def test_context_size_one(char_tok):
-    A, B, DOT = (char_tok.index(c) for c in "AB.")
-    windows = make_windows(char_tok, ["AB."], context_size=1)
-    assert np.array_equal(windows.contexts.ravel(), [0, A, B])
-    assert np.array_equal(windows.targets, [A, B, DOT])
+def test_context_size_one():
+    windows = make_windows([BOS, 2, 3, 4], context_size=1)
+    assert np.array_equal(windows.contexts.ravel(), [0, 2, 3])
+    assert np.array_equal(windows.targets, [2, 3, 4])
 
 
-def test_empty_sentences_skipped(char_tok):
-    real = "...real sentence here."
-    windows = make_windows(char_tok, [real, "   "], context_size=2)
-    assert windows.sentence_lengths == (len(real),)  # len == char tokens
+def test_single_token_sentence():
+    windows = make_windows([BOS, 2, BOS, 3], context_size=2)
+    assert windows.sentence_lengths == (1, 1)
+    assert np.array_equal(windows.contexts, [[0, 0], [0, 0]])
+    assert np.array_equal(windows.targets, [2, 3])
 
 
-def test_sentence_split_happens_inside(char_tok):
-    windows = make_windows(char_tok, ["AB. CD."], context_size=1)
-    assert windows.sentence_lengths == (3, 3)
+def test_bos_is_never_a_target():
+    windows = make_windows([BOS, 2, 3, 4, BOS, 5], context_size=2)
+    assert BOS not in windows.targets  # generation relies on this
 
 
-def test_no_windows_raises(char_tok):
-    with pytest.raises(ValueError, match="no windows"):
-        make_windows(char_tok, ["", "  \n"], context_size=2)
+def test_error_paths():
     with pytest.raises(ValueError, match="context_size"):
-        make_windows(char_tok, ["AB."], context_size=0)
+        make_windows([BOS, 2], context_size=0)
+    with pytest.raises(ValueError, match="must start with <bos>"):
+        make_windows([], context_size=2)
+    with pytest.raises(ValueError, match="must start with <bos>"):
+        make_windows([2, 3, 4], context_size=2)  # unmarked stream
+    with pytest.raises(ValueError, match="empty sentence"):
+        make_windows([BOS, BOS, 2], context_size=2)
+    with pytest.raises(ValueError, match="empty sentence"):
+        make_windows([BOS, 2, BOS], context_size=2)  # trailing marker, no tokens
+
+
+# ---- end to end: an encoded corpus is a self-describing stream -------------
+
+
+def test_encoded_corpus_needs_no_text():
+    tok = Tokenizer.from_corpus(["AB.", "CD."], "char")
+    stream = tok.encode_corpus(["AB.", "CD."])
+    assert stream == tok.encode("AB.") + tok.encode("CD.")
+    windows = make_windows(stream, context_size=3)
+    assert windows.sentence_lengths == (3, 3)
+    assert len(windows) == 6
+    assert np.array_equal(windows.contexts[3], [BOS, BOS, BOS])
+
+
+def test_documents_are_not_merged_into_one_sentence():
+    # "AB" has no terminator: concatenating the *texts* would fuse the two
+    # documents, concatenating their streams cannot.
+    tok = Tokenizer.from_corpus(["AB", "CD"], "char")
+    windows = make_windows(tok.encode_corpus(["AB", "CD"]), context_size=1)
+    assert windows.sentence_lengths == (2, 2)
+
+
+# ---- splitting -------------------------------------------------------------
+
+
+def twelve_sentences() -> Windows:
+    stream = [x for i in range(12) for x in (BOS, i + 2, i + 3)]
+    return make_windows(stream, context_size=2)
 
 
 def test_split_is_sentence_disjoint_deterministic_and_complete():
-    docs = [f"{c}{c}." for c in "abcdefghijkl"]  # 12 sentences, shared letters
-    tok = Tokenizer.from_corpus(docs, "char")
-    windows = make_windows(tok, docs, context_size=2)
-
+    windows = twelve_sentences()
     train, val = windows.split(val_fraction=0.25, seed=1)
     assert len(val.sentence_lengths) == max(1, round(12 * 0.25)) == 3
     assert sum(train.sentence_lengths) == len(train)
@@ -139,12 +142,19 @@ def test_split_is_sentence_disjoint_deterministic_and_complete():
 
 
 def test_split_fraction_validation():
-    tok = Tokenizer.from_corpus(["ab.", "cd."], "char")
-    windows = make_windows(tok, ["ab.", "cd."], context_size=1)
+    windows = make_windows([BOS, 2, 3, BOS, 4, 5], context_size=1)
     with pytest.raises(ValueError, match="val_fraction"):
         windows.split(val_fraction=0.0)
     with pytest.raises(ValueError, match="at least 2"):
-        make_windows(tok, ["ab."], context_size=1).split()
+        make_windows([BOS, 2, 3], context_size=1).split()
+
+
+def test_split_caps_validation_to_leave_training_rows():
+    windows = make_windows([BOS, 2, 3, BOS, 4, 5], context_size=1)
+    train, val = windows.split(val_fraction=0.99)
+    assert len(train.sentence_lengths) == 1
+    assert len(val.sentence_lengths) == 1
+    assert len(train) > 0
 
 
 def test_windows_consistency_guard():
@@ -155,12 +165,3 @@ def test_windows_consistency_guard():
             context_size=2,
             sentence_lengths=(3, 3),
         )
-
-
-def test_split_caps_validation_to_leave_training_rows():
-    tok = Tokenizer.from_corpus(["ab.", "cd."], "char")
-    windows = make_windows(tok, ["ab.", "cd."], context_size=1)
-    train, val = windows.split(val_fraction=0.99)
-    assert len(train.sentence_lengths) == 1
-    assert len(val.sentence_lengths) == 1
-    assert len(train) > 0

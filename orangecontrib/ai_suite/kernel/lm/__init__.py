@@ -15,7 +15,7 @@ from .tokenizer import (
     Tokenizer,
     WordTokenizer,
 )
-from .windowing import Windows, make_windows, split_sentences
+from .windowing import Windows, make_windows
 
 # Keras-dependent names resolve lazily (PEP 562).
 _KERAS_NAMES = {
@@ -50,6 +50,5 @@ __all__ = [
     "build_model",
     "compile_model",
     "make_windows",
-    "split_sentences",
     "train_language_model",
 ]

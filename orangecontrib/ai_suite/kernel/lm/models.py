@@ -91,7 +91,7 @@ class LanguageModel:
         in-domain / out-of-domain pair: a single-domain model looks good only on
         the domain it was trained on.
         """
-        windows = make_windows(self.tokenizer, texts, self.context_size)
+        windows = make_windows(self.tokenizer.encode_corpus(texts), self.context_size)
         # bigram consumes only the last token of a window (builders.py)
         x = windows.contexts[:, -1:] if self.architecture == "bigram" else windows.contexts
         loss = float(

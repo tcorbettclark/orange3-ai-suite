@@ -320,7 +320,8 @@ from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows, train_lang
 
 tokenizer = Tokenizer.from_corpus(texts, "char")
 tokenizer = tokenizer.keep_top(2000)       # or .drop_rare(min_count=3); pure, chainable
-windows = make_windows(tokenizer, texts, context_size=16)
+stream = tokenizer.encode_corpus(texts)    # BOS marks every sentence start
+windows = make_windows(stream, context_size=16)
 train, valid = windows.split(val_fraction=0.1, seed=0)
 
 model = train_language_model(

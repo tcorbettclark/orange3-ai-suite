@@ -53,7 +53,8 @@ def test_levels_are_classes():
 def test_char_level_excludes_nothing():
     tok = Tokenizer.from_corpus(["a b"], "char")
     ids = tok.encode("a b")
-    assert len(ids) == 3  # the space is a real token
+    assert ids[0] == BOS_ID
+    assert len(ids) == 4  # <bos> + 'a', ' ', 'b'
     assert tok.decode(ids) == "a b"
     assert tok.vocab_size == 2 + 3  # <bos>, <unk>, 'a', ' ', 'b'
 
@@ -61,7 +62,7 @@ def test_char_level_excludes_nothing():
 def test_word_level_apostrophes_and_punctuation():
     tok = Tokenizer.from_corpus(CORPUS, "word")
     tokens = [tok.token(i) for i in tok.encode("Don't stop; it's o’clock.")]
-    assert tokens == ["Don't", "stop", ";", "it's", "o’clock", "."]
+    assert tokens == [BOS, "Don't", "stop", ";", "it's", "o’clock", "."]
 
 
 def test_word_level_preserves_case():
@@ -70,10 +71,18 @@ def test_word_level_preserves_case():
     assert tok.vocab_size == 2 + 2
 
 
-def test_char_round_trip_exact():
-    text = "Hello, world!\nSecond line; done?"
+def test_char_round_trip_exact_within_sentence():
+    text = "Hello, world; done?"
     tok = Tokenizer.from_corpus([text], "char")
     assert tok.decode(tok.encode(text)) == text
+
+
+def test_char_sentence_separator_comes_back_as_one_space():
+    # The separator is not a token, so it cannot survive verbatim: a newline
+    # returns as a single space. Within a sentence nothing is invented.
+    text = "Hello, world!\nSecond line; done?"
+    tok = Tokenizer.from_corpus([text], "char")
+    assert tok.decode(tok.encode(text)) == "Hello, world! Second line; done?"
 
 
 def test_word_round_trip_normalises_whitespace():
@@ -100,11 +109,32 @@ def test_unknown_maps_to_unk():
 
 def test_counts_aligned_with_tokens():
     tok = Tokenizer.from_corpus(CORPUS, "char")
-    total = sum(len(tok.encode(t)) for t in CORPUS)
+    total = sum(1 for t in CORPUS for i in tok.encode(t) if i != BOS_ID)
     assert sum(tok.counts) == total
     assert tok.counts[0] == 0
     assert tok.total_token_count == total
     assert tok.dropped_occurrences == 0
+
+
+# ---- encode emits sentence structure ---------------------------------------
+
+
+def test_encode_marks_every_sentence():
+    tok = Tokenizer.from_corpus(["AB. CD."], "char")
+    A, B, C, D, DOT = (tok.index(c) for c in "ABCD.")
+    assert tok.encode("AB. CD.") == [BOS_ID, A, B, DOT, BOS_ID, C, D, DOT]
+    assert tok.encode("AB") == [BOS_ID, A, B]  # single sentence is still marked
+    assert tok.encode("") == []
+    assert tok.encode("   \n") == []
+    assert BOS not in tok.encode("AB")[1:]  # BOS only at sentence starts
+
+
+def test_encode_corpus_concatenates_documents():
+    tok = Tokenizer.from_corpus(["AB", "CD"], "char")
+    A, B, C, D = (tok.index(c) for c in "ABCD")
+    assert tok.encode_corpus(["AB", "CD"]) == [BOS_ID, A, B, BOS_ID, C, D]
+    assert tok.encode_corpus([]) == []
+    assert tok.encode_corpus(["AB"]) == tok.encode("AB")
 
 
 # ---- order is undefined; only the aggregation is invariant -----------------

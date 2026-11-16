@@ -6,6 +6,7 @@ from orangecontrib.ai_suite.kernel.text import (
     clean_text,
     parse_qa,
     reflow_qa_pair,
+    split_sentences,
     split_text,
 )
 
@@ -57,6 +58,19 @@ def test_split_modes():
         "Second sentence.",
         "A new paragraph.",
     )
+
+
+def test_split_sentences():
+    assert split_sentences("Hi! You are... ok? Yes.") == ["Hi!", "You are...", "ok?", "Yes."]
+    assert split_sentences("AB.\nCD.") == ["AB.", "CD."]  # newline = hard break
+    assert split_sentences("no terminator here") == ["no terminator here"]
+    assert split_sentences("What?! No.") == ["What?!", "No."]  # "?!" stays together
+    assert split_sentences("") == []
+    assert split_sentences("   \n\n  ") == []
+    assert split_sentences("Dr. Who") == ["Dr.", "Who"]  # accepted limitation
+    # the terminator needs whitespace after it, so numbers and domains survive
+    assert split_sentences("3.14 is pi.") == ["3.14 is pi."]
+    assert split_sentences("see example.com") == ["see example.com"]
 
 
 def test_parse_qa_includes_marker_in_prompt():

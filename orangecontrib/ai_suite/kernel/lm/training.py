@@ -56,7 +56,7 @@ def train_language_model(
     if not 0.0 < validation_fraction < 1.0:
         raise ValueError("validation_fraction must be strictly between 0 and 1")
 
-    windows = make_windows(tokenizer, texts, context_size)  # enforces sentence edges
+    windows = make_windows(tokenizer.encode_corpus(texts), context_size)
     train, val = windows.split(validation_fraction, seed=seed)
 
     keras_model = compile_model(

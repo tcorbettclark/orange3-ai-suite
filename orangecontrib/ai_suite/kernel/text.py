@@ -10,7 +10,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .lm.windowing import split_sentences
+# Split after terminal punctuation followed by whitespace ("What?! No." keeps
+# "?!" together). Newlines are hard breaks; lines without terminal punctuation
+# are sentences of their own. Known limitation for teaching corpora:
+# abbreviations such as "Mr." split. The whitespace requirement is why this has
+# to run on raw text: word-level tokenization drops it, so "3.14" would
+# otherwise be cut in half.
+_TERMINATOR = re.compile(r"(?<=[.!?…])\s+")
 
 _PG_START = re.compile(
     r"^\s*\*\*\* START OF .*PROJECT GUTENBERG EBOOK.*$", re.IGNORECASE | re.MULTILINE
@@ -124,6 +130,27 @@ def clean_text(text: str, options: CleanOptions | None = None) -> CleanResult:
     if opts.reflow:
         text = _reflow(text)
     return CleanResult(text.strip(), removed, gutenberg_stripped)
+
+
+def split_sentences(text: str) -> list[str]:
+    """Split a document into sentences; a newline is a hard break.
+
+    Text-level on purpose: the two rules it encodes - a newline ends a
+    sentence, a terminator ends one only when whitespace follows - both depend
+    on characters that tokenization may discard. Callers that work in the
+    token domain get sentence structure from the tokenizer, which marks every
+    sentence start with BOS (see ``Tokenizer.encode``).
+    """
+    out: list[str] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        for part in _TERMINATOR.split(line):
+            part = part.strip()
+            if part:
+                out.append(part)
+    return out
 
 
 def split_text(text: str, mode: str) -> tuple[str, ...]:

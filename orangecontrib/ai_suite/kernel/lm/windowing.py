@@ -1,44 +1,28 @@
-"""Sentence-aware window construction for next-token training pairs.
+"""Window construction for next-token training pairs, in the token domain.
 
-Windows never cross sentence or document boundaries: the model must not learn
-to continue across unrelated sentences. BOS doubles as the context pad, so
-early tokens with short context are trainable.
+The input is a BOS-marked token stream - what ``Tokenizer.encode`` /
+``Tokenizer.encode_corpus`` produce - so this module deals in integers only:
+no text, no tokenizer, no vocabulary.
 
-For a sentence with ids s1..sm and context size k, the sequence is
+The stream is self-describing. A BOS before every sentence means sentence
+structure travels inside the data, so windows cannot cross a sentence boundary
+even by accident, and nothing here needs a parallel list of sentence lengths.
+
+For a sentence with ids s1..sm and context size k, the stream carries
 ``[BOS, s1..sm]``. The window for target s_i is the last k tokens before it,
-left-padded with BOS: window 1 is all-BOS, and only from window k+1 onwards is
-the context fully real tokens.
+left-padded with BOS: the first window is all-BOS, and only from window k+1
+onwards is the context fully real tokens. BOS is never a target, which is what
+lets generation treat a sampled BOS as "stop".
 """
 
 from __future__ import annotations
 
-import re
-from collections.abc import Iterable
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
-from .tokenizer import BOS_ID, Tokenizer
-
-# Split after terminal punctuation followed by whitespace ("What?! No." keeps
-# "?!" together). Newlines are hard breaks; lines without terminal punctuation
-# are sentences of their own. Known limitation for teaching corpora:
-# abbreviations such as "Mr." split.
-_TERMINATOR = re.compile(r"(?<=[.!?…])\s+")
-
-
-def split_sentences(text: str) -> list[str]:
-    """Split a document into sentences; a newline is a hard break."""
-    out: list[str] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        for part in _TERMINATOR.split(line):
-            part = part.strip()
-            if part:
-                out.append(part)
-    return out
+from .tokenizer import BOS_ID
 
 
 @dataclass
@@ -98,44 +82,47 @@ class Windows:
         return gather(order[n_val:]), gather(order[:n_val])
 
 
-def make_windows(
-    tokenizer: Tokenizer,
-    texts: Iterable[str],
-    context_size: int,
-) -> Windows:
-    """Tokenize documents and build all next-token windows.
+def make_windows(stream: Sequence[int], context_size: int) -> Windows:
+    """Build all next-token windows of a BOS-marked token stream.
 
-    Sentences are split internally (:func:`split_sentences`); windows never
-    span sentences. Empty sentences (no tokens after tokenization) are skipped
-    and contribute no windows.
+    The stream is split on ``BOS_ID``; each piece is one sentence and is
+    windowed independently, with BOS as the left pad. Every window of every
+    sentence is known in advance - ``len(stream)`` minus one per sentence - so
+    the result is preallocated.
+
+    A stream that does not start with BOS, or that has two BOS in a row, is
+    rejected: it can only come from something that did not encode a document.
     """
     if int(context_size) < 1:
         raise ValueError("context_size must be >= 1")
     context_size = int(context_size)
 
-    contexts: list[list[int]] = []
-    targets: list[int] = []
-    sentence_lengths: list[int] = []
+    ids = np.asarray(stream, dtype=np.int32)
+    starts = np.flatnonzero(ids == BOS_ID)
+    if len(starts) == 0 or starts[0] != 0:
+        raise ValueError(
+            "stream must start with <bos>: BOS marks every sentence start, "
+            "so this only accepts a stream from Tokenizer.encode"
+        )
+    ends = np.append(starts[1:], len(ids))
+    lengths = ends - starts - 1
+    if (lengths < 1).any():
+        raise ValueError("stream has an empty sentence (two <bos> in a row)")
 
-    for text in texts:
-        for sentence in split_sentences(text):
-            ids = tokenizer.encode(sentence)
-            if not ids:
-                continue
-            seq = [BOS_ID, *ids]
-            for i in range(1, len(seq)):
-                lo = max(0, i - context_size)
-                window = [BOS_ID] * (context_size - (i - lo)) + seq[lo:i]
-                contexts.append(window)
-                targets.append(seq[i])
-            sentence_lengths.append(len(ids))
-
-    if not sentence_lengths:
-        raise ValueError("no windows built: corpus has no non-empty sentences")
+    contexts = np.full((len(ids) - len(starts), context_size), BOS_ID, dtype=np.int32)
+    targets = np.empty(len(contexts), dtype=np.int32)
+    row = 0
+    for start, end in zip(starts, ends, strict=True):
+        sentence = ids[start:end]  # begins with BOS by construction
+        for i in range(1, len(sentence)):
+            lo = max(0, i - context_size)
+            contexts[row, context_size - (i - lo) :] = sentence[lo:i]
+            targets[row] = sentence[i]
+            row += 1
 
     return Windows(
-        contexts=np.asarray(contexts, dtype=np.int32),
-        targets=np.asarray(targets, dtype=np.int32),
+        contexts=contexts,
+        targets=targets,
         context_size=context_size,
-        sentence_lengths=tuple(sentence_lengths),
+        sentence_lengths=tuple(int(v) for v in lengths),
     )

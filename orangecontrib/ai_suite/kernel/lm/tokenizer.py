@@ -12,8 +12,8 @@ Two concrete levels, each with its own segmentation and its own ``decode``
 (they are different algorithms, not one algorithm with a flag):
 
 - :class:`CharTokenizer` - every character is a token (spaces included - word
-  boundaries matter at char level); ``decode`` is concatenation and round-trips
-  exactly.
+  boundaries matter at char level); ``decode`` concatenates, rendering the
+  sentence separator as one space.
 - :class:`WordTokenizer` - dependency-free regex tokens: words with internal
   apostrophes ("don't", Shakespeare's "o'er", both quote styles) plus every
   non-word non-space character as its own token. Whitespace is dropped, case is
@@ -37,9 +37,14 @@ order.
 
 Special tokens (ids fixed across levels)
 ----------------------------------------
-- id 0 = ``<bos>``: sentence-start marker, and the context-window pad, so
-  early positions with short context are trainable. Windowing places it; the
-  tokenizer only owns the mapping. Never a pruning casualty.
+- id 0 = ``<bos>``: sentence-start marker, emitted by :meth:`Tokenizer.encode`
+  before every sentence, and the context-window pad, so early positions with
+  short context are trainable. Because the marker travels in the stream, the
+  token domain is self-describing: ``[BOS, s1..sm, BOS, t1..tn]`` carries its
+  own sentence structure and nothing downstream needs the text again. It is
+  also indistinguishable from padding by design - both mean "nothing came
+  before". Never a pruning casualty, and never a target: ``encode`` only puts
+  it at sentence starts, and windowing never predicts index 0 of a sentence.
 - id 1 = ``<unk>``: out-of-vocabulary input (unknown words at word level,
   unknown characters at char level, or tokens removed by pruning).
 
@@ -57,6 +62,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 from typing import ClassVar
+
+from ..text import split_sentences
 
 BOS = "<bos>"
 UNK = "<unk>"
@@ -231,10 +238,38 @@ class Tokenizer(ABC):
         )
 
     # ---- encoding / decoding ----------------------------------------------
+    #
+    # encode() is the single text -> token transition, and it emits sentence
+    # structure as data: a BOS before every sentence. After it the stream is
+    # self-describing - no caller needs the text, and none needs a parallel
+    # list of sentence lengths.
 
     def encode(self, text: str) -> list[int]:
-        """Text -> token ids; out-of-vocabulary items map to ``<unk>``."""
-        return [self._token_to_id.get(t, UNK_ID) for t in self.segment(text)]
+        """Text -> a token-id stream with a BOS before every sentence.
+
+        Sentence boundaries are detected on the raw text
+        (:func:`~orangecontrib.ai_suite.kernel.text.split_sentences`), because
+        tokenization discards the whitespace those rules depend on. A leading
+        BOS appears even for a single sentence, so a stream always starts with
+        one; ``decode`` drops BOS, so ``decode(encode(t))`` still round-trips.
+        Out-of-vocabulary items map to ``<unk>``.
+        """
+        stream: list[int] = []
+        for sentence in split_sentences(text):
+            ids = [self._token_to_id.get(t, UNK_ID) for t in self.segment(sentence)]
+            if ids:
+                stream.append(BOS_ID)
+                stream.extend(ids)
+        return stream
+
+    def encode_corpus(self, texts: Iterable[str]) -> list[int]:
+        """Documents -> one marked stream, in corpus order.
+
+        Concatenating *encoded* documents (not the texts) is what stops the
+        last sentence of one document running into the first of the next:
+        every sentence carries its own leading BOS.
+        """
+        return [i for text in texts for i in self.encode(text)]
 
     @classmethod
     @abstractmethod
@@ -338,7 +373,20 @@ class CharTokenizer(Tokenizer):
         return list(text)
 
     def decode(self, ids: Sequence[int]) -> str:
-        return "".join(self.tokens[i] for i in map(int, ids) if i != BOS_ID)
+        """Token ids -> text.
+
+        Concatenation, so within a sentence this round-trips exactly. A
+        non-leading BOS renders as one space: the sentence separator is not a
+        token, so a newline or a run of spaces comes back as a single space.
+        """
+        pieces: list[str] = []
+        for i in map(int, ids):
+            if i == BOS_ID:
+                if pieces:
+                    pieces.append(" ")
+            else:
+                pieces.append(self.tokens[i])
+        return "".join(pieces)
 
 
 class WordTokenizer(Tokenizer):
