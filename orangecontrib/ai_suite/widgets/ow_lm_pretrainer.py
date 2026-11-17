@@ -21,10 +21,12 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
-from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text, tokenizer_levels
+from orangecontrib.ai_suite.kernel.lm import ARCHITECTURES, tokenizer_from_text, tokenizer_levels
 
-ARCHITECTURE_LABELS = ["Bigram", "MLP-over-window", "LSTM"]
-ARCHITECTURE_VALUES = ["bigram", "mlp_window", "lstm"]
+# Architecture names and labels come from the kernel registry, so neither
+# dropdown can drift from the classes it offers.
+ARCHITECTURE_VALUES = list(ARCHITECTURES)
+ARCHITECTURE_LABELS = [cls.label for cls in ARCHITECTURES.values()]
 # Level identifiers come from the kernel, so the dropdown cannot drift from the
 # classes; only the short label formatting is decided here.
 LEVELS = tokenizer_levels()
@@ -39,10 +41,11 @@ class TrainingWorker(QThread):
     finished_ok = pyqtSignal(object)
     failed = pyqtSignal(str)
 
-    def __init__(self, text, tokenizer, options, parent=None):
+    def __init__(self, text, tokenizer, architecture, options, parent=None):
         super().__init__(parent)
         self.text = text
         self.tokenizer = tokenizer
+        self.architecture = architecture
         self.options = options
         self.request_stop = False
 
@@ -53,12 +56,8 @@ class TrainingWorker(QThread):
             model = train_language_model(
                 self.tokenizer,
                 self.text,
-                self.options["architecture"],
+                self.architecture,
                 context_size=self.options["context_size"],
-                embedding_dim=self.options["embedding_dim"],
-                hidden_units=self.options["hidden_units"],
-                lstm_units=self.options["lstm_units"],
-                lstm_layers=self.options["lstm_layers"],
                 epochs=self.options["epochs"],
                 batch_size=self.options["batch_size"],
                 validation_fraction=self.options["validation_fraction"],
@@ -205,15 +204,27 @@ class OWLMPretrainer(OWWidget):
 
     # ---- lifecycle ---------------------------------------------------------
 
-    def _collect_options(self) -> dict:
-        return {
-            "architecture": ARCHITECTURE_VALUES[self.architecture_index],
-            "tokenizer_level": LEVEL_VALUES[self.tokenizer_level_index],
-            "context_size": self.context_size,
+    def _architecture(self):
+        """The selected model, given the hyperparameters it declares.
+
+        The spin boxes exist for every architecture; ``get_params`` is what says
+        which of them actually belong to the one selected, so an MLP is never
+        handed ``lstm_units``. Trimming the controls per architecture is a
+        widget job for later - this keeps the kernel from accepting the noise.
+        """
+        cls = ARCHITECTURES[ARCHITECTURE_VALUES[self.architecture_index]]
+        values = {
             "embedding_dim": self.embedding_dim,
             "hidden_units": self.hidden_units,
-            "lstm_units": self.lstm_units,
-            "lstm_layers": self.lstm_layers_index + 1,
+            "units": self.lstm_units,
+            "layers": self.lstm_layers_index + 1,
+        }
+        return cls(**{k: v for k, v in values.items() if k in cls().get_params()})
+
+    def _collect_options(self) -> dict:
+        return {
+            "tokenizer_level": LEVEL_VALUES[self.tokenizer_level_index],
+            "context_size": self.context_size,
             "epochs": self.epochs,
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,
@@ -241,11 +252,12 @@ class OWLMPretrainer(OWWidget):
         self.status_label.setText("")
 
         options = self._collect_options()
+        architecture = self._architecture()
         tokenizer = tokenizer_from_text(self.text, options.pop("tokenizer_level"))
         max_vocab = options.pop("max_vocab")
         if max_vocab:
             tokenizer = tokenizer.keep_top(max_vocab)  # real tokens, specials always kept
-        worker = TrainingWorker(self.text, tokenizer, options)
+        worker = TrainingWorker(self.text, tokenizer, architecture, options)
         worker.epoch_signal.connect(self._on_epoch)
         worker.finished_ok.connect(self._on_done)
         worker.failed.connect(self._on_failed)

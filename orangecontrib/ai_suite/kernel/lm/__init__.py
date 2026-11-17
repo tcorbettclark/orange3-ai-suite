@@ -1,11 +1,14 @@
-"""Language-model kernel: tokenizers (with their statistics), windowing and
-the Keras model ladder.
+"""Language-model kernel: tokenizers (with their statistics), windowing, and the
+from-scratch Keras models with their training entry point.
 
-The Keras-dependent names (builders, training, ``LanguageModel``) resolve
-lazily, so importing the tokenizer never pulls in TensorFlow. That keeps the
-widget layer's optional ``[lm]`` extra genuinely optional.
+Nothing here imports TensorFlow at module import: Keras is imported inside the
+functions that build or run a graph, so the widget layer can import the kernel -
+and describe an architecture, its parameters and a vocabulary - without the
+optional ``[lm]`` extra. Only running training needs it.
 """
 
+from .builders import ARCHITECTURES, LSTM, Bigram, MLPWindow, compile_model
+from .models import LanguageModel
 from .tokenizer import (
     BOS,
     BOS_ID,
@@ -20,26 +23,8 @@ from .tokenizer import (
     tokenizer_from_text,
     tokenizer_levels,
 )
+from .training import train_language_model
 from .windowing import Windows, make_windows
-
-# Keras-dependent names resolve lazily (PEP 562).
-_KERAS_NAMES = {
-    "ARCHITECTURES": "builders",
-    "build_model": "builders",
-    "compile_model": "builders",
-    "LanguageModel": "models",
-    "train_language_model": "training",
-}
-
-
-def __getattr__(name: str):
-    module = _KERAS_NAMES.get(name)
-    if module is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-
-    return getattr(importlib.import_module(f".{module}", __name__), name)
-
 
 __all__ = [
     "ARCHITECTURES",
@@ -47,14 +32,16 @@ __all__ = [
     "BOS_ID",
     "EOS",
     "EOS_ID",
+    "LSTM",
     "UNK",
     "UNK_ID",
+    "Bigram",
     "CharTokenizer",
     "LanguageModel",
+    "MLPWindow",
     "Tokenizer",
     "Windows",
     "WordTokenizer",
-    "build_model",
     "compile_model",
     "make_windows",
     "tokenizer_from_dict",

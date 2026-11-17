@@ -21,7 +21,7 @@ from orangecontrib.ai_suite.kernel.lm import (
     tokenizer_from_text,
     train_language_model,
 )
-from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, build_model
+from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, LSTM, Bigram, MLPWindow
 from orangecontrib.ai_suite.kernel.lm.models import _sample
 
 CORPUS = "the cat sat on the mat. the cat saw the dog. a dog and a cat ran."
@@ -37,10 +37,8 @@ def mlp_model(tokenizer):
     return train_language_model(
         tokenizer,
         CORPUS,
-        "mlp_window",
+        MLPWindow(embedding_dim=8, hidden_units=16),
         context_size=8,
-        embedding_dim=8,
-        hidden_units=16,
         epochs=30,
         batch_size=32,
         seed=0,
@@ -50,38 +48,46 @@ def mlp_model(tokenizer):
 # ---- builders ------------------------------------------------------------
 
 
-def test_builder_forward_shape(tokenizer):
-    for architecture in ARCHITECTURES:
-        model = build_model(
-            architecture,
-            vocab_size=tokenizer.vocab_size,
-            context_size=8,
-            embedding_dim=8,
-            hidden_units=16,
-            lstm_units=16,
-            seed=0,
-        )
-        # bigram consumes a single token id (context of 1)
-        x = np.zeros((2, 1) if architecture == "bigram" else (2, 8), dtype=np.int32)
-        assert tuple(model(x).shape) == (2, tokenizer.vocab_size)
+def test_forward_shape_through_take(tokenizer):
+    for cls in ARCHITECTURES.values():
+        architecture = cls()
+        graph = architecture.build(vocab_size=tokenizer.vocab_size, context_size=8, seed=0)
+        # Feeding what `take` yields is the contract every caller relies on.
+        x = architecture.take(np.zeros((2, 8), dtype=np.int32))
+        assert x.shape[1] == (1 if cls is Bigram else 8)
+        assert tuple(graph(x).shape) == (2, tokenizer.vocab_size)
 
 
 def test_bigram_parameter_count_is_the_count_table(tokenizer):
-    model = build_model("bigram", vocab_size=tokenizer.vocab_size, context_size=1, seed=0)
+    model = Bigram().build(vocab_size=tokenizer.vocab_size, context_size=1, seed=0)
     assert model.count_params() == tokenizer.vocab_size**2  # Flatten adds none
 
 
+def test_architectures_declare_only_their_own_parameters():
+    # The point of one estimator per model: nothing to ignore.
+    assert Bigram().get_params() == {}
+    assert MLPWindow().get_params() == {"embedding_dim": 32, "hidden_units": 128}
+    assert LSTM().get_params() == {"embedding_dim": 32, "units": 256, "layers": 1}
+    assert list(ARCHITECTURES) == ["bigram", "mlp_window", "lstm"]
+
+
+def test_architectures_are_cloneable_estimators():
+    from sklearn.base import clone
+
+    config = MLPWindow(embedding_dim=8, hidden_units=16)
+    assert clone(config).get_params() == config.get_params()
+    assert config.set_params(hidden_units=64).hidden_units == 64
+
+
 def test_builder_error_paths(tokenizer):
-    with pytest.raises(ValueError, match="architecture"):
-        build_model("tiny_gpt", vocab_size=10, context_size=2)
     with pytest.raises(ValueError, match="vocab_size"):
-        build_model("mlp_window", vocab_size=2, context_size=2)
+        MLPWindow().build(vocab_size=2, context_size=2)
     with pytest.raises(ValueError, match="context_size"):
-        build_model("mlp_window", vocab_size=10, context_size=0)
-    with pytest.raises(ValueError, match="lstm_layers"):
-        build_model("lstm", vocab_size=10, context_size=2, lstm_layers=3)
-    for arch in ("mlp_window", "lstm"):
-        build_model(arch, vocab_size=10, context_size=2)  # constructs fine
+        MLPWindow().build(vocab_size=10, context_size=0)
+    with pytest.raises(ValueError, match="layers"):
+        LSTM(layers=3).build(vocab_size=10, context_size=2)
+    for cls in (MLPWindow, LSTM):
+        cls().build(vocab_size=10, context_size=2)  # constructs fine
 
 
 # ---- training ------------------------------------------------------------
@@ -96,10 +102,8 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
     model = train_language_model(
         tokenizer,
         CORPUS,
-        "mlp_window",
+        MLPWindow(embedding_dim=8, hidden_units=16),
         context_size=8,
-        embedding_dim=8,
-        hidden_units=16,
         epochs=12,
         batch_size=32,
         seed=0,
@@ -130,10 +134,8 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
     model = train_language_model(
         tokenizer,
         CORPUS,
-        "mlp_window",
+        MLPWindow(embedding_dim=8, hidden_units=16),
         context_size=8,
-        embedding_dim=8,
-        hidden_units=16,
         epochs=50,
         batch_size=32,
         seed=0,
@@ -147,17 +149,17 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
 def test_train_validation_split_is_mandatory():
     with pytest.raises(ValueError, match="validation_fraction"):
         train_language_model(
-            tokenizer_from_text(CORPUS, "char"), CORPUS, "mlp_window", validation_fraction=0.0
+            tokenizer_from_text(CORPUS, "char"), CORPUS, MLPWindow(), validation_fraction=0.0
         )
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
         train_language_model(
             tokenizer_from_text("one sentence only.", "char"),
             "one sentence only.",
-            "mlp_window",
+            MLPWindow(),
         )
     with pytest.raises(ValueError, match="epochs"):
-        train_language_model(tokenizer_from_text(CORPUS, "char"), CORPUS, "mlp_window", epochs=0)
+        train_language_model(tokenizer_from_text(CORPUS, "char"), CORPUS, MLPWindow(), epochs=0)
 
 
 # ---- sampling ------------------------------------------------------------
@@ -195,7 +197,7 @@ def test_long_prompt_uses_last_window(mlp_model):
 def test_word_level_generate_smoke():
     tok = tokenizer_from_text(CORPUS, "word")
     model = train_language_model(
-        tok, CORPUS, "bigram", context_size=1, epochs=8, batch_size=16, seed=0
+        tok, CORPUS, Bigram(), context_size=1, epochs=8, batch_size=16, seed=0
     )
     out = model.generate("the", temperature=0, max_new_tokens=6)
     assert out.startswith("the")
@@ -247,10 +249,8 @@ def test_stop_requested_works_without_epoch_hook(tokenizer):
     model = train_language_model(
         tokenizer,
         CORPUS,
-        "mlp_window",
+        MLPWindow(embedding_dim=8, hidden_units=16),
         context_size=8,
-        embedding_dim=8,
-        hidden_units=16,
         epochs=5,
         batch_size=32,
         stop_requested=lambda: True,

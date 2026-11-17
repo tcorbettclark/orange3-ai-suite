@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 
-from .builders import ARCHITECTURES, build_model, compile_model
+from .builders import Architecture, compile_model
 from .models import LanguageModel
 from .tokenizer import Tokenizer
 from .windowing import make_windows
@@ -22,12 +22,9 @@ EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity[, sample
 def train_language_model(
     tokenizer: Tokenizer,
     text: str,
-    architecture: str,
+    architecture: Architecture,
+    *,
     context_size: int = 16,
-    embedding_dim: int = 32,
-    hidden_units: int = 128,
-    lstm_units: int = 256,
-    lstm_layers: int = 1,
     epochs: int = 15,
     batch_size: int = 256,
     validation_fraction: float = 0.1,
@@ -49,8 +46,6 @@ def train_language_model(
     ``"sample"`` - text generated from ``sample_prompt`` with the in-training
     model at each epoch (a per-epoch snapshot of current behaviour).
     """
-    if architecture not in ARCHITECTURES:
-        raise ValueError(f"architecture must be one of {ARCHITECTURES}, got {architecture!r}")
     if epochs < 1:
         raise ValueError("epochs must be >= 1")
     if not 0.0 < validation_fraction < 1.0:
@@ -60,16 +55,7 @@ def train_language_model(
     train, val = windows.split(validation_fraction, seed=seed)
 
     keras_model = compile_model(
-        build_model(
-            architecture,
-            vocab_size=tokenizer.vocab_size,
-            context_size=context_size,
-            embedding_dim=embedding_dim,
-            hidden_units=hidden_units,
-            lstm_units=lstm_units,
-            lstm_layers=lstm_layers,
-            seed=seed,
-        ),
+        architecture.build(vocab_size=tokenizer.vocab_size, context_size=context_size, seed=seed),
         learning_rate=learning_rate,
     )
 
@@ -103,15 +89,10 @@ def train_language_model(
 
         callbacks.append(_EpochCallback())
 
-    # Bigram honours "context of 1": only the last token of a window enters
-    # the model (builders.py documents this).
-    def model_input(win):
-        return win.contexts[:, -1:] if architecture == "bigram" else win.contexts
-
     history = keras_model.fit(
-        model_input(train),
+        architecture.take(train.contexts),
         train.targets,
-        validation_data=(model_input(val), val.targets),
+        validation_data=(architecture.take(val.contexts), val.targets),
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
@@ -124,12 +105,9 @@ def train_language_model(
         context_size=context_size,
         keras_model=keras_model,
         hyperparameters={
-            "architecture": architecture,
+            "architecture": architecture.name,
+            "architecture_params": architecture.get_params(),
             "context_size": context_size,
-            "embedding_dim": embedding_dim,
-            "hidden_units": hidden_units,
-            "lstm_units": lstm_units,
-            "lstm_layers": lstm_layers,
             "epochs": epochs,
             "batch_size": batch_size,
             "validation_fraction": validation_fraction,

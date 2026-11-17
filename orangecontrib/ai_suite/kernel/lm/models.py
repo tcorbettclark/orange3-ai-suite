@@ -12,12 +12,15 @@ import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict
 from .windowing import make_windows
+
+if TYPE_CHECKING:  # a builders import would pull Keras in at module import
+    from .builders import Architecture
 
 _META_FILE = "meta.json"
 _MODEL_FILE = "model.keras"
@@ -58,7 +61,7 @@ class LanguageModel:
     - the same interface the MLX/LoRA models expose.
     """
 
-    architecture: str
+    architecture: Architecture
     tokenizer: Tokenizer
     context_size: int
     keras_model: Any  # keras.Model, typed loosely to keep the kernel import-light
@@ -93,10 +96,8 @@ class LanguageModel:
         context = [BOS_ID] * (self.context_size - len(tail)) + tail
         generated: list[int] = []
         for _ in range(max_new_tokens):
-            window = context[-1:] if self.architecture == "bigram" else context
-            logits = self.keras_model(np.asarray([window], dtype=np.int32), training=False).numpy()[
-                0
-            ]
+            window = self.architecture.take(np.asarray([context], dtype=np.int32))
+            logits = self.keras_model(window, training=False).numpy()[0]
             next_id = _sample(logits, temperature, rng)
             if next_id == EOS_ID:
                 break
@@ -114,10 +115,13 @@ class LanguageModel:
         the domain it was trained on.
         """
         windows = make_windows(self.tokenizer.encode(text), self.context_size)
-        # bigram consumes only the last token of a window (builders.py)
-        x = windows.contexts[:, -1:] if self.architecture == "bigram" else windows.contexts
         loss = float(
-            self.keras_model.evaluate(x, windows.targets, batch_size=batch_size, verbose=0)
+            self.keras_model.evaluate(
+                self.architecture.take(windows.contexts),
+                windows.targets,
+                batch_size=batch_size,
+                verbose=0,
+            )
         )
         return {"loss": loss, "perplexity": math.exp(loss)}
 
@@ -130,7 +134,10 @@ class LanguageModel:
         out = Path(path)
         out.mkdir(parents=True, exist_ok=True)
         meta = {
-            "architecture": self.architecture,
+            "architecture": {
+                "name": self.architecture.name,
+                "params": self.architecture.get_params(),
+            },
             "context_size": self.context_size,
             "hyperparameters": self.hyperparameters,
             "tokenizer": self.tokenizer.to_dict(),
@@ -146,9 +153,11 @@ class LanguageModel:
 
         src = Path(path)
         meta = json.loads((src / _META_FILE).read_text())
+        from .builders import architecture_from_metadata  # local: pulls in Keras
+
         tokenizer = tokenizer_from_dict(meta["tokenizer"])
         return cls(
-            architecture=meta["architecture"],
+            architecture=architecture_from_metadata(meta["architecture"]),
             tokenizer=tokenizer,
             context_size=meta["context_size"],
             keras_model=keras.models.load_model(src / _MODEL_FILE),

@@ -92,7 +92,7 @@ def test_stop_button_sets_flag(qapp, text_table):
     w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
-    w.worker = TrainingWorker([], None, {})
+    w.worker = TrainingWorker([], None, None, {})
     w.stop_training()
     assert w.worker.request_stop is True
 

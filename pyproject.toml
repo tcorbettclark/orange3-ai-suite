@@ -36,6 +36,9 @@ image = [
 lm = [
     "keras>=3.10.0",
     "tf-keras>=2.19.0",
+    # the architectures are sklearn estimators (get_params/set_params/clone);
+    # Orange already depends on scikit-learn, so this costs nothing in the app.
+    "scikit-learn>=1.4",
 ]
 lora = [
     # Apple-silicon-only: mlx is not portable.
