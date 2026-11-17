@@ -8,19 +8,15 @@ within tolerance. A feature whose category flips on a 5-pixel shift is noise.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, extract_features
+from orangecontrib.ai_suite.kernel.features import (
+    FeatureOptions,
+    all_count_feature_names,
+    extract_features,
+)
 from synth import cloud_image, crop_shift, digit8_image, ring_image, shift_image
 
-COUNT_FEATURES = frozenset(
-    {
-        "row_profile_peaks",
-        "column_profile_peaks",
-        "diagonal_profile_peaks",
-        "anti_diagonal_profile_peaks",
-        "median_upcrossing_count",
-        "hole_count",
-    }
-)
+# Count features are flagged on the feature class; a new one cannot be forgotten here.
+COUNT_FEATURES = frozenset(all_count_feature_names())
 TOL_CONTINUOUS = 0.05  # relative to max(1, |value|)
 TOL_NOISY = 0.20  # additive noise genuinely adds fine texture; looser bar
 

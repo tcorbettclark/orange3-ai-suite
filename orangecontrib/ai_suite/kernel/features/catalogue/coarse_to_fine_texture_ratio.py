@@ -1,0 +1,27 @@
+"""Where the texture lives: coarse as a fraction of total.
+
+The bounded form ``coarse / (coarse + fine)`` is used instead of
+``coarse / fine``, which divides two small numbers and is ill-conditioned
+exactly when images are smooth. 0.5 is scale-neutral; puffy cumulus scores high
+and wispy cirrus low, which is why this carries so much cloud signal.
+"""
+
+import numpy as np
+
+from .._primitives import block_mean_variance, local_std_mean
+from .._stats import EPS
+from ..feature import Feature, FeatureOptions
+
+
+class CoarseToFineTextureRatio(Feature):
+    name = "coarse_to_fine_texture_ratio"
+    definition = (
+        "Where the texture lives: coarse texture as a fraction of total "
+        "texture (coarse/(coarse+fine), [0,1], 0.5 = scale-neutral); puffy "
+        "cumulus scores high, wispy cirrus low."
+    )
+
+    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
+        coarse = block_mean_variance(img)
+        fine = local_std_mean(img)
+        return coarse / (coarse + fine + EPS)

@@ -1,14 +1,20 @@
-"""Group G - colour: shortcut features, default off."""
+"""Colour features - the opt-in shortcut, off by default."""
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, colour, extract_features
+from orangecontrib.ai_suite.kernel.features import (
+    FeatureOptions,
+    extract_features,
+    features_of_group,
+    get_feature,
+)
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("G")
 
 
 def _compute(img):
-    return colour.compute(img, OPTS)
+    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
 
 
 def sky_photo(size=64):
@@ -38,7 +44,7 @@ def test_bluish_fraction_separates_sky_from_ground():
 
 
 def test_shortcuts_are_documented():
-    definition = colour.DEFINITIONS["bluish_fraction"].lower()
+    definition = get_feature("bluish_fraction").definition.lower()
     assert "shortcut" in definition  # the lesson is part of the data
 
 

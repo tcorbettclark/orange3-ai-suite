@@ -3,14 +3,15 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, symmetry
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
 from synth import band_image, ring_image, uniform_image
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("F")
 
 
 def _compute(img):
-    return symmetry.compute(img, OPTS)
+    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
 
 
 def test_mirror_symmetric_images():

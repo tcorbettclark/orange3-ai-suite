@@ -1,7 +1,7 @@
 """Preprocessing: luminance, centre crop, resize, denoise, contrast normalise.
 
 Features are computed on a float32 luminance image in [0, 1]. Colour is dropped
-deliberately: colour statistics belong to the opt-in shortcut group G, not to
+deliberately: colour statistics belong to the opt-in colour features, not to
 the default feature set.
 
 Pipeline order: luminance -> centre crop -> resize -> denoise ->
@@ -14,13 +14,17 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from ._stats import EPS
 from .options import FeatureOptions
-
-_EPS = 1e-12
 
 # ITU-R BT.601 luma weights, RGB channel order. Callers must convert OpenCV's
 # BGR first - the kernel never guesses channel order.
 _LUMA = (0.299, 0.587, 0.114)
+
+
+def _drop_alpha(img: np.ndarray) -> np.ndarray:
+    """Drop a fourth (alpha) channel if there is one."""
+    return img[..., :3] if img.ndim == 3 and img.shape[-1] == 4 else img
 
 
 def to_luminance(image: np.ndarray) -> np.ndarray:
@@ -36,8 +40,7 @@ def to_luminance(image: np.ndarray) -> np.ndarray:
         return img.astype(np.float32)
     if img.ndim != 3:
         raise ValueError(f"expected a 2-D or 3-D image, got shape {img.shape}")
-    if img.shape[-1] == 4:
-        img = img[..., :3]
+    img = _drop_alpha(img)
     if img.shape[-1] != 3:
         raise ValueError(
             f"expected 1, 3 or 4 channels, got {img.shape[-1]} - pass RGB "
@@ -58,6 +61,16 @@ def _centre_crop_to_square(img: np.ndarray) -> np.ndarray:
     return img[y0 : y0 + side, x0 : x0 + side]
 
 
+def _geometry(img: np.ndarray, options: FeatureOptions) -> np.ndarray:
+    """The geometric half of both pipelines: centre-crop, then resize."""
+    if options.centre_crop:
+        img = _centre_crop_to_square(img)
+    size = options.working_size
+    if size is not None and img.shape != (size,) * 2:
+        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
+    return img
+
+
 def _contrast_normalise(img: np.ndarray) -> np.ndarray:
     """Clip to the image's own [p1, p99] and scale to [0, 1].
 
@@ -66,7 +79,7 @@ def _contrast_normalise(img: np.ndarray) -> np.ndarray:
     features behave consistently.
     """
     lo, hi = np.percentile(img, 1), np.percentile(img, 99)
-    if hi - lo < _EPS:
+    if hi - lo < EPS:
         return np.zeros_like(img)
     return np.clip((img - lo) / (hi - lo), 0.0, 1.0).astype(np.float32)
 
@@ -80,33 +93,15 @@ def preprocess_colour(image: np.ndarray, options: FeatureOptions) -> np.ndarray:
     """
     img = np.asarray(image)
     if img.ndim == 3:
-        if img.shape[-1] == 4:
-            img = img[..., :3]
-        img = img.astype(np.float64)
+        img = _drop_alpha(img).astype(np.float64)
         if img.max() > 1.0:
             img = img / 255.0
-    if options.centre_crop:
-        img = _centre_crop_to_square(img)
-    if options.working_size is not None and img.shape != (options.working_size,) * 2:
-        img = cv2.resize(
-            img,
-            (options.working_size, options.working_size),
-            interpolation=cv2.INTER_AREA,
-        )
-    return np.ascontiguousarray(img, dtype=np.float32)
+    return np.ascontiguousarray(_geometry(img, options), dtype=np.float32)
 
 
 def preprocess(image: np.ndarray, options: FeatureOptions) -> np.ndarray:
     """Run the full preprocessing pipeline; returns float32 in [0, 1]."""
-    img = to_luminance(image)
-    if options.centre_crop:
-        img = _centre_crop_to_square(img)
-    if options.working_size is not None and img.shape != (options.working_size,) * 2:
-        img = cv2.resize(
-            img,
-            (options.working_size, options.working_size),
-            interpolation=cv2.INTER_AREA,
-        )
+    img = _geometry(to_luminance(image), options)
     if options.denoise:
         k = max(3, min(int(options.denoise_ksize), 5))
         if k % 2 == 0:

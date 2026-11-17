@@ -1,0 +1,21 @@
+"""Do the horizontal and vertical structures agree?
+
+Lumpy images correlate high, streaky images low. A flat profile carries no
+structure to agree or disagree about, so it returns 0.0 rather than a NaN.
+"""
+
+import numpy as np
+
+from .._stats import safe_corr
+from ..feature import Feature, FeatureOptions
+
+
+class ProfileRowColumnCorrelation(Feature):
+    name = "profile_row_column_correlation"
+    definition = (
+        "Do horizontal and vertical structures agree? Correlation of the row- "
+        "and column-mean profiles; 0.0 when either is flat (lumpy vs. streaky)."
+    )
+
+    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
+        return safe_corr(img.mean(axis=1), img.mean(axis=0), flat_policy="zero")

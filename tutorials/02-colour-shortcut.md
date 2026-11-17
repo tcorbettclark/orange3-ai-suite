@@ -53,13 +53,13 @@ signatures. This is the honest difficulty of hand-crafted features.
 
 ## 3. Switch on the shortcut
 
-Tick **G: colour**. The output grows from 36 to 40 columns.
+Tick **G: colour**. The output grows from 34 to 38 columns.
 
 Look at the new features in **Data Table**:
 
 - `bluish_fraction` - fraction of pixels bluer than red;
-- `blueness_mean` - overall blue-red balance;
-- `saturation_mean` - colourfulness;
+- `mean_blueness` - overall blue-red balance;
+- `mean_saturation` - colourfulness;
 - `greenery_fraction` - ground clutter.
 
 Run **Test & Score** again. Accuracy usually rises. The model has found a

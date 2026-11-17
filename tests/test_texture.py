@@ -2,14 +2,15 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, texture
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
 from synth import cloud_image, uniform_image
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("D")
 
 
 def _compute(img):
-    return texture.compute(img, OPTS)
+    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
 
 
 def test_flat_image_all_zero():

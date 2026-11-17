@@ -2,14 +2,15 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, photometry
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
 from synth import uniform_image
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("A")
 
 
 def _compute(img):
-    return photometry.compute(img, OPTS)
+    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
 
 
 def test_symmetric_distribution_has_zero_skew():

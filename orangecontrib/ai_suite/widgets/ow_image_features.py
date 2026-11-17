@@ -38,35 +38,14 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import image_paths
+from orangecontrib.ai_suite.kernel import features
 
-GROUP_LABELS = (
-    ("A", "A: global photometry"),
-    ("B", "B: profile summaries"),
-    ("C", "C: spatial mass"),
-    ("D", "D: texture"),
-    ("E", "E: topology"),
-    ("F", "F: symmetry"),
-    ("G", "G: colour"),
+# Group letters, titles and help text come from the kernel assembly.
+GROUP_LABELS = tuple(
+    (group.letter, f"{group.letter}: {group.title}") for group in features.ASSEMBLIES
 )
-
-GROUP_HELP = {
-    "A": "Global photometry: brightness, contrast, skewness, kurtosis and "
-    "bright fraction. Little spatial information; useful as a baseline.",
-    "B": "Profile summaries: dense row, column and diagonal projections. "
-    "Trend, roughness, peak counts, centre of mass and median crossings.",
-    "C": "Spatial mass: where the bright matter sits, how wide or tall it is, "
-    "elongation and the radial gradient.",
-    "D": "Texture: gradient strength, edge density, fine and coarse texture, "
-    "and autocorrelation width. Carries most signal for cloud imagery.",
-    "E": "Topology: Otsu foreground, enclosed-background hole count and stroke "
-    "crossings. The classic digit features.",
-    "F": "Symmetry: left-right, top-bottom and quadrant self-similarity.",
-    "G": "Colour: bluish fraction, blueness, saturation and greenery. A "
-    "deliberate shortcut, off by default: colour alone can answer 'is there "
-    "sky?' without learning any spatial structure.",
-}
-
-_ALL_GROUPS = "ABCDEFG"
+GROUP_HELP = {group.letter: group.description for group in features.ASSEMBLIES}
+_ALL_GROUPS = "".join(features.GROUP_ORDER)
 _THUMBNAIL_SIZE = 48
 _GRID_ITEM_SIZE = QSize(66, 76)
 
@@ -84,7 +63,7 @@ class _ImageCache:
 
 @dataclass
 class _FeatureCache:
-    """Raw feature values for every group, in ``all_feature_names()`` order."""
+    """Raw feature values for every group, in ``features.all_feature_names()`` order."""
 
     names: tuple[str, ...]
     values: np.ndarray
@@ -134,8 +113,6 @@ class ImageExtractionWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.features import all_feature_names, extract_features
-
             image_cache = self._image_cache
             if image_cache is None:
                 images: list[np.ndarray] = []
@@ -163,7 +140,7 @@ class ImageExtractionWorker(QThread):
             else:
                 start = 0
 
-            names = all_feature_names()
+            names = features.all_feature_names()
             values = np.empty((len(image_cache.images), len(names)), dtype=np.float64)
             columns = {name: i for i, name in enumerate(names)}
 
@@ -171,7 +148,7 @@ class ImageExtractionWorker(QThread):
             for n, image in enumerate(image_cache.images):
                 if self._stop:
                     return
-                vec = extract_features(image, self._options, groups=_ALL_GROUPS)
+                vec = features.extract_features(image, self._options, groups=_ALL_GROUPS)
                 for name, value in vec.items():
                     values[n, columns[name]] = value
                 self.progress.emit(int(100 * (start + n + 1) / total))
@@ -303,7 +280,7 @@ class OWImageFeatures(OWWidget):
     centre_crop = Setting(True)
     contrast_normalise = Setting(True)
     denoise = Setting(False)
-    groups_enabled = Setting("ABCDEF")
+    groups_enabled = Setting(features.DEFAULT_GROUPS)
     selected_index = Setting(0)
 
     def __init__(self):
@@ -452,8 +429,6 @@ class OWImageFeatures(OWWidget):
     def _setup_feature_panel(self, panel):
         import pyqtgraph as pg
 
-        from orangecontrib.ai_suite.kernel.features import features_of_group
-
         self._panel_title = QLabel("No image selected.")
         title_font = self._panel_title.font()
         title_font.setBold(True)
@@ -482,7 +457,7 @@ class OWImageFeatures(OWWidget):
             group_item.setFont(0, group_font)
             self._feature_tree.addTopLevelItem(group_item)
             self._feature_groups[letter] = group_item
-            for feature in features_of_group(letter):
+            for feature in features.features_of_group(letter):
                 item = QTreeWidgetItem([feature.name, "—"])
                 item.setData(0, Qt.UserRole, feature.name)
                 item.setToolTip(0, feature.definition)
@@ -624,9 +599,7 @@ class OWImageFeatures(OWWidget):
             self._histogram_caption.setText("")
             self._clear_histogram()
             return
-        from orangecontrib.ai_suite.kernel.features import get_feature
-
-        self._feature_definition.setText(get_feature(name).definition)
+        self._feature_definition.setText(features.get_feature(name).definition)
         self._update_histogram(name)
 
     def _clear_histogram(self):
@@ -637,8 +610,6 @@ class OWImageFeatures(OWWidget):
 
     def _update_histogram(self, feature_name: str):
         import pyqtgraph as pg
-
-        from orangecontrib.ai_suite.kernel.features import get_feature
 
         plot = self._histogram.getPlotItem()
         self._clear_histogram()
@@ -717,7 +688,7 @@ class OWImageFeatures(OWWidget):
         caption = f"current: {_format_feature_value(current)}"
         if labels is not None:
             caption += " — bars by class"
-        if get_feature(feature_name).group not in self.groups_enabled:
+        if features.groups.group_of(feature_name) not in self.groups_enabled:
             caption += " — group off (not in output)"
         self._histogram_caption.setText(caption)
 
@@ -806,9 +777,7 @@ class OWImageFeatures(OWWidget):
                     self._on_thumbnails_loaded(generation, batch)
 
     def _feature_options(self):
-        from orangecontrib.ai_suite.kernel.features import FeatureOptions
-
-        return FeatureOptions(
+        return features.FeatureOptions(
             working_size=self.working_size,
             centre_crop=self.centre_crop,
             contrast_normalise=self.contrast_normalise,
@@ -977,8 +946,6 @@ class OWImageFeatures(OWWidget):
         self._send_selected()
 
     def _send_features(self):
-        from orangecontrib.ai_suite.kernel.features import group_names
-
         image_cache = self._image_cache
         feature_cache = self._feature_cache
         self.Warning.rows_skipped(
@@ -1002,7 +969,7 @@ class OWImageFeatures(OWWidget):
             name
             for letter, _ in GROUP_LABELS
             if letter in self.groups_enabled
-            for name in group_names(letter)
+            for name in features.group_names(letter)
         ]
         columns = {name: i for i, name in enumerate(feature_cache.names)}
         values = feature_cache.values[:, [columns[name] for name in ordered]]

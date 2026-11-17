@@ -2,14 +2,15 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, spatial
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
 from synth import ellipse_blob_image, ring_image, uniform_image
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("C")
 
 
 def _compute(img):
-    return spatial.compute(img, OPTS)
+    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
 
 
 def test_centre_of_mass_placement():

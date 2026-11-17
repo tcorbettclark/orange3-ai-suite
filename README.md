@@ -286,14 +286,17 @@ Experiments that the widgets make easy:
 
 ## Image feature groups
 
-All features are defined in the group modules and collected by
-`orangecontrib.ai_suite.kernel.features.registry`; each carries a
-human-auditable definition sentence.
+Each feature is a class in `orangecontrib.ai_suite.kernel.features.catalogue`,
+carrying its own name, definition sentence and computation. Groups are a
+lightweight assembly over that flat catalogue
+(`orangecontrib.ai_suite.kernel.features.groups`): membership lists used for
+ablation and display, so a feature can belong to more than one group and the
+grouping never touches the feature itself.
 
 | Group | Count | What it describes |
 |---|---|---|
 | A | 6 | Global photometry: brightness, contrast, skewness, kurtosis, bright fraction |
-| B | 12 | Row/column/diagonal profile summaries: trend, roughness, peaks, centre of mass, crossings |
+| B | 10 | Row/column/diagonal profile summaries: trend, roughness, peaks, crossings |
 | C | 6 | Spatial mass: centre of mass, spread, elongation, radial gradient |
 | D | 6 | Texture: gradient, edge density, fine/coarse texture, autocorrelation width |
 | E | 3 | Topology: hole count, foreground area, stroke crossings |
@@ -434,7 +437,9 @@ orangecontrib/
     __init__.py
     adapters.py Orange <-> kernel conversion
     kernel/
-      features/   preprocessing, registry, groups A-G, extraction front door
+      features/   preprocessing, index, extraction front door
+        catalogue/   one module and one class per feature
+        groups.py    feature groups as an assembly over the catalogue
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects

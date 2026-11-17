@@ -2,14 +2,15 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, topology
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
 from synth import digit8_image, ring_image, vertical_bar_image
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("E")
 
 
 def _compute(img):
-    return topology.compute(img, OPTS)
+    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
 
 
 def test_hole_counts_digit_like():

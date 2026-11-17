@@ -1,15 +1,16 @@
-"""Group B — profile summaries."""
+"""Profile summaries - group B."""
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, profiles
+from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
 from synth import band_image, uniform_image, vertical_bar_image
 
 OPTS = FeatureOptions()
+_GROUP = features_of_group("B")
 
 
 def _compute(img, opts=OPTS):
-    return profiles.compute(img, opts)
+    return {feature.name: feature.compute(img, opts) for feature in _GROUP}
 
 
 def test_two_bands_two_row_peaks():
@@ -57,16 +58,8 @@ def test_flat_image_profiles():
     assert f["row_profile_peaks"] == 0.0
     assert f["row_profile_roughness"] == 0.0
     assert abs(f["row_profile_trend"]) < 1e-12  # polyfit float noise
-    assert f["row_profile_centre_of_mass"] == 0.5
     assert f["profile_row_column_correlation"] == 0.0  # flat guard
-    assert f["median_upcrossing_count"] == 0.0
-
-
-def test_row_centre_of_mass_bottom_band():
-    bands = band_image(((100, 128),))
-    f = _compute(bands)
-    # rows 100-127 bright, weighted mean row ~ 113 of 127 -> ~0.89
-    assert f["row_profile_centre_of_mass"] > 0.8
+    assert f["profile_median_crossing_count"] == 0.0
 
 
 def test_border_peak_counts():
@@ -76,11 +69,11 @@ def test_border_peak_counts():
     assert _compute(bands)["row_profile_peaks"] == 1.0
 
 
-def test_median_upcrossing_vertical_bar():
+def test_median_crossing_count_vertical_bar():
     f = _compute(vertical_bar_image())
     # every row crosses the global median exactly once (into the bar);
     # columns are constant -> their own median gives no crossings
-    assert abs(f["median_upcrossing_count"] - 0.5) < 1e-6
+    assert abs(f["profile_median_crossing_count"] - 0.5) < 1e-6
 
 
 def test_diagonal_profiles_finite_and_sane():
