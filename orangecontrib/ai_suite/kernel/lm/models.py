@@ -18,8 +18,8 @@ import keras
 import numpy as np
 
 from .builders import Architecture, architecture_from_metadata
+from .pairs import make_pairs
 from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict
-from .windowing import make_windows
 
 _META_FILE = "meta.json"
 _MODEL_FILE = "model.keras"
@@ -109,17 +109,17 @@ class LanguageModel:
         return self.tokenizer.decode(prompt_ids + generated)
 
     def perplexity(self, text: str, batch_size: int = 256) -> dict[str, float]:
-        """Loss and perplexity (e^loss) over the windows of the given text.
+        """Loss and perplexity (e^loss) over the pairs of the given text.
 
         Run it on the training corpus and on unrelated text to get the
         in-domain / out-of-domain pair: a single-domain model looks good only on
         the domain it was trained on.
         """
-        windows = make_windows(self.tokenizer.encode(text), self.context_width)
+        pairs = make_pairs(self.tokenizer.encode(text), self.context_width)
         loss = float(
             self.keras_model.evaluate(
-                windows.contexts,
-                windows.targets,
+                pairs.contexts,
+                pairs.targets,
                 batch_size=batch_size,
                 verbose=0,
             )

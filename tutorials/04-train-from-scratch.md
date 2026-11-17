@@ -39,7 +39,7 @@ evolving as the model learns.
 Set:
 
 - **Architecture**: MLP-over-window
-- **Context window**: 16
+- **Context width**: 16
 - **Embedding dim**: 32
 - **Hidden units**: 128
 - **Epochs**: 8
@@ -55,7 +55,7 @@ Press **Train**. Compare three things with the bigram:
 3. The model has a hard, visible memory: it sees exactly the last 16 tokens.
 
 The status line after training reports the number of training and validation
-windows and the final validation loss and perplexity. Perplexity is `e^loss`:
+pairs and the final validation loss and perplexity. Perplexity is `e^loss`:
 roughly, "the model is choosing among this many plausible next tokens".
 
 ## 4. LSTM: recurrent memory
@@ -63,7 +63,7 @@ roughly, "the model is choosing among this many plausible next tokens".
 Set:
 
 - **Architecture**: LSTM
-- **Context window**: 32
+- **Context width**: 32
 - **Embedding dim**: 64
 - **LSTM units**: 128
 - **LSTM layers**: 1 layer
@@ -81,7 +81,7 @@ Repeat the MLP run with:
 
 - **Tokenizer**: Word level
 - **Max vocab**: 5000
-- **Context window**: 8
+- **Context width**: 8
 
 Look at the vocabulary in **LM Vocab Viewer** (connect the model's **Model**
 output to its **Model** input). Word level gives a larger vocabulary and shorter

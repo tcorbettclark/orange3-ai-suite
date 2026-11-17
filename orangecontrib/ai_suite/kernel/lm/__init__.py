@@ -1,5 +1,5 @@
-"""Language-model kernel: tokenizers (with their statistics), windowing, and the
-from-scratch Keras models with their training entry point.
+"""Language-model kernel: tokenizers (with their statistics), the pairs they
+feed, and the from-scratch Keras models with their training entry point.
 
 ``builders`` imports Keras, and importing Keras imports its TensorFlow backend,
 so importing this package costs a couple of seconds. That is paid once per
@@ -9,6 +9,7 @@ since every part of the model stack needs it.
 
 from .builders import ARCHITECTURES, LSTM, Bigram, MLPWindow, compile_model
 from .models import LanguageModel
+from .pairs import Pairs, make_pairs
 from .tokenizer import (
     BOS,
     BOS_ID,
@@ -24,7 +25,6 @@ from .tokenizer import (
     tokenizer_levels,
 )
 from .training import train_language_model
-from .windowing import Windows, make_windows
 
 __all__ = [
     "ARCHITECTURES",
@@ -39,11 +39,11 @@ __all__ = [
     "CharTokenizer",
     "LanguageModel",
     "MLPWindow",
+    "Pairs",
     "Tokenizer",
-    "Windows",
     "WordTokenizer",
     "compile_model",
-    "make_windows",
+    "make_pairs",
     "tokenizer_from_dict",
     "tokenizer_from_text",
     "tokenizer_levels",

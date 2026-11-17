@@ -133,12 +133,12 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
             math.exp(s["val_loss"]), rel=1e-9
         )
     hp = model.hyperparameters
-    assert hp["n_train_windows"] + hp["n_val_windows"] == hp["n_windows_total"]
-    assert hp["n_val_windows"] > 0 and hp["n_train_windows"] > 0
+    assert hp["n_train_pairs"] + hp["n_val_pairs"] == hp["n_pairs_total"]
+    assert hp["n_val_pairs"] > 0 and hp["n_train_pairs"] > 0
     assert 0 < hp["validation_fraction"] < 1
 
 
-def test_windows_are_built_at_the_models_width(tokenizer):
+def test_pairs_are_built_at_the_models_width(tokenizer):
     # The bigram has no width to ask for; the data follows the model.
     bigram = train_language_model(tokenizer, CORPUS, Bigram(), epochs=1, batch_size=32, seed=0)
     assert bigram.context_width == 1
@@ -155,7 +155,7 @@ def test_windows_are_built_at_the_models_width(tokenizer):
     )
     assert wide.context_width == 4
     assert wide.keras_model.input_shape == (None, 4)
-    assert wide.hyperparameters["n_windows_total"] == bigram.hyperparameters["n_windows_total"]
+    assert wide.hyperparameters["n_pairs_total"] == bigram.hyperparameters["n_pairs_total"]
 
 
 def test_stop_requested_stops_training_cleanly(tokenizer):
@@ -221,7 +221,7 @@ def test_different_seeds_diverge_at_high_temperature(mlp_model):
     assert len(outs) > 1
 
 
-def test_long_prompt_uses_last_window(mlp_model):
+def test_long_prompt_uses_only_the_last_context(mlp_model):
     # In-vocabulary prompt far longer than context width 8: only its tail can
     # influence the continuation.
     long_prompt = "the cat sat " * 6

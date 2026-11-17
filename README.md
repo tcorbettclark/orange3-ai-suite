@@ -13,7 +13,7 @@ and generations come back as corpora that Orange's text widgets can analyse.
 ## What is in the box
 
 - **`orangecontrib/ai_suite/kernel/`** - the substance. Pure Python, with no
-  Orange or Qt imports: image features, tokenizers and windowing, Keras model
+  Orange or Qt imports: image features, tokenizers and pairs, Keras model
   builders, sampling, perplexity, and MLX LoRA wrappers. The same code runs in
   the widgets or in a plain Python session.
 - **`orangecontrib/ai_suite/`** - the Orange add-on. Nine widgets and the signal
@@ -320,7 +320,7 @@ all_features()  # the full catalogue, in stable column order
 ```python
 from orangecontrib.ai_suite.kernel.lm import (
     MLPWindow,
-    make_windows,
+    make_pairs,
     tokenizer_from_text,
     train_language_model,
 )
@@ -329,14 +329,14 @@ text = "\n".join(texts)  # join documents outside the kernel
 tokenizer = tokenizer_from_text(text, "char")
 tokenizer = tokenizer.keep_top(2000)  # or .drop_rare(min_count=3); pure, chainable
 stream = tokenizer.encode(text)  # every sentence ends with <eos>
-windows = make_windows(stream, context_width=16)
-train, valid = windows.split(val_fraction=0.1, seed=0)
+pairs = make_pairs(stream, context_width=16)
+train, valid = pairs.split(validation_fraction=0.1, seed=0)
 
 architecture = MLPWindow(context_width=16, embedding_dim=32, hidden_units=128)
 model = train_language_model(
     tokenizer,
     text,
-    architecture,  # windows are built at architecture.context_width
+    architecture,  # pairs are built at architecture.context_width
     epochs=15,
     validation_fraction=0.1,
     seed=0,
@@ -431,7 +431,7 @@ orangecontrib/
     adapters.py Orange <-> kernel conversion
     kernel/
       features/   preprocessing, registry, groups A-G, extraction front door
-      lm/         tokenizer (with its stats), windowing, Keras builders,
+      lm/         tokenizer (with its stats), pairs, Keras builders,
                   training, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects
       pixels.py   luminance grid features

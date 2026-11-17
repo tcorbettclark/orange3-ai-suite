@@ -2,7 +2,7 @@
 
 A thin shell over :mod:`orangecontrib.ai_suite.kernel.lm`: options, a live loss plot and the
 checkpoint table. Training runs in a background QThread and streams per-epoch
-stats into pyqtgraph; all substance (tokenizer, windowing, Keras builders,
+stats into pyqtgraph; all substance (tokenizer, pairs, Keras builders,
 sampling) lives in the kernel.
 """
 
@@ -333,8 +333,8 @@ class OWLMPretrainer(OWWidget):
         self.Outputs.checkpoint.send(checkpoint_table(self.epoch_stats))
         hp = model.hyperparameters
         self.status_label.setText(
-            f"Done: {hp['architecture']}, {hp['n_train_windows']} train windows "
-            f"({hp['n_val_windows']} val), final val loss "
+            f"Done: {hp['architecture']}, {hp['n_train_pairs']} train pairs "
+            f"({hp['n_val_pairs']} val), final val loss "
             f"{hp['final_val_loss']:.3f} (perplexity "
             f"{np.exp(hp['final_val_loss']):.1f})"
         )

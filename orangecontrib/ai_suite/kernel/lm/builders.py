@@ -1,7 +1,8 @@
 """Keras model builders for the three from-scratch architectures.
 
 Bigram, MLP-over-window and LSTM are separate models that happen to share an
-input contract - a ``(context_width,)`` int32 token-id window - and an output
+input contract - a ``(context_width,)`` int32 context of token ids - and an
+output
 contract - logits over the vocabulary, so softmax lives in the loss and in the
 sampling loop. They are offered side by side for comparison, not as one thing
 that grows: each declares its own hyperparameters, so no model can be handed a
@@ -35,15 +36,15 @@ class Architecture(BaseEstimator, ABC):
     name: ClassVar[str]  # registry key, and what saved metadata records
     label: ClassVar[str]  # human-readable, for a dropdown
     # How many ids of history the model reads: a hyperparameter where it is
-    # tunable (MLPWindow, LSTM), a constant where the architecture fixes it
-    # (Bigram). The windower is told the same number, so data and graph agree.
+    # tunable (MLP, LSTM), a constant where the architecture fixes it
+    # (Bigram). The pair builder is told the same number, so data and graph agree.
     context_width: int
 
     def build(self, *, vocab_size: int, seed: int = 0) -> keras.Model:
         """Build the graph: ``(n, context_width)`` ids -> ``(n, vocab_size)`` logits.
 
         The width comes from the model itself, and that is the same number the
-        windower was given, so the two cannot disagree. Seeding lives here
+        pair builder was given, so the two cannot disagree. Seeding lives here
         because it is a global Keras side effect, and this is the one place that
         builds a graph.
         """
@@ -90,11 +91,12 @@ class Bigram(Architecture):
 
 
 class MLPWindow(Architecture):
-    """A fixed, visible memory: the whole window concatenated into one hidden layer.
+    """A fixed, visible memory: the whole context concatenated into one hidden layer.
 
     Position is carried by concatenation order, so the model can only ever look
-    ``context_width`` tokens back - the contrast with the LSTM, which carries
-    position in its state.
+    ``context_width`` ids back - the contrast with the LSTM, which carries position
+    in its state. Named for the fixed span (the `window`) it reads; the span itself
+    is the model's context, not a separate object.
     """
 
     name = "mlp_window"
@@ -113,7 +115,7 @@ class MLPWindow(Architecture):
     def _graph(self, *, vocab_size: int) -> keras.Model:
         inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
         x = keras.layers.Embedding(vocab_size, self.embedding_dim, name="token_embeddings")(inputs)
-        x = keras.layers.Flatten(name="concatenate_window")(x)
+        x = keras.layers.Flatten(name="concatenate_context")(x)
         x = keras.layers.Dense(self.hidden_units, activation="tanh", name="hidden")(x)
         logits = keras.layers.Dense(vocab_size, name="logits")(x)
         return keras.Model(inputs, logits, name=self.name)

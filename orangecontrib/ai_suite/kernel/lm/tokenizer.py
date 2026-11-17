@@ -12,7 +12,9 @@ There are two tokenizers, both subclasses of an abstract :class:`Tokenizer`:
   Words with internal apostrophes ("don't", Shakespeare's "o'er", both quote
   styles) plus every non-word non-space character as its own token. Whitespace
   is dropped, case is preserved, and rendering a unit re-inserts spaces except
-  around punctuation.
+  around punctuation and before an opening quote. Because straight quotes are
+  symmetric, ``'hello'`` decodes as ``"' hello'"``: the tokeniser cannot tell an
+  opening quote from a closing one.
 
 Use :func:`tokenizer_from_text` to build either level.
 
@@ -33,9 +35,10 @@ Special tokens (ids fixed across levels)
 ----------------------------------------
 
 - id 0 = ``<bos>``: the start-of-sequence marker, meaning "nothing came
-  before". ``encode`` never emits it: the window builder prepends it as the
-  start of a unit's context and uses it as the left pad, so early positions
-  with short context stay trainable rather than being thrown away.
+  before". ``encode`` never emits it: the pair builder opens a unit's context
+  with it and pads out a context with it when the unit has fewer than the
+  context width of ids before the target, so early positions stay trainable
+  rather than being thrown away.
 - id 1 = ``<unk>``: out-of-vocabulary input (unknown words at word level,
   unknown characters at char level, or tokens removed by pruning).
 - id 2 = ``<eos>``: closes every unit, emitted by :meth:`Tokenizer.encode`. It
@@ -175,10 +178,10 @@ class Tokenizer(ABC):
     def encode(self, text: str) -> list[int]:
         """Text -> a token-id stream where every unit ends with EOS.
 
-        This is the single text -> token transition. It marks the END of
-        every unit with EOS. Starts (BOS) are not marked in the stream: the window
-        builder prepends BOS as the start-of-context marker, so ends travel as
-        data while starts are context construction.
+        This is the single text -> token transition. It marks the END of every
+        unit with EOS. Starts (BOS) are not marked in the stream: the pair
+        builder opens a unit's context with BOS, so ends travel as data while
+        starts are context construction.
 
         A unit is one sentence.
 

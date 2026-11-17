@@ -15,8 +15,8 @@ import keras
 
 from .builders import Architecture, compile_model
 from .models import LanguageModel
+from .pairs import make_pairs
 from .tokenizer import Tokenizer
-from .windowing import make_windows
 
 EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity[, sample]}
 
@@ -38,10 +38,10 @@ def train_language_model(
     sample_max_new_tokens: int = 32,
     sample_seed: int = 0,
 ) -> LanguageModel:
-    """Build windows from one text, split by sentence, train, return the model.
+    """Build pairs from one text, split by sentence, train, return the model.
 
     The context width is the architecture's own: a hyperparameter where it is
-    tunable, the constant 1 for a bigram. Windows are built at that width and
+    tunable, the constant 1 for a bigram. Pairs are built at that width and
     the graph is shaped from it, so the two cannot disagree.
 
     ``stop_requested`` is checked after every epoch; when it returns True the
@@ -56,8 +56,8 @@ def train_language_model(
     if not 0.0 < validation_fraction < 1.0:
         raise ValueError("validation_fraction must be strictly between 0 and 1")
 
-    windows = make_windows(tokenizer.encode(text), architecture.context_width)
-    train, val = windows.split(validation_fraction, seed=seed)
+    pairs = make_pairs(tokenizer.encode(text), architecture.context_width)
+    train, val = pairs.split(validation_fraction, seed=seed)
 
     keras_model = compile_model(
         architecture.build(vocab_size=tokenizer.vocab_size, seed=seed),
@@ -79,7 +79,7 @@ def train_language_model(
             }
             if sample_temperature is not None:
                 transient = LanguageModel(
-                    architecture, tokenizer, windows.context_width, keras_model, {}
+                    architecture, tokenizer, pairs.context_width, keras_model, {}
                 )
                 stats["sample"] = transient.generate(
                     sample_prompt, sample_temperature, sample_max_new_tokens, sample_seed
@@ -108,23 +108,23 @@ def train_language_model(
     return LanguageModel(
         architecture=architecture,
         tokenizer=tokenizer,
-        # The width the weights were built at: windows are always rebuilt at
+        # The width the weights were built at: pairs are always rebuilt at
         # this width from now on.
-        context_width=windows.context_width,
+        context_width=pairs.context_width,
         keras_model=keras_model,
         hyperparameters={
             "architecture": architecture.name,
             "architecture_params": architecture.get_params(),
-            "context_width": windows.context_width,
+            "context_width": pairs.context_width,
             "epochs": epochs,
             "batch_size": batch_size,
             "validation_fraction": validation_fraction,
             "learning_rate": learning_rate,
             "seed": seed,
             "samples_enabled": sample_temperature is not None,
-            "n_windows_total": len(windows),
-            "n_train_windows": len(train),
-            "n_val_windows": len(val),
+            "n_pairs_total": len(pairs),
+            "n_train_pairs": len(train),
+            "n_val_pairs": len(val),
             "final_loss": float(history["loss"][-1]),
             "final_val_loss": float(history["val_loss"][-1]),
         },
