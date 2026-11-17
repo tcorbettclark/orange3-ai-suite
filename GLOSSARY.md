@@ -2,8 +2,11 @@
 
 ## Processes
 
-- **tokenizer**: `text` → `stream` — the whole corpus as one list of ids, EOS
-  after every unit.
+- **tokenizer**: `text` → `stream` — the whole corpus as one list of ids.
+- **encode**: `text` → `stream` — EOS closes every unit, and anything the
+  vocabulary cannot hold becomes `<unk>`.
+- **decode**: `stream` → `text` — the reverse; BOS and EOS are dropped, `<unk>`
+  stays literal.
 - **pair builder**: `stream` → `pairs` — one context and one target per prediction.
 - **fit**: `architecture` + `text` → a `model` — build the pairs, then the weights
   that minimise the loss.
@@ -11,6 +14,8 @@
 - **sampler**: `logits` → `id` — one id per step of a generation.
 - **evaluate**: `model` + `text` → loss and perplexity, on any text. Report it on
   text the weights were not trained on to see the in-domain / out-of-domain gap.
+- **save** / **load**: `model` ↔ a directory — the weights (`model.keras`), the
+  tokenizer, and the run's settings and results (`meta.json`).
 
 ## Text
 
@@ -30,6 +35,8 @@ Tokens are built by the tokenizer (`kernel/lm/tokenizer.py`).
   many, which is also how many logits the model emits.
 - **stream** — the corpus as one flat list of ids. Each unit ends with EOS. The
   stream is the only input to the pair builder.
+- **special token** — one of BOS, `<unk>` or EOS: the tokens every vocabulary
+  begins with, and the only ones with no corpus count. "The specials" for short.
 - **EOS** — the id that closes a unit. It travels inside the stream, and it is
   itself a target.
 - **BOS** — the id meaning "nothing came before". It never travels in the
@@ -117,30 +124,49 @@ context is padded out with BOS, or when a unit is shorter than `w`.
 
 ## Model
 
-- **architecture** — a buildable recipe: a graph plus its own hyperparameters
-  (`Bigram`, `MLP`, `LSTM`). No weights, no tokenizer.
+- **architecture** — a buildable recipe: a Keras graph plus its own
+  hyperparameters (`Bigram`, `MLP`, `LSTM`). No weights, no tokenizer.
 - **model** — an instance of an architecture with a tokenizer and weights: what
   `fit` returns, and what generates, evaluates and saves. The architecture is
   the recipe; the model is one fitted result of it.
 - **hyperparameter** — a setting for an architecture, e.g. `context_width`,
-  `units` or `hidden_units`. Enumerable through `get_params()`.
+  `embedding_dim`, or the LSTM's `units`. Enumerable through `get_params()`.
+- **parameter** — a number the model learns from the data (embeddings, weights,
+  biases), as against a **hyperparameter**, which is chosen. `parameter_count()`
+  counts these.
+- **embedding** — the learned vector for one token id; `embedding_dim` is how
+  long it is.
 - **order** — how many tokens a prediction involves: its `w` ids of history plus
   the target, so `order = w + 1`. A bigram conditions on one token, so its order
   is fixed at 2; an `MLP` or `LSTM` order follows its context width.
 - **n-gram** — a model of order `n`, conditioning on `n - 1` ids: `Bigram` is
   the `n = 2` member. `MLP` and `LSTM` are trainable relatives of the same
   family, whose order is chosen instead of fixed.
-- **logits** — one score per token in the vocabulary, unnormalised. Softmax is
-  computed where it is needed: inside the training loss and in the sampler.
+- **logits** — one score per token in the vocabulary, unnormalised.
+- **softmax** — turns logits into probabilities: positive and summing to one. It
+  is applied in the loss and in the sampler, never in the Keras graph.
 - **loss** — the number training minimises: the cross-entropy between the
   model's distribution over the vocabulary and the actual target, averaged over
   all predictions in the set being measured (train or validation).
+- **optimizer** — the rule that turns the loss into weight updates. Adam here,
+  with the learning rate as its step size.
 - **perplexity** — `e^loss`: roughly, how many tokens the model is choosing
   between at each step. 1 is perfect and the vocabulary size is a uniform guess.
   Reported for the training and the validation pairs separately.
-- **epoch** — one pass over all the training pairs. The checkpoint table has one
-  row per epoch, with the loss, the validation loss, both perplexities and an
-  optional sample.
+- **in-domain** / **out-of-domain** — text drawn from the corpus the model was
+  trained on, versus text from anywhere else. The two perplexities are the
+  comparison.
+- **learning rate** — how far one optimizer step moves the weights.
+- **batch size** — how many pairs one optimizer step averages over; the `batch`
+  is that stack of pairs.
+- **validation fraction** — the share of *units* held out for the split, not of
+  pairs.
+- **seed** — the number a run's random choices are derived from: weight
+  initialisation and the split, so the same seed and inputs repeat a run.
+  `generate` takes a seed of its own for sampling.
+- **epoch** — one pass over all the training pairs. The per-epoch stats carry the
+  loss, the validation loss and both perplexities, plus a sample if the caller's
+  hook adds one.
 - **prompt** — the user's text, tokenized and trimmed to its last unit, used as
   the first context of a generation.
 - **generation** — repeat: context → logits → pick one id → append it → drop the
