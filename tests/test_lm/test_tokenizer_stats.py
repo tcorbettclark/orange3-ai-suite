@@ -42,7 +42,7 @@ def test_zipf_summary(word_tok):
 
 def test_stats(word_tok):
     s = word_tok.stats()
-    assert s["level"] == "word"
+    assert s["tokenizer_name"] == "word"
     assert s["vocab_size"] == word_tok.vocab_size
     assert s["special_tokens"] == ("<bos>", "<unk>", "<eos>")
     longest = s["longest_tokens"]
@@ -54,7 +54,7 @@ def test_stats(word_tok):
 
 def test_small_vocab_char_vs_word_is_the_lesson():
     # A word-rich but alphabet-poor corpus: the whole point of the LM Pre-trainer's
-    # tokenizer dropdown — char level = far smaller vocab, longer sequences.
+    # tokenizer dropdown — char tokenizer = far smaller vocab, longer sequences.
     words = " ".join(a + b for a in "abcd" for b in "abcdef")
     char_tok = tokenizer_from_text(words, "char")
     word_tok = tokenizer_from_text(words, "word")

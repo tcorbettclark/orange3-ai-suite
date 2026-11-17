@@ -1,14 +1,21 @@
-"""Language-model kernel: tokenizers (with their statistics), the pairs they
-feed, and the from-scratch Keras models with their training entry point.
+"""Language-model kernel: tokenizers (with their statistics), the pairs they feed,
+the architectures, and the model that trains, generates and evaluates.
 
-``builders`` imports Keras, and importing Keras imports its TensorFlow backend,
+``architecture`` imports Keras, and importing Keras imports its TensorFlow backend,
 so importing this package costs a couple of seconds. That is paid once per
 process and is why Orange takes a moment longer to start; it is not deferrable,
 since every part of the model stack needs it.
 """
 
-from .builders import ARCHITECTURES, LSTM, MLP, Bigram, compile_model
-from .models import LanguageModel
+from .architecture import (
+    LSTM,
+    MLP,
+    Architecture,
+    Bigram,
+    architecture_from_dict,
+    architectures,
+)
+from .language_model import LanguageModel
 from .pairs import Pairs, make_pairs
 from .tokenizer import (
     BOS,
@@ -22,12 +29,11 @@ from .tokenizer import (
     WordTokenizer,
     tokenizer_from_dict,
     tokenizer_from_text,
-    tokenizer_levels,
+    tokenizers,
 )
-from .training import train_language_model
+from .training import TrainingOptions, TrainingResults
 
 __all__ = [
-    "ARCHITECTURES",
     "BOS",
     "BOS_ID",
     "EOS",
@@ -36,16 +42,19 @@ __all__ = [
     "MLP",
     "UNK",
     "UNK_ID",
+    "Architecture",
     "Bigram",
     "CharTokenizer",
     "LanguageModel",
     "Pairs",
     "Tokenizer",
+    "TrainingOptions",
+    "TrainingResults",
     "WordTokenizer",
-    "compile_model",
+    "architecture_from_dict",
+    "architectures",
     "make_pairs",
     "tokenizer_from_dict",
     "tokenizer_from_text",
-    "tokenizer_levels",
-    "train_language_model",
+    "tokenizers",
 ]

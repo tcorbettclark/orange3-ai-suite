@@ -13,8 +13,8 @@ and generations come back as corpora that Orange's text widgets can analyse.
 ## What is in the box
 
 - **`orangecontrib/ai_suite/kernel/`** - the substance. Pure Python, with no
-  Orange or Qt imports: image features, tokenizers and pairs, Keras model
-  builders, sampling, perplexity, and MLX LoRA wrappers. The same code runs in
+  Orange or Qt imports: image features, tokenizers and pairs, the architectures,
+  the model that trains and generates, and MLX LoRA wrappers. The same code runs in
   the widgets or in a plain Python session.
 - **`orangecontrib/ai_suite/`** - the Orange add-on. Nine widgets and the signal
   adapters that convert between Orange objects and kernel types. The widgets
@@ -140,7 +140,7 @@ selects:
   layer, so its memory is fixed and visible; the default.
 - **LSTM** - recurrent state; smoother but slower on CPU.
 
-The tokenizer can be character-level or word-level, which visibly changes
+The tokenizer can be the character or the word one, which visibly changes
 vocabulary size and sequence length. Training always holds out a sentence-level
 validation split, so overfitting on a tiny corpus is visible in the live loss
 curve. The checkpoint output has one row per epoch with loss, perplexity and an
@@ -196,7 +196,7 @@ unquantised because its quantisation cannot be verified without downloading it.
 ### LM Vocab Viewer
 
 A read-only view of a tokenizer. Connect a model to see the vocabulary embedded
-in it, or connect text data to build character-level and word-level tokenizers
+in it, or connect text data to build the character and word tokenizers
 side by side. The summary reports vocabulary size, mean token length and the
 fraction of tokens seen only once; the tabs list tokens, ids and corpus counts.
 The viewer has no outputs, so it can never feed a mismatched vocabulary back
@@ -319,10 +319,11 @@ all_features()  # the full catalogue, in stable column order
 
 ```python
 from orangecontrib.ai_suite.kernel.lm import (
+    LanguageModel,
     MLP,
+    TrainingOptions,
     make_pairs,
     tokenizer_from_text,
-    train_language_model,
 )
 
 text = "\n".join(texts)  # join documents outside the kernel
@@ -332,23 +333,23 @@ stream = tokenizer.encode(text)  # every sentence ends with <eos>
 pairs = make_pairs(stream, context_width=16)
 train, valid = pairs.split(validation_fraction=0.1, seed=0)
 
+# An architecture is the recipe; a model is that recipe fitted.
 architecture = MLP(context_width=16, embedding_dim=32, hidden_units=128)
-model = train_language_model(
-    tokenizer,
+model = LanguageModel(architecture, tokenizer).fit(
     text,
-    architecture,  # pairs are built at architecture.context_width
-    epochs=15,
-    validation_fraction=0.1,
-    seed=0,
+    TrainingOptions(epochs=15, validation_fraction=0.1, seed=0),
 )
+
 model.generate("the ", temperature=0.8, max_new_tokens=64)
-model.perplexity(held_out_text)  # {'loss': ..., 'perplexity': ...}
+model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}; perplexity = e^loss
 model.save("my-model")  # weights + tokenizer + metadata
 ```
 
-`LanguageModel.load(path)` reads the directory back as one object. The
-training hook (`on_epoch`) and the stop callback (`stop_requested`) are plain
-Python callables; the kernel never imports Qt.
+`fit` returns the model, so the call can be chained; it builds pairs at
+`architecture.context_width`, so the data and the weights cannot disagree.
+`LanguageModel.load(path)` reads the directory back as one object. The training
+hook (`on_epoch`) and the stop callback (`stop_requested`) are plain Python
+callables; the kernel never imports Qt.
 
 ### LoRA
 
@@ -431,8 +432,8 @@ orangecontrib/
     adapters.py Orange <-> kernel conversion
     kernel/
       features/   preprocessing, registry, groups A-G, extraction front door
-      lm/         tokenizer (with its stats), pairs, Keras builders,
-                  training, LanguageModel with embedded tokenizer
+      lm/         tokenizer (with its stats), pairs, architectures,
+                  training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects
       pixels.py   luminance grid features
       text.py     text loading and corpus helpers

@@ -80,7 +80,7 @@ def test_stop_button_sets_flag(qapp, text_table):
     w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
-    w.worker = TrainingWorker([], None, None, {})
+    w.worker = TrainingWorker([], None, None)
     w.stop_training()
     assert w.worker.request_stop is True
 
@@ -99,11 +99,11 @@ def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
     w.show()
     w.set_data(text_table)
 
-    def failing_train(*args, **kwargs):
+    def failing_fit(*args, **kwargs):
         raise RuntimeError("kapow")
 
     monkeypatch.setattr(
-        "orangecontrib.ai_suite.widgets.ow_lm_pretrainer.train_language_model", failing_train
+        "orangecontrib.ai_suite.widgets.ow_lm_pretrainer.LanguageModel.fit", failing_fit
     )
     w.epochs = 2
     w.run_training_blocking()

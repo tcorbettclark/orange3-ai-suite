@@ -1,18 +1,19 @@
-"""Keras model builders for the three from-scratch architectures.
+"""The three from-scratch architectures: hyperparameters in, a Keras model out.
 
-Bigram, MLP and LSTM are separate models that happen to share an
-input contract - a ``(context_width,)`` int32 context of token ids - and an
-output
+Bigram, MLP and LSTM are separate architectures that happen to share an input
+contract - a ``(context_width,)`` int32 context of token ids - and an output
 contract - logits over the vocabulary, so softmax lives in the loss and in the
 sampling loop. They are offered side by side for comparison, not as one thing
-that grows: each declares its own hyperparameters, so no model can be handed a
-parameter it would ignore.
+that grows: each declares its own hyperparameters, so no architecture can be
+handed a parameter it would ignore.
 
 Each is a scikit-learn estimator: the constructor stores hyperparameters
 verbatim and does nothing else, every check happens in :meth:`Architecture.build`,
 and ``get_params`` / ``set_params`` / ``clone`` come from ``BaseEstimator``. That
-lets a caller enumerate a model's parameters instead of guessing a superset -
-Orange's controls and parameter sweeps are driven from exactly this.
+lets a caller enumerate an architecture's parameters instead of guessing a
+superset - Orange's controls and parameter sweeps are driven from exactly this.
+A model is an instance of an architecture with a tokenizer and weights; see
+:class:`~.language_model.LanguageModel`.
 
 No transformer is offered here. At classroom scale an LSTM is at least as
 accurate and far cheaper to train on CPU; the transformer lesson is delivered
@@ -21,8 +22,8 @@ by adapting a real pretrained model with LoRA instead.
 
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
-from typing import ClassVar
 
 import keras
 from sklearn.base import BaseEstimator
@@ -31,22 +32,29 @@ from .tokenizer import SPECIAL_TOKENS
 
 
 class Architecture(BaseEstimator, ABC):
-    """One buildable model: hyperparameters in, a Keras graph out."""
+    """One buildable architecture: hyperparameters in, a Keras model out."""
 
-    name: ClassVar[str]  # registry key, and what saved metadata records
-    label: ClassVar[str]  # human-readable, for a dropdown
+    @classmethod
+    def architecture_name(cls) -> str:
+        """The name this architecture is known by outside the kernel: ``"mlp"``.
+
+        Derived from the class name, lower-cased, so it is ready to be passed back
+        in to :func:`architecture` and cannot drift from the class.
+        """
+        return cls.__name__.lower()
+
     # How many ids of history the model reads: a hyperparameter where it is
     # tunable (MLP, LSTM), a constant where the architecture fixes it
-    # (Bigram). The pair builder is told the same number, so data and graph agree.
+    # (Bigram). The pair builder is told the same number, so data and model agree.
     context_width: int
 
     def build(self, *, vocab_size: int, seed: int = 0) -> keras.Model:
-        """Build the graph: ``(n, context_width)`` ids -> ``(n, vocab_size)`` logits.
+        """Build the Keras model: ``(n, context_width)`` ids -> ``(n, vocab_size)`` logits.
 
-        The width comes from the model itself, and that is the same number the
-        pair builder was given, so the two cannot disagree. Seeding lives here
-        because it is a global Keras side effect, and this is the one place that
-        builds a graph.
+        The width comes from the architecture itself, and that is the same number
+        the pair builder was given, so data and model cannot disagree. Seeding
+        lives here because it is a global Keras side effect, and this is the one
+        place that builds a model.
         """
         if vocab_size < len(SPECIAL_TOKENS) + 1:
             raise ValueError(
@@ -56,11 +64,12 @@ class Architecture(BaseEstimator, ABC):
         if self.context_width < 1:
             raise ValueError("context_width must be >= 1")
         keras.utils.set_random_seed(seed)
-        return self._graph(vocab_size=vocab_size)
+        return self._keras_model(vocab_size=vocab_size)
 
     @abstractmethod
-    def _graph(self, *, vocab_size: int) -> keras.Model:
-        """The layers; seeding and input-independent checks live in :meth:`build`."""
+    def _keras_model(self, *, vocab_size: int) -> keras.Model:
+        """The layers as a Keras model; seeding and input-independent checks live in
+        :meth:`build`."""
 
 
 class Bigram(Architecture):
@@ -78,16 +87,14 @@ class Bigram(Architecture):
     ``TypeError`` here, because there is no such argument to accept.
     """
 
-    name = "bigram"
-    label = "Bigram"
     context_width = 1
 
-    def _graph(self, *, vocab_size: int) -> keras.Model:
+    def _keras_model(self, *, vocab_size: int) -> keras.Model:
         inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
         logits = keras.layers.Flatten(name="next_token_logits")(
             keras.layers.Embedding(vocab_size, vocab_size, name="bigram_table")(inputs)
         )
-        return keras.Model(inputs, logits, name=self.name)
+        return keras.Model(inputs, logits, name=type(self).__name__)
 
 
 class MLP(Architecture):
@@ -97,9 +104,6 @@ class MLP(Architecture):
     ``context_width`` ids back - the contrast with the LSTM, which carries
     position in its state.
     """
-
-    name = "mlp"
-    label = "MLP"
 
     def __init__(
         self,
@@ -111,20 +115,17 @@ class MLP(Architecture):
         self.embedding_dim = embedding_dim
         self.hidden_units = hidden_units
 
-    def _graph(self, *, vocab_size: int) -> keras.Model:
+    def _keras_model(self, *, vocab_size: int) -> keras.Model:
         inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
         x = keras.layers.Embedding(vocab_size, self.embedding_dim, name="token_embeddings")(inputs)
         x = keras.layers.Flatten(name="concatenate_context")(x)
         x = keras.layers.Dense(self.hidden_units, activation="tanh", name="hidden")(x)
         logits = keras.layers.Dense(vocab_size, name="logits")(x)
-        return keras.Model(inputs, logits, name=self.name)
+        return keras.Model(inputs, logits, name=type(self).__name__)
 
 
 class LSTM(Architecture):
     """Recurrence: position is carried by state rather than by concatenation."""
-
-    name = "lstm"
-    label = "LSTM"
 
     def __init__(
         self,
@@ -138,7 +139,7 @@ class LSTM(Architecture):
         self.units = units
         self.layers = layers
 
-    def _graph(self, *, vocab_size: int) -> keras.Model:
+    def _keras_model(self, *, vocab_size: int) -> keras.Model:
         if self.layers not in (1, 2):
             raise ValueError("layers must be 1 or 2")
         inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
@@ -147,22 +148,38 @@ class LSTM(Architecture):
             x = keras.layers.LSTM(self.units, return_sequences=True, name=f"lstm_{i}")(x)
         x = keras.layers.LSTM(self.units, name="lstm_final")(x)
         logits = keras.layers.Dense(vocab_size, name="logits")(x)
-        return keras.Model(inputs, logits, name=self.name)
+        return keras.Model(inputs, logits, name=type(self).__name__)
 
 
-ARCHITECTURES: dict[str, type[Architecture]] = {cls.name: cls for cls in (Bigram, MLP, LSTM)}
+def architectures() -> tuple[tuple[type[Architecture], str], ...]:
+    """(architecture, one-line description) for each, in definition order.
 
-
-def architecture_from_metadata(meta: dict) -> Architecture:
-    """Rebuild the architecture recorded by :meth:`LanguageModel.save`."""
-    cls = ARCHITECTURES[meta["name"]]
-    return cls(**meta["params"])
-
-
-def compile_model(model: keras.Model, learning_rate: float = 1e-3) -> keras.Model:
-    """Compile with Adam and sparse cross-entropy over raw logits."""
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
-        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    An architecture is the class here, as it is everywhere inside the kernel; the
+    name the rest of the program passes in is :meth:`Architecture.architecture_name`.
+    The descriptions are the classes' own docstring summaries, so a catalogue cannot
+    drift from the classes. Only *direct* subclasses of :class:`Architecture` count:
+    a subclass of a subclass would be invisible here, so keep the family one level
+    deep.
+    """
+    return tuple(
+        (cls, (inspect.getdoc(cls) or "").partition("\n")[0])
+        for cls in Architecture.__subclasses__()
     )
-    return model
+
+
+def _architecture(architecture_name: str) -> type[Architecture]:
+    """The class an architecture name refers to.
+
+    Private on purpose: :func:`architecture_from_dict` is the way in, so a name
+    never has to be turned into a class by a caller.
+    """
+    for cls in Architecture.__subclasses__():
+        if cls.architecture_name() == architecture_name:
+            return cls
+    available = tuple(cls.architecture_name() for cls in Architecture.__subclasses__())
+    raise ValueError(f"architecture must be one of {available}, got {architecture_name!r}")
+
+
+def architecture_from_dict(data: dict) -> Architecture:
+    """Rebuild the architecture recorded by :meth:`LanguageModel.save`."""
+    return _architecture(data["architecture_name"])(**data["architecture_params"])

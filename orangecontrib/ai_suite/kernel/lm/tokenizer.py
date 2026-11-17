@@ -2,10 +2,12 @@
 
 A tokenizer is a constituent part of a model.
 
-Character and Word level tokenizers
------------------------------------
+Two tokenizers
+---------------
 
-There are two tokenizers, both subclasses of an abstract :class:`Tokenizer`:
+There are two, both subclasses of an abstract :class:`Tokenizer`. A tokenizer is
+a string outside the kernel ("char", "word") and the class behind it inside;
+:func:`tokenizers` lists the strings and :func:`tokenizer` returns the class.
 
 - :class:`CharTokenizer` - every character is a token, including spaces.
 - :class:`WordTokenizer` - every word is a token, identified with a regex.
@@ -16,7 +18,7 @@ There are two tokenizers, both subclasses of an abstract :class:`Tokenizer`:
   symmetric, ``'hello'`` decodes as ``"' hello'"``: the tokeniser cannot tell an
   opening quote from a closing one.
 
-Use :func:`tokenizer_from_text` to build either level.
+Use :func:`tokenizer_from_text` to build either one.
 
 Order
 -----
@@ -31,7 +33,7 @@ Do not compare ids across tokenizers, and do not read anything
 into the position of a token.
 
 
-Special tokens (ids fixed across levels)
+Special tokens (ids the same for every tokenizer)
 ----------------------------------------
 
 - id 0 = ``<bos>``: the start-of-sequence marker, meaning "nothing came
@@ -39,8 +41,9 @@ Special tokens (ids fixed across levels)
   with it and pads out a context with it when the unit has fewer than the
   context width of ids before the target, so early positions stay trainable
   rather than being thrown away.
-- id 1 = ``<unk>``: out-of-vocabulary input (unknown words at word level,
-  unknown characters at char level, or tokens removed by pruning).
+- id 1 = ``<unk>``: out-of-vocabulary input (an unknown word for the word
+  tokenizer, an unknown character for the char tokenizer, or a token removed by
+  pruning).
 - id 2 = ``<eos>``: closes every unit, emitted by :meth:`Tokenizer.encode`. It
   is the only special that travels in the stream, and is the target so generation
   can learn to stop.
@@ -73,8 +76,8 @@ SPECIAL_TOKENS = (BOS, UNK, EOS)
 class Tokenizer(ABC):
     """A frozen vocabulary with corpus frequencies.
 
-    Abstract: build one with :func:`tokenizer_from_text`, which dispatches on
-    ``level`` to :class:`CharTokenizer` or :class:`WordTokenizer`.
+    Abstract: build one with :func:`tokenizer_from_text`, which dispatches on the
+    tokenizer name to :class:`CharTokenizer` or :class:`WordTokenizer`.
     """
 
     tokens: tuple[str, ...]  # id -> token, specials first
@@ -82,7 +85,15 @@ class Tokenizer(ABC):
     total_token_count: int  # corpus tokens, including those pruning later removes
     _token_to_id: dict[str, int] = field(default_factory=dict, repr=False, compare=False)
 
-    level: ClassVar[str]
+    @classmethod
+    def tokenizer_name(cls) -> str:
+        """The name this tokenizer is known by outside the kernel: ``"char"``, ``"word"``.
+
+        Derived from the class name - lower-cased, without the ``Tokenizer``
+        suffix they all share - so it is ready to be passed back in to
+        :func:`tokenizer_from_text`, and cannot drift from the class.
+        """
+        return cls.__name__.removesuffix("Tokenizer").lower()
 
     def __post_init__(self) -> None:
         if len(self.counts) != len(self.tokens):
@@ -161,7 +172,7 @@ class Tokenizer(ABC):
         return self._rebuilt([tc for tc in self.ranked_counts() if tc[1] >= floor])
 
     def _rebuilt(self, keep: list[tuple[str, int]]) -> Tokenizer:
-        """A new tokenizer of the same level holding only ``keep``; total is preserved."""
+        """A new tokenizer of the same kind holding only ``keep``; total is preserved."""
         if not keep:
             raise ValueError(
                 "criterion removes every real token "
@@ -234,7 +245,7 @@ class Tokenizer(ABC):
         lengths = [len(t) for t, _ in real]
         n = len(real)
         return {
-            "level": self.level,
+            "tokenizer_name": self.tokenizer_name(),
             "vocab_size": self.vocab_size,
             "special_tokens": tuple(self.token(i) for i in range(self.n_special)),
             "longest_tokens": by_length[:10],
@@ -283,7 +294,7 @@ class Tokenizer(ABC):
         Order is significant *here* even though it is undefined elsewhere.
         """
         return {
-            "level": self.level,
+            "tokenizer_name": self.tokenizer_name(),
             "tokens": list(self.tokens),
             "counts": list(self.counts),
             "total_token_count": self.total_token_count,
@@ -291,9 +302,7 @@ class Tokenizer(ABC):
 
 
 class CharTokenizer(Tokenizer):
-    """Character level: every character is a token, spaces included."""
-
-    level: ClassVar[str] = "char"
+    """Character tokenizer: every character is a token, spaces included."""
 
     @classmethod
     def segment(cls, text: str) -> list[str]:
@@ -304,14 +313,12 @@ class CharTokenizer(Tokenizer):
 
 
 class WordTokenizer(Tokenizer):
-    """Word level: regex words (internal apostrophes kept) plus lone punctuation."""
-
-    level: ClassVar[str] = "word"
+    """Word tokenizer: regex words (internal apostrophes kept) plus lone punctuation."""
 
     # Words with internal apostrophes, then any single non-word non-space char.
     _PATTERN: ClassVar[re.Pattern] = re.compile(r"\w+(?:['’]\w+)*|[^\w\s]", re.UNICODE)
 
-    # In word-level decode these tokens close the previous token (no space before).
+    # In the word tokenizer these close the previous token (no space before).
     _ATTACH_PREV: ClassVar[frozenset[str]] = frozenset(".,;:!?…)]}%'’\"”»")
     # And these open the next one (no space after). Only the unambiguous typographic
     # quotes: straight quotes are symmetric and stay in _ATTACH_PREV, so 'hello'
@@ -340,41 +347,42 @@ class WordTokenizer(Tokenizer):
 # ---- construction -----------------------------------------------------------
 
 
-def tokenizer_levels() -> tuple[tuple[str, str], ...]:
-    """(level, one-line description) for each concrete level, in definition order.
+def tokenizers() -> tuple[tuple[type[Tokenizer], str], ...]:
+    """(tokenizer, one-line description) for each one, in definition order.
 
-    The level can be passed to :func:`tokenizer_from_text` to construct a
-    concrete tokenizer; the description is the class's own docstring summary.
+    A tokenizer is the class here, as it is everywhere inside the kernel; the name
+    the rest of the program passes in is :meth:`Tokenizer.tokenizer_name`. The
+    descriptions are the classes' own docstring summaries, so a catalogue cannot
+    drift from the classes. Only *direct* subclasses of :class:`Tokenizer` count: a
+    subclass of a subclass would be invisible here, so keep the family one level
+    deep.
     """
     return tuple(
-        (sub.level, (inspect.getdoc(sub) or "").partition("\n")[0])
-        for sub in Tokenizer.__subclasses__()
+        (cls, (inspect.getdoc(cls) or "").partition("\n")[0]) for cls in Tokenizer.__subclasses__()
     )
 
 
-def _class_for(level: str) -> type[Tokenizer]:
-    """The concrete class for ``level``.
+def _tokenizer(tokenizer_name: str) -> type[Tokenizer]:
+    """The class a tokenizer name refers to.
 
-    Only *direct* subclasses of Tokenizer are levels: Tokenizer.__subclasses__()
-    does not see grandchildren, so a subclass of a level would be invisible here
-    and in :func:`tokenizer_levels`.
+    Private on purpose: :func:`tokenizer_from_text` and :func:`tokenizer_from_dict`
+    are the way in, so a name never has to be turned into a class by a caller.
     """
-    for sub in Tokenizer.__subclasses__():
-        if sub.level == level:
-            return sub
-    available = tuple(name for name, _ in tokenizer_levels())
-    raise ValueError(f"level must be one of {available}, got {level!r}")
+    for cls in Tokenizer.__subclasses__():
+        if cls.tokenizer_name() == tokenizer_name:
+            return cls
+    available = tuple(cls.tokenizer_name() for cls in Tokenizer.__subclasses__())
+    raise ValueError(f"tokenizer must be one of {available}, got {tokenizer_name!r}")
 
 
-def tokenizer_from_text(text: str, level: str) -> Tokenizer:
+def tokenizer_from_text(text: str, tokenizer_name: str) -> Tokenizer:
     """Count tokens over the text and fix the vocabulary.
 
-    ``level`` chooses the class, so this is the single entry point for both
-    levels; :func:`tokenizer_levels` lists the names it accepts. A corpus of
-    several documents arrives as one text: counts do not care where documents
-    end, so nothing is lost by joining them first.
+    ``tokenizer_name`` chooses the tokenizer; :func:`tokenizers` lists the names it
+    accepts. A corpus of several documents arrives as one text: counts do not
+    care where documents end, so nothing is lost by joining them first.
     """
-    impl = _class_for(level)
+    impl = _tokenizer(tokenizer_name)
     # Count what encode will actually tokenize: the sentences, not the raw text,
     # so a newline or the space after a terminator is never a token and
     # total_token_count stays the number of tokens the model can see.
@@ -391,7 +399,7 @@ def tokenizer_from_text(text: str, level: str) -> Tokenizer:
 
 def tokenizer_from_dict(data: dict) -> Tokenizer:
     """Rebuild the tokenizer that :meth:`Tokenizer.to_dict` wrote."""
-    return _class_for(data["level"])(
+    return _tokenizer(data["tokenizer_name"])(
         tokens=tuple(data["tokens"]),
         counts=tuple(data["counts"]),
         total_token_count=data["total_token_count"],

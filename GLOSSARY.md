@@ -5,8 +5,12 @@
 - **tokenizer**: `text` → `stream` — the whole corpus as one list of ids, EOS
   after every unit.
 - **pair builder**: `stream` → `pairs` — one context and one target per prediction.
+- **fit**: `architecture` + `text` → a `model` — build the pairs, then the weights
+  that minimise the loss.
 - **model**: `context` → `logits` — one score per token in the vocabulary.
 - **sampler**: `logits` → `id` — one id per step of a generation.
+- **evaluate**: `model` + `text` → loss and perplexity, on text the weights were
+  not trained on.
 
 ## Text
 
@@ -18,8 +22,8 @@
 
 Tokens are built by the tokenizer (`kernel/lm/tokenizer.py`).
 
-- **token** — the smallest piece the tokenizer emits: one character (char level)
-  or one word or punctuation mark (word level).
+- **token** — the smallest piece the tokenizer emits: one character (char
+  tokenizer) or one word or punctuation mark (word tokenizer).
 - **id** — a token's integer. Opaque: only the tokenizer's table gives it
   meaning, and ids never mean anything across two tokenizers.
 - **vocabulary** — the set of tokens the tokenizer knows. **`vocab_size`** — how
@@ -63,9 +67,9 @@ Tokens are built by the tokenizer (`kernel/lm/tokenizer.py`).
   **rightmost slot holds the id immediately before the target**, and moving
   left goes further back.
 - **context width `w`** — how many slots a context has: how far back the model
-  reads. A hyperparameter of `MLP` and `LSTM`, enumerable through
-  `get_params()`, and the constant 1 for `Bigram`, which has no such parameter: a
-  model that reads more history is an n-gram of higher order, a different model
+  reads. A hyperparameter of `MLP` and `LSTM`, enumerable through `get_params()`,
+  and the constant 1 for `Bigram`, which has no such parameter: a model that
+  reads more history is an n-gram of higher order, a different architecture
   rather than a setting.
 
 ## Pairs
@@ -114,7 +118,11 @@ context is padded out with BOS, or when a unit is shorter than `w`.
 
 ## Model
 
-- **architecture** — one buildable model class: `Bigram`, `MLP`, `LSTM`.
+- **architecture** — a buildable recipe: a graph plus its own hyperparameters
+  (`Bigram`, `MLP`, `LSTM`). No weights, no tokenizer.
+- **model** — an instance of an architecture with a tokenizer and weights: what
+  `fit` returns, and what generates, evaluates and saves. The architecture is
+  the recipe; the model is one fitted result of it.
 - **hyperparameter** — a setting for an architecture, e.g. `context_width`,
   `units` or `hidden_units`. Enumerable through `get_params()`.
 - **order** — how many tokens a prediction involves: its `w` ids of history plus

@@ -11,21 +11,21 @@ enable the Gutenberg and reflow cleaning rules.
 
 Connect its **Data** output to **LM Vocab Viewer** **Data**.
 
-## 2. Compare character and word level
+## 2. Compare the character and word tokenizers
 
 Open **LM Vocab Viewer**. The summary line reports vocabulary size, mean token
 length and the fraction of tokens seen only once (the hapax fraction).
 
-- **Char level** - every character is a token, spaces included. The vocabulary
+- **Char** - every character is a token, spaces included. The vocabulary
   is small; the sequences are long.
-- **Word level** - words and punctuation marks are tokens. The vocabulary is
+- **Word** - words and punctuation marks are tokens. The vocabulary is
   larger; the sequences are shorter.
 
-Read the **Char level** and **Word level** tabs. Then answer:
+Read the **Char** and **Word** tabs. Then answer:
 
-1. Which level has more tokens seen exactly once?
-2. Which level has the longest individual tokens?
-3. What happens to punctuation at word level? Look for `.`, `,` and `"` in the
+1. Which tokenizer has more tokens seen exactly once?
+2. Which tokenizer has the longest individual tokens?
+3. What happens to punctuation with the word tokenizer? Look for `.`, `,` and `"` in the
    token list.
 4. What happens to capital letters? Case is preserved; `The` and `the` are
    different tokens.
@@ -39,7 +39,7 @@ The king's counsellors said, "We will not wait."
 The physician's satchel held herbs, a knife and a tincture.
 ```
 
-Load it with **LM Text Loader** and press **Reload** and inspect again. At word level, `king's` should stay one token;
+Load it with **LM Text Loader** and press **Reload** and inspect again. With the word tokenizer, `king's` should stay one token;
 quote marks are separate tokens. This is the dependency-free tokenizer the
 kernel uses, not a pretrained subword tokenizer.
 
@@ -60,18 +60,18 @@ mismatched vocabulary back into training or generation.
 
 The LM Pre-trainer's tokenizer choice is a testable hypothesis:
 
-- char level should give a smaller vocabulary and longer sequences;
-- word level should give a larger vocabulary and shorter sequences, but more
+- the char tokenizer should give a smaller vocabulary and longer sequences;
+- the word tokenizer should give a larger vocabulary and shorter sequences, but more
   `<unk>` tokens on unfamiliar text.
 
 Compare the numbers in **LM Vocab Viewer** with the loss curves in the LM Pre-trainer.
-Write down which level trained faster and which produced more plausible text.
+Write down which tokenizer trained faster and which produced more plausible text.
 
 ## Checkpoint
 
 - You can read vocabulary size, mean token length and hapax fraction.
 - You can explain why the tokenizer travels with the model.
-- You can predict what a word-level model will do with an unseen word.
+- You can predict what a word-tokenizer model will do with an unseen word.
 
 ## What next
 

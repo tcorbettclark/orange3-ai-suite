@@ -2,7 +2,7 @@
 
 A thin shell over :mod:`orangecontrib.ai_suite.kernel.lm`: options, a live loss plot and the
 checkpoint table. Training runs in a background QThread and streams per-epoch
-stats into pyqtgraph; all substance (tokenizer, pairs, Keras builders,
+stats into pyqtgraph; all substance (tokenizer, pairs, architectures, training,
 sampling) lives in the kernel.
 """
 
@@ -19,21 +19,21 @@ from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
 from orangecontrib.ai_suite.kernel.lm import (
-    ARCHITECTURES,
+    LanguageModel,
+    TrainingOptions,
+    architectures,
     tokenizer_from_text,
-    tokenizer_levels,
-    train_language_model,
+    tokenizers,
 )
 
-# Architecture names and labels come from the kernel registry, so neither
-# dropdown can drift from the classes it offers.
-ARCHITECTURE_VALUES = list(ARCHITECTURES)
-ARCHITECTURE_LABELS = [cls.label for cls in ARCHITECTURES.values()]
-# Level identifiers come from the kernel, so the dropdown cannot drift from the
-# classes; only the short label formatting is decided here.
-LEVELS = tokenizer_levels()
-LEVEL_VALUES = [name for name, _ in LEVELS]
-LEVEL_LABELS = [f"{name.capitalize()} level" for name, _ in LEVELS]
+# Names and labels come from the kernel's own discovery, so neither dropdown can
+# drift from the classes it offers; only the label formatting is decided here.
+ARCHITECTURES = architectures()
+ARCHITECTURE_VALUES = [cls.architecture_name() for cls, _ in ARCHITECTURES]
+ARCHITECTURE_LABELS = [cls.__name__ for cls, _ in ARCHITECTURES]
+TOKENIZERS = tokenizers()
+TOKENIZER_VALUES = [cls.tokenizer_name() for cls, _ in TOKENIZERS]
+TOKENIZER_LABELS = [cls.__name__.removesuffix("Tokenizer") for cls, _ in TOKENIZERS]
 
 
 class TrainingWorker(QThread):
@@ -43,31 +43,20 @@ class TrainingWorker(QThread):
     finished_ok = pyqtSignal(object)
     failed = pyqtSignal(str)
 
-    def __init__(self, text, tokenizer, architecture, options, parent=None):
+    def __init__(self, text, model, options, parent=None):
         super().__init__(parent)
         self.text = text
-        self.tokenizer = tokenizer
-        self.architecture = architecture
+        self.model = model
         self.options = options
         self.request_stop = False
 
     def run(self):
         try:
-            model = train_language_model(
-                self.tokenizer,
+            model = self.model.fit(
                 self.text,
-                self.architecture,
-                epochs=self.options["epochs"],
-                batch_size=self.options["batch_size"],
-                validation_fraction=self.options["validation_fraction"],
-                learning_rate=self.options["learning_rate"],
-                seed=self.options["seed"],
+                self.options,
                 on_epoch=self.epoch_signal.emit,  # thread-safe queued signal
                 stop_requested=lambda: self.request_stop,
-                sample_prompt=self.options["sample_prompt"],
-                sample_temperature=self.options["sample_temperature"],
-                sample_max_new_tokens=self.options["sample_max_new_tokens"],
-                sample_seed=self.options["sample_seed"],
             )
             self.finished_ok.emit(model)
         except Exception:  # pragma: no cover - exact failure surfaces via msg
@@ -82,7 +71,8 @@ class OWLMPretrainer(OWWidget):
     table: one row per epoch with loss, perplexity and, optionally, a sample of
     generated text.
 
-    The architecture dropdown selects the bigram, MLP or LSTM model; the tokenizer dropdown switches between character and word level.
+    The architecture dropdown selects the bigram, MLP or LSTM model; the tokenizer dropdown switches between the
+    character and word tokenizers.
     Running several architectures on one corpus is the central experiment:
     the bigram plateaus, the MLP has a fixed visible memory, and the LSTM
     trains smoothly at a higher cost. Training/validation loss is plotted live
@@ -114,7 +104,7 @@ class OWLMPretrainer(OWWidget):
 
     # settings
     architecture_index = Setting(1)  # MLP is the default
-    tokenizer_level_index = Setting(0)  # char level: small vocab, long sequences
+    tokenizer_index = Setting(0)  # char: small vocab, long sequences
     # One setting per (architecture, hyperparameter), named after the estimator
     # parameter it feeds, so a model can never be handed a control that belongs
     # to another. Defaults agree on embedding_dim and context_width: a fair
@@ -153,7 +143,7 @@ class OWLMPretrainer(OWWidget):
             label="Architecture",
             callback=self._show_architecture,
         )
-        gui.comboBox(arch_box, self, "tokenizer_level_index", items=LEVEL_LABELS, label="Tokenizer")
+        gui.comboBox(arch_box, self, "tokenizer_index", items=TOKENIZER_LABELS, label="Tokenizer")
 
         # Only the selected architecture's controls are shown: the others would
         # be inert, since each estimator declares just its own parameters.
@@ -235,31 +225,36 @@ class OWLMPretrainer(OWWidget):
             box.setVisible(name == selected)
 
     def _architecture(self):
-        """The selected model, configured from the settings it declares.
+        """The selected architecture, configured from the settings it declares.
 
         ``get_params`` names the hyperparameters, and each setting is named
-        after the parameter it feeds, so the wiring is derived from the
-        estimator rather than restated here - a new parameter on a model needs a
+        after the parameter it feeds, so the wiring is derived from the class
+        rather than restated here - a new parameter on an architecture is a
         control and nothing else.
         """
-        cls = ARCHITECTURES[ARCHITECTURE_VALUES[self.architecture_index]]
-        values = {param: getattr(self, f"{cls.name}_{param}") for param in cls().get_params()}
+        cls = ARCHITECTURES[self.architecture_index][0]
+        name = cls.architecture_name()
+        values = {param: getattr(self, f"{name}_{param}") for param in cls().get_params()}
         return cls(**values)
 
-    def _collect_options(self) -> dict:
-        return {
-            "tokenizer_level": LEVEL_VALUES[self.tokenizer_level_index],
-            "epochs": self.epochs,
-            "batch_size": self.batch_size,
-            "learning_rate": self.learning_rate,
-            "validation_fraction": self.validation_fraction,
-            "max_vocab": self.max_vocab,  # 0 = all
-            "seed": 0,
-            "sample_prompt": self.sample_prompt,
-            "sample_temperature": self.sample_temperature if self.store_samples else None,
-            "sample_max_new_tokens": self.sample_max_new_tokens,
-            "sample_seed": 0,
-        }
+    def _training_options(self) -> TrainingOptions:
+        """The run's settings, as the kernel's record of a run.
+
+        None of these describe the architecture: tokenization and vocabulary
+        pruning happen before the model exists, and the architecture's own
+        hyperparameters come from the controls it declares.
+        """
+        return TrainingOptions(
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            learning_rate=self.learning_rate,
+            validation_fraction=self.validation_fraction,
+            seed=0,
+            sample_prompt=self.sample_prompt,
+            sample_temperature=self.sample_temperature if self.store_samples else None,
+            sample_max_new_tokens=self.sample_max_new_tokens,
+            sample_seed=0,
+        )
 
     def _prepare_worker(self) -> TrainingWorker | None:
         self.Warning.nothing_to_train.clear()
@@ -274,13 +269,12 @@ class OWLMPretrainer(OWWidget):
         self._val_curve.setData([], [])
         self.status_label.setText("")
 
-        options = self._collect_options()
-        architecture = self._architecture()
-        tokenizer = tokenizer_from_text(self.text, options.pop("tokenizer_level"))
-        max_vocab = options.pop("max_vocab")
-        if max_vocab:
-            tokenizer = tokenizer.keep_top(max_vocab)  # real tokens, specials always kept
-        worker = TrainingWorker(self.text, tokenizer, architecture, options)
+        text_tokenizer = tokenizer_from_text(self.text, TOKENIZER_VALUES[self.tokenizer_index])
+        if self.max_vocab:
+            # real tokens only; the special tokens are always kept
+            text_tokenizer = text_tokenizer.keep_top(self.max_vocab)
+        model = LanguageModel(self._architecture(), text_tokenizer)
+        worker = TrainingWorker(self.text, model, self._training_options())
         worker.epoch_signal.connect(self._on_epoch)
         worker.finished_ok.connect(self._on_done)
         worker.failed.connect(self._on_failed)
@@ -330,12 +324,12 @@ class OWLMPretrainer(OWWidget):
         self.model = model
         self.Outputs.model.send(model)
         self.Outputs.checkpoint.send(checkpoint_table(self.epoch_stats))
-        hp = model.hyperparameters
+        results = model.results
         self.status_label.setText(
-            f"Done: {hp['architecture']}, {hp['n_train_pairs']} train pairs "
-            f"({hp['n_val_pairs']} val), final val loss "
-            f"{hp['final_val_loss']:.3f} (perplexity "
-            f"{np.exp(hp['final_val_loss']):.1f})"
+            f"Done: {model.architecture.label}, {results.n_train_pairs} train pairs "
+            f"({results.n_val_pairs} val), final val loss "
+            f"{results.final_val_loss:.3f} (perplexity "
+            f"{np.exp(results.final_val_loss):.1f})"
         )
 
     def _on_failed(self, tb: str):

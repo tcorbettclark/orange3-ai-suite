@@ -1,4 +1,4 @@
-"""Tokenizer edge cases: special ids, levels, encode/decode round trips, pruning
+"""Tokenizer edge cases: special ids, the catalogue, encode/decode round trips, pruning
 (BOS/padding, unknowns, sentence boundaries) start here.
 
 Expected ids are always derived via ``tok.index(...)`` - no hardcoded id
@@ -22,7 +22,7 @@ from orangecontrib.ai_suite.kernel.lm import (
     WordTokenizer,
     tokenizer_from_dict,
     tokenizer_from_text,
-    tokenizer_levels,
+    tokenizers,
 )
 
 CORPUS = "Hello world!\nDon't stop; it's o’clock.\nAB ab ab"
@@ -37,26 +37,30 @@ def test_special_ids_fixed():
     assert tok.token(EOS_ID) == EOS and tok.is_special(EOS_ID)
 
 
-def test_levels_catalogue():
+def test_tokenizers_catalogue():
     # The catalogue is derived from the classes, so it cannot go stale.
-    levels = tokenizer_levels()
-    assert [name for name, _ in levels] == ["char", "word"]
-    assert all(desc for _, desc in levels)
-    assert levels[0][1].startswith("Character level")
-    assert levels[1][1].startswith("Word level")
-    assert levels == tokenizer_levels()  # stable across calls
+    catalogue = tokenizers()
+    assert [cls.tokenizer_name() for cls, _ in catalogue] == ["char", "word"]
+    assert all(desc for _, desc in catalogue)
+    assert catalogue[0][1].startswith("Character tokenizer")
+    assert catalogue[1][1].startswith("Word tokenizer")
+    assert catalogue == tokenizers()  # stable across calls
+    assert CharTokenizer.tokenizer_name() == "char"
+    assert WordTokenizer.tokenizer_name() == "word"
 
 
-def test_levels_are_classes():
+def test_tokenizer_lookup_is_classes():
     assert isinstance(tokenizer_from_text(CORPUS, "char"), CharTokenizer)
     assert isinstance(tokenizer_from_text(CORPUS, "word"), WordTokenizer)
     with pytest.raises(TypeError):
         Tokenizer(tokens=(BOS, UNK), counts=(0, 0))  # abstract
-    with pytest.raises(ValueError, match="level"):
+    assert isinstance(tokenizer_from_text(CORPUS, "char"), CharTokenizer)
+    assert isinstance(tokenizer_from_text(CORPUS, "word"), WordTokenizer)
+    with pytest.raises(ValueError, match="tokenizer"):
         tokenizer_from_text(CORPUS, "sentencepiece")
 
 
-def test_char_level_excludes_nothing():
+def test_char_tokenizer_excludes_nothing():
     tok = tokenizer_from_text("a b", "char")
     ids = tok.encode("a b")
     assert len(ids) == 4  # 'a', ' ', 'b' + <eos>
@@ -65,13 +69,13 @@ def test_char_level_excludes_nothing():
     assert tok.vocab_size == 3 + 3  # <bos>, <unk>, 'a', ' ', 'b'
 
 
-def test_word_level_apostrophes_and_punctuation():
+def test_word_tokenizer_apostrophes_and_punctuation():
     tok = tokenizer_from_text(CORPUS, "word")
     tokens = [tok.token(i) for i in tok.encode("Don't stop; it's o’clock.")]
     assert tokens == ["Don't", "stop", ";", "it's", "o’clock", ".", EOS]
 
 
-def test_word_level_preserves_case():
+def test_word_tokenizer_preserves_case():
     tok = tokenizer_from_text("AB ab", "word")
     assert tok.index("AB") != tok.index("ab")
     assert tok.vocab_size == 3 + 2
@@ -248,7 +252,7 @@ def test_dict_round_trip():
 def test_from_dict_preserves_saved_order():
     # Saved order is what ids were trained against, so it must never be re-sorted.
     data = {
-        "level": "word",
+        "tokenizer_name": "word",
         "tokens": [BOS, UNK, EOS, "z", "a"],
         "counts": [0, 0, 0, 1, 2],
         "total_token_count": 3,

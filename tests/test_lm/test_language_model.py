@@ -1,4 +1,4 @@
-"""Keras builder + LanguageModel tests.
+"""Architecture + LanguageModel tests.
 
 These run in plain Python - no Orange, no Qt - and need only the package's own
 dependencies.
@@ -14,13 +14,29 @@ import pytest
 
 from orangecontrib.ai_suite.kernel.lm import (
     LanguageModel,
+    TrainingOptions,
     tokenizer_from_text,
-    train_language_model,
 )
-from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, LSTM, MLP, Bigram
-from orangecontrib.ai_suite.kernel.lm.models import _sample
+from orangecontrib.ai_suite.kernel.lm.architecture import (
+    LSTM,
+    MLP,
+    Bigram,
+    architecture_from_dict,
+    architectures,
+)
+from orangecontrib.ai_suite.kernel.lm.language_model import _sample
 
 CORPUS = "the cat sat on the mat. the cat saw the dog. a dog and a cat ran."
+
+
+def fit(tokenizer, text, architecture, *, on_epoch=None, stop_requested=None, **options):
+    """Training in one line: the model owns fit, the options carry the run."""
+    return LanguageModel(architecture, tokenizer).fit(
+        text,
+        TrainingOptions(**options),
+        on_epoch=on_epoch,
+        stop_requested=stop_requested,
+    )
 
 
 @pytest.fixture(scope="module")
@@ -30,7 +46,7 @@ def tokenizer():
 
 @pytest.fixture(scope="module")
 def mlp_model(tokenizer):
-    return train_language_model(
+    return fit(
         tokenizer,
         CORPUS,
         MLP(context_width=8, embedding_dim=8, hidden_units=16),
@@ -53,21 +69,21 @@ def test_context_width_is_a_hyperparameter_only_where_it_is_tunable():
         Bigram(context_width=8)
 
 
-def test_graph_accepts_the_models_own_width(tokenizer):
-    for architecture in (Bigram(), MLP(context_width=8), LSTM(context_width=8)):
-        width = architecture.context_width
-        graph = architecture.build(vocab_size=tokenizer.vocab_size, seed=0)
+def test_built_keras_model_accepts_the_architectures_own_width(tokenizer):
+    for instance in (Bigram(), MLP(context_width=8), LSTM(context_width=8)):
+        width = instance.context_width
+        keras_model = instance.build(vocab_size=tokenizer.vocab_size, seed=0)
         # Order is history plus the target: 2 for a bigram, width + 1 otherwise.
-        assert width + 1 == (2 if isinstance(architecture, Bigram) else 9)
-        assert tuple(graph(np.zeros((2, width), dtype=np.int32)).shape) == (
+        assert width + 1 == (2 if isinstance(instance, Bigram) else 9)
+        assert tuple(keras_model(np.zeros((2, width), dtype=np.int32)).shape) == (
             2,
             tokenizer.vocab_size,
         )
 
 
 def test_bigram_parameter_count_is_the_count_table(tokenizer):
-    model = Bigram().build(vocab_size=tokenizer.vocab_size, seed=0)
-    assert model.count_params() == tokenizer.vocab_size**2  # Flatten adds none
+    keras_model = Bigram().build(vocab_size=tokenizer.vocab_size, seed=0)
+    assert keras_model.count_params() == tokenizer.vocab_size**2  # Flatten adds none
 
 
 def test_architectures_declare_only_their_own_parameters():
@@ -84,7 +100,15 @@ def test_architectures_declare_only_their_own_parameters():
         "units": 256,
         "layers": 1,
     }
-    assert list(ARCHITECTURES) == ["bigram", "mlp", "lstm"]
+    # Discovery, not registration: definition order, and a clear error for a typo.
+    assert [(cls.architecture_name(), summary) for cls, summary in architectures()] == [
+        ("bigram", "Next token from the current token alone: the count table, learned."),
+        ("mlp", "A fixed, visible memory: the whole context concatenated into one hidden layer."),
+        ("lstm", "Recurrence: position is carried by state rather than by concatenation."),
+    ]
+    assert architectures()[1][0] is MLP
+    with pytest.raises(ValueError, match="mlp"):
+        architecture_from_dict({"architecture_name": "mlpp", "architecture_params": {}})
 
 
 def test_architectures_are_cloneable_estimators():
@@ -103,8 +127,8 @@ def test_builder_error_paths(tokenizer):
         MLP(context_width=0).build(vocab_size=10)
     with pytest.raises(ValueError, match="layers"):
         LSTM(context_width=2, layers=3).build(vocab_size=10)
-    for architecture in (MLP(context_width=2), LSTM(context_width=2)):
-        architecture.build(vocab_size=10)  # constructs fine
+    for instance in (MLP(context_width=2), LSTM(context_width=2)):
+        instance.build(vocab_size=10)  # constructs fine
 
 
 # ---- training ------------------------------------------------------------
@@ -116,7 +140,7 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
     def hook(stats):
         seen.append(stats)
 
-    model = train_language_model(
+    model = fit(
         tokenizer,
         CORPUS,
         MLP(context_width=8, embedding_dim=8, hidden_units=16),
@@ -132,20 +156,19 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
         assert s["val_loss"] > 0 and s["val_perplexity"] == pytest.approx(
             math.exp(s["val_loss"]), rel=1e-9
         )
-    hp = model.hyperparameters
-    assert hp["n_train_pairs"] + hp["n_val_pairs"] == hp["n_pairs_total"]
-    assert hp["n_val_pairs"] > 0 and hp["n_train_pairs"] > 0
-    assert 0 < hp["validation_fraction"] < 1
+    results = model.results
+    assert results.n_train_pairs + results.n_val_pairs == results.n_pairs_total
+    assert results.n_val_pairs > 0 and results.n_train_pairs > 0
+    assert model.training.epochs == 12 and model.training.batch_size == 32
 
 
 def test_pairs_are_built_at_the_models_width(tokenizer):
-    # The bigram has no width to ask for; the data follows the model.
-    bigram = train_language_model(tokenizer, CORPUS, Bigram(), epochs=1, batch_size=32, seed=0)
-    assert bigram.context_width == 1
+    # The bigram has no width to ask for; the data follows the architecture.
+    bigram = fit(tokenizer, CORPUS, Bigram(), epochs=1, batch_size=32, seed=0)
+    assert bigram.context_width == 1  # read through the architecture, not stored
     assert bigram.keras_model.input_shape == (None, 1)
-    assert bigram.hyperparameters["context_width"] == 1
 
-    wide = train_language_model(
+    wide = fit(
         tokenizer,
         CORPUS,
         LSTM(context_width=4, embedding_dim=8, units=16),
@@ -155,7 +178,7 @@ def test_pairs_are_built_at_the_models_width(tokenizer):
     )
     assert wide.context_width == 4
     assert wide.keras_model.input_shape == (None, 4)
-    assert wide.hyperparameters["n_pairs_total"] == bigram.hyperparameters["n_pairs_total"]
+    assert wide.results.n_pairs_total == bigram.results.n_pairs_total
 
 
 def test_stop_requested_stops_training_cleanly(tokenizer):
@@ -167,7 +190,7 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
     def stop_requested():
         return len(seen) >= 2  # the widget's Stop button analogue
 
-    model = train_language_model(
+    model = fit(
         tokenizer,
         CORPUS,
         MLP(context_width=8, embedding_dim=8, hidden_units=16),
@@ -181,20 +204,18 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
     assert max(seen) <= 3 and len(seen) < 50  # training ended early
 
 
-def test_train_validation_split_is_mandatory():
+def test_training_options_and_split_are_validated():
     with pytest.raises(ValueError, match="validation_fraction"):
-        train_language_model(
-            tokenizer_from_text(CORPUS, "char"), CORPUS, MLP(), validation_fraction=0.0
-        )
+        TrainingOptions(validation_fraction=0.0)
+    with pytest.raises(ValueError, match="epochs"):
+        TrainingOptions(epochs=0)
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
-        train_language_model(
+        fit(
             tokenizer_from_text("one sentence only.", "char"),
             "one sentence only.",
             MLP(),
         )
-    with pytest.raises(ValueError, match="epochs"):
-        train_language_model(tokenizer_from_text(CORPUS, "char"), CORPUS, MLP(), epochs=0)
 
 
 # ---- sampling ------------------------------------------------------------
@@ -233,7 +254,7 @@ def test_word_level_generate_smoke():
     tok = tokenizer_from_text(CORPUS, "word")
     # The bigram has no width parameter: it trains and generates at width 1,
     # with no input trimming anywhere and nothing to validate.
-    model = train_language_model(tok, CORPUS, Bigram(), epochs=8, batch_size=16, seed=0)
+    model = fit(tok, CORPUS, Bigram(), epochs=8, batch_size=16, seed=0)
     assert model.context_width == 1
     out = model.generate("the", temperature=0, max_new_tokens=6)
     assert out.startswith("the")
@@ -246,12 +267,12 @@ def test_sample_temperature_zero_is_argmax():
     assert _sample(logits, -1.0, rng) == 1  # any non-positive temperature = greedy
 
 
-# ---- perplexity ------------------------------------------------------------
+# ---- evaluation -----------------------------------------------------------
 
 
-def test_perplexity_prefers_indomain_text(mlp_model):
-    in_domain = mlp_model.perplexity("the cat sat on the mat. the cat saw the dog.")
-    out_domain = mlp_model.perplexity("zx qv jk wp lk bf hg.")
+def test_evaluation_prefers_indomain_text(mlp_model):
+    in_domain = mlp_model.evaluate("the cat sat on the mat. the cat saw the dog.")
+    out_domain = mlp_model.evaluate("zx qv jk wp lk bf hg.")
     assert in_domain["perplexity"] > 1.0
     assert in_domain["perplexity"] < out_domain["perplexity"]
 
@@ -264,7 +285,8 @@ def test_save_load_round_trip(mlp_model, tmp_path):
     assert (path / "model.keras").exists() and (path / "meta.json").exists()
     loaded = LanguageModel.load(path)
     assert loaded.tokenizer.tokens == mlp_model.tokenizer.tokens
-    assert loaded.hyperparameters == mlp_model.hyperparameters
+    assert loaded.training == mlp_model.training
+    assert loaded.results == mlp_model.results
     assert loaded.parameter_count() == mlp_model.parameter_count()
     # deterministic comparison at greedy temperature: identical generations
     prompt = "the cat "
@@ -282,7 +304,7 @@ def test_language_model_is_serialisable_in_principle(mlp_model):
 
 def test_stop_requested_works_without_epoch_hook(tokenizer):
     """The stop flag must not depend on an on_epoch callback being present."""
-    model = train_language_model(
+    model = fit(
         tokenizer,
         CORPUS,
         MLP(context_width=8, embedding_dim=8, hidden_units=16),
@@ -290,4 +312,12 @@ def test_stop_requested_works_without_epoch_hook(tokenizer):
         batch_size=32,
         stop_requested=lambda: True,
     )
-    assert math.isfinite(model.hyperparameters["final_loss"])
+    assert math.isfinite(model.results.final_loss)
+
+
+def test_unfitted_model_says_so():
+    model = LanguageModel(Bigram(), tokenizer_from_text(CORPUS, "char"))
+    with pytest.raises(RuntimeError, match="fit"):
+        model.generate("the")
+    with pytest.raises(RuntimeError, match="fit"):
+        model.evaluate("the cat sat.")

@@ -1,7 +1,7 @@
 """LM Vocab Viewer: a read-only view of a tokenizer.
 
 Input is a model (preferred: its embedded tokenizer is shown) or data with text
-columns (then character-level and word-level tokenizers are built side by side,
+columns (then the character and word tokenizers are built side by side,
 making the LM Pre-trainer's tokenizer choice visible). There are deliberately no
 outputs: the viewer never feeds back into training or generation, so
 vocabulary-mismatch bugs are impossible by construction.
@@ -31,7 +31,7 @@ class OWLMVocabViewer(OWWidget):
     """Inspect a tokenizer: tokens, ids and frequencies.
 
     Connect a model to see the vocabulary embedded in it, or connect text data
-    to compare a character-level and a word-level tokenizer built from that
+    to compare a character and a word tokenizer built from that
     data. The summary line reports vocabulary size, mean token length and the
     fraction of tokens seen only once; the tabs list the full vocabulary for
     each tokenizer.
@@ -70,8 +70,8 @@ class OWLMVocabViewer(OWWidget):
         self.char_table = self._make_table(("token", "id", "count"))
         self.word_table = self._make_table(("token", "id", "count"))
         tabs.addTab(self.model_table, "Model tokenizer")
-        tabs.addTab(self.char_table, "Char level")
-        tabs.addTab(self.word_table, "Word level")
+        tabs.addTab(self.char_table, "Char")
+        tabs.addTab(self.word_table, "Word")
         self.mainArea.layout().addWidget(tabs)
         self._tabs = tabs
         self.resize(620, 700)
@@ -119,7 +119,7 @@ class OWLMVocabViewer(OWWidget):
             stats = self._model_tokenizer.stats()
             dropped = stats["dropped_occurrences"]
             self.summary_label.setText(
-                f"{stats['level']}-level, vocab {stats['vocab_size']} "
+                f"{stats['tokenizer_name']} tokenizer, vocab {stats['vocab_size']} "
                 f"(incl. specials), mean token length {stats['mean_token_length']:.2f}, "
                 f"hapax fraction {stats['single_occurrence_fraction']:.0%}"
                 + (f", {dropped} corpus tokens dropped" if dropped else "")

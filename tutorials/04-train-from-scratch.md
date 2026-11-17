@@ -19,7 +19,7 @@ instead. The steps are identical; only the corpus size changes.
 Set:
 
 - **Architecture**: Bigram
-- **Tokenizer**: Char level
+- **Tokenizer**: Char
 - **Epochs**: 5
 - **Batch size**: 256
 - **Sample prompt**: `the `
@@ -75,17 +75,17 @@ context. Its curve is usually smoother, and it costs more per epoch. Treat it
 as a launch-and-return experiment: start it, then inspect the samples when it
 finishes.
 
-## 5. Character level versus word level
+## 5. Character versus word tokenizer
 
 Repeat the MLP run with:
 
-- **Tokenizer**: Word level
+- **Tokenizer**: Word
 - **Max vocab**: 5000
 - **Context width**: 8
 
 Look at the vocabulary in **LM Vocab Viewer** (connect the model's **Model**
-output to its **Model** input). Word level gives a larger vocabulary and shorter
-sequences. Compare the loss curve and the samples with the char-level run.
+output to its **Model** input). The word tokenizer gives a larger vocabulary and shorter
+sequences. Compare the loss curve and the samples with the char run.
 
 ## 6. Stop early
 
