@@ -4,7 +4,10 @@ An architecture describes a graph and its own hyperparameters; training decides
 the optimizer, the loss, how long to fit, when to stop and what counts as a
 result. The loop itself lives on :class:`~.language_model.LanguageModel`, which
 is the object that owns the weights; this module holds the nouns a run is
-described and measured by, plus the per-epoch plumbing.
+described and measured by, the optimizer/loss pair, and the epoch callback.
+
+Sampling from the model during training is deliberately *not* here: it is a
+reporting concern, so a caller does it in its own ``on_epoch`` hook.
 """
 
 from __future__ import annotations
@@ -15,16 +18,15 @@ from dataclasses import dataclass
 
 import keras
 
-EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity[, sample]}
+EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity}, plus what a hook adds
 
 
 @dataclass(frozen=True)
 class TrainingOptions:
     """How to train: one run's settings, none of which describe the architecture.
 
-    ``sample_temperature`` is None unless the caller wants a generated sample
-    after every epoch, which is what makes the checkpoint table readable: it is
-    a snapshot of current behaviour rather than a number.
+    ``validation_fraction`` is the share of units held out, not of pairs: the
+    division happens per unit, inside :meth:`Pairs.split`.
     """
 
     epochs: int = 15
@@ -32,10 +34,6 @@ class TrainingOptions:
     validation_fraction: float = 0.1
     learning_rate: float = 1e-3
     seed: int = 0
-    sample_prompt: str = ""
-    sample_temperature: float | None = None
-    sample_max_new_tokens: int = 32
-    sample_seed: int = 0
 
     def __post_init__(self) -> None:
         if self.epochs < 1:
@@ -46,13 +44,26 @@ class TrainingOptions:
 
 @dataclass(frozen=True)
 class TrainingResults:
-    """What one run produced, beyond the weights: the counts and the final losses."""
+    """What one run produced, beyond the weights: the counts and the final losses.
+
+    Perplexity is ``e^loss`` - the same measurement, re-scaled to "how many equally
+    likely tokens the model behaves as if it were choosing between" - so it is a
+    property of the loss rather than a second number that could disagree with it.
+    """
 
     n_pairs_total: int
     n_train_pairs: int
     n_val_pairs: int
     final_loss: float
     final_val_loss: float
+
+    @property
+    def final_perplexity(self) -> float:
+        return math.exp(self.final_loss)
+
+    @property
+    def final_val_perplexity(self) -> float:
+        return math.exp(self.final_val_loss)
 
 
 def compile_keras_model(keras_model: keras.Model, learning_rate: float = 1e-3) -> keras.Model:
@@ -73,15 +84,13 @@ def epoch_callback(
     *,
     on_epoch: Callable[[EpochStats], None] | None = None,
     stop_requested: Callable[[], bool] | None = None,
-    sample: Callable[[], str] | None = None,
 ) -> keras.callbacks.Callback:
     """The two mid-run needs of a caller: stream stats, and stop between epochs.
 
-    ``on_epoch`` receives one stats dict per epoch. ``sample``, when given, is
-    called once per epoch to add a generated sample under ``"sample"`` - it needs
-    the model as it currently stands, so the caller supplies it rather than this
-    module reaching for it. ``stop_requested`` is polled after every epoch and
-    ends the Keras loop cleanly rather than raising.
+    ``on_epoch`` receives one stats dict per epoch; a hook that wants to add a
+    generated sample can call ``model.generate(...)`` itself, since the model being
+    fitted is the caller's own object. ``stop_requested`` is polled after every
+    epoch and ends the Keras loop cleanly rather than raising.
     """
 
     def emit(epoch: int, logs: dict) -> None:
@@ -94,8 +103,6 @@ def epoch_callback(
             "perplexity": math.exp(loss) if loss is not None else float("nan"),
             "val_perplexity": (math.exp(val_loss) if val_loss is not None else float("nan")),
         }
-        if sample is not None:
-            stats["sample"] = sample()
         on_epoch(stats)
 
     class _EpochCallback(keras.callbacks.Callback):

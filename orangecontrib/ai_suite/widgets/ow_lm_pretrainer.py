@@ -43,19 +43,26 @@ class TrainingWorker(QThread):
     finished_ok = pyqtSignal(object)
     failed = pyqtSignal(str)
 
-    def __init__(self, text, model, options, parent=None):
+    def __init__(self, text, model, options, sample=None, parent=None):
         super().__init__(parent)
         self.text = text
         self.model = model
         self.options = options
+        self.sample = sample  # (model) -> str, or None: the checkpoint column
         self.request_stop = False
+
+    def _on_epoch(self, stats):
+        """Stream one epoch's numbers, plus a sample if the widget asked for one."""
+        if self.sample is not None:
+            stats["sample"] = self.sample(self.model)
+        self.epoch_signal.emit(stats)  # thread-safe queued signal
 
     def run(self):
         try:
             model = self.model.fit(
                 self.text,
                 self.options,
-                on_epoch=self.epoch_signal.emit,  # thread-safe queued signal
+                on_epoch=self._on_epoch,
                 stop_requested=lambda: self.request_stop,
             )
             self.finished_ok.emit(model)
@@ -250,10 +257,17 @@ class OWLMPretrainer(OWWidget):
             learning_rate=self.learning_rate,
             validation_fraction=self.validation_fraction,
             seed=0,
-            sample_prompt=self.sample_prompt,
-            sample_temperature=self.sample_temperature if self.store_samples else None,
-            sample_max_new_tokens=self.sample_max_new_tokens,
-            sample_seed=0,
+        )
+
+    def _epoch_sample(self):
+        """One generation from the model as it stands, or None when switched off."""
+        if not self.store_samples:
+            return None
+        return lambda model: model.generate(
+            self.sample_prompt,
+            self.sample_temperature,
+            self.sample_max_new_tokens,
+            seed=0,
         )
 
     def _prepare_worker(self) -> TrainingWorker | None:
@@ -274,7 +288,7 @@ class OWLMPretrainer(OWWidget):
             # real tokens only; the special tokens are always kept
             text_tokenizer = text_tokenizer.keep_top(self.max_vocab)
         model = LanguageModel(self._architecture(), text_tokenizer)
-        worker = TrainingWorker(self.text, model, self._training_options())
+        worker = TrainingWorker(self.text, model, self._training_options(), self._epoch_sample())
         worker.epoch_signal.connect(self._on_epoch)
         worker.finished_ok.connect(self._on_done)
         worker.failed.connect(self._on_failed)
@@ -326,10 +340,10 @@ class OWLMPretrainer(OWWidget):
         self.Outputs.checkpoint.send(checkpoint_table(self.epoch_stats))
         results = model.results
         self.status_label.setText(
-            f"Done: {model.architecture.label}, {results.n_train_pairs} train pairs "
+            f"Done: {type(model.architecture).__name__}, {results.n_train_pairs} train pairs "
             f"({results.n_val_pairs} val), final val loss "
             f"{results.final_val_loss:.3f} (perplexity "
-            f"{np.exp(results.final_val_loss):.1f})"
+            f"{results.final_val_perplexity:.1f})"
         )
 
     def _on_failed(self, tb: str):

@@ -317,6 +317,9 @@ all_features()  # the full catalogue, in stable column order
 
 ### Language models
 
+A runnable end-to-end script lives in `examples/lm_from_scratch.py`
+(`uv run python examples/lm_from_scratch.py`); the essentials are:
+
 ```python
 from orangecontrib.ai_suite.kernel.lm import (
     LanguageModel,
@@ -439,6 +442,7 @@ orangecontrib/
       text.py     text loading and corpus helpers
     widgets/      the nine Orange widgets and their icons
 demo/             corpora, fetchers, generated .ows workflows
+examples/         runnable kernel examples
 tests/            kernel tests + offscreen widget tests
 ```
 

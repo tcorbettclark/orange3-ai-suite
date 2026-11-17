@@ -106,8 +106,9 @@ class LanguageModel:
         Pairs are built at the architecture's own context width and split by
         unit, so no unit is on both sides. ``options`` carries everything about
         the run and nothing about the architecture. The Keras model is assigned
-        before fitting begins, so a per-epoch sample is a sample of the model as
-        it currently stands.
+        before fitting begins, so an ``on_epoch`` hook can generate from the model
+        as it currently stands - that is where a per-epoch sample belongs, not in
+        the training settings.
         """
         options = options if options is not None else TrainingOptions()
         pairs = make_pairs(self.tokenizer.encode(text), self.context_width)
@@ -120,13 +121,7 @@ class LanguageModel:
 
         callbacks = []
         if on_epoch is not None or stop_requested is not None:
-            callbacks.append(
-                epoch_callback(
-                    on_epoch=on_epoch,
-                    stop_requested=stop_requested,
-                    sample=self._epoch_sample(options),
-                )
-            )
+            callbacks.append(epoch_callback(on_epoch=on_epoch, stop_requested=stop_requested))
 
         history = self.keras_model.fit(
             train.contexts,
@@ -147,17 +142,6 @@ class LanguageModel:
             final_val_loss=float(history["val_loss"][-1]),
         )
         return self
-
-    def _epoch_sample(self, options: TrainingOptions) -> Callable[[], str] | None:
-        """A callable generating one sample from this model, or None if unwanted."""
-        if options.sample_temperature is None:
-            return None
-        return lambda: self.generate(
-            options.sample_prompt,
-            options.sample_temperature,
-            options.sample_max_new_tokens,
-            options.sample_seed,
-        )
 
     # ---- generation and evaluation -----------------------------------------
 

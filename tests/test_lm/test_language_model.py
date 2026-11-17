@@ -181,6 +181,27 @@ def test_pairs_are_built_at_the_models_width(tokenizer):
     assert wide.results.n_pairs_total == bigram.results.n_pairs_total
 
 
+def test_results_offer_perplexity_alongside_loss(mlp_model):
+    # perplexity is e^loss, so it is derived, not a second stored number
+    results = mlp_model.results
+    assert results.final_perplexity == pytest.approx(math.exp(results.final_loss))
+    assert results.final_val_perplexity == pytest.approx(math.exp(results.final_val_loss))
+
+
+def test_the_epoch_hook_can_generate_from_the_model_as_it_trains(tokenizer):
+    # Sampling during training is the caller's business: the model being fitted
+    # is its own object, and the Keras model is assigned before the loop starts.
+    samples = []
+    model = LanguageModel(MLP(context_width=8, embedding_dim=8, hidden_units=16), tokenizer)
+    model.fit(
+        CORPUS,
+        TrainingOptions(epochs=3, batch_size=32, seed=0),
+        on_epoch=lambda stats: samples.append(model.generate("the", 0.0, max_new_tokens=8)),
+    )
+    assert len(samples) == 3
+    assert all(isinstance(sample, str) and sample for sample in samples)
+
+
 def test_stop_requested_stops_training_cleanly(tokenizer):
     seen = []
 
