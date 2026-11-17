@@ -136,7 +136,7 @@ Pre-trains a small language model from scratch on a text corpus. The architectur
 selects:
 
 - **Bigram** - context of one token; the floor that any learning achieves.
-- **MLP over a fixed window** - embeds the last *k* tokens and predicts the
+- **MLP over a fixed window** - embeds the last *w* tokens and predicts the
   next; the default.
 - **LSTM** - recurrent state; smoother but slower on CPU.
 
@@ -328,14 +328,14 @@ text = "\n".join(texts)  # join documents outside the kernel
 tokenizer = tokenizer_from_text(text, "char")
 tokenizer = tokenizer.keep_top(2000)  # or .drop_rare(min_count=3); pure, chainable
 stream = tokenizer.encode(text)  # every sentence ends with <eos>
-windows = make_windows(stream, context_size=16)
+windows = make_windows(stream, context_width=16)
 train, valid = windows.split(val_fraction=0.1, seed=0)
 
 model = train_language_model(
     tokenizer,
     text,
     "mlp_window",
-    context_size=16,
+    max_context_width=16,
     embedding_dim=32,
     hidden_units=128,
     epochs=15,

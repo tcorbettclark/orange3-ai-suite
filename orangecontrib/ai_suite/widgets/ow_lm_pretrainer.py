@@ -57,7 +57,7 @@ class TrainingWorker(QThread):
                 self.tokenizer,
                 self.text,
                 self.architecture,
-                context_size=self.options["context_size"],
+                max_context_width=self.options["max_context_width"],
                 epochs=self.options["epochs"],
                 batch_size=self.options["batch_size"],
                 validation_fraction=self.options["validation_fraction"],
@@ -117,7 +117,7 @@ class OWLMPretrainer(OWWidget):
     # settings
     architecture_index = Setting(1)  # MLP-over-window is the default
     tokenizer_level_index = Setting(0)  # char level: small vocab, long sequences
-    context_size = Setting(16)  # window width: data, not a model parameter
+    max_context_width = Setting(16)  # widest context to offer any model
     # One setting per (architecture, hyperparameter), named after the estimator
     # parameter it feeds, so a model can never be handed a control that belongs
     # to another. Defaults agree on embedding_dim: a fair comparison holds it
@@ -155,7 +155,7 @@ class OWLMPretrainer(OWWidget):
             callback=self._show_architecture,
         )
         gui.comboBox(arch_box, self, "tokenizer_level_index", items=LEVEL_LABELS, label="Tokenizer")
-        gui.spin(arch_box, self, "context_size", 1, 64, label="Context window")
+        gui.spin(arch_box, self, "max_context_width", 1, 64, label="Max context")
 
         # Only the selected architecture's controls are shown: the others would
         # be inert, since each estimator declares just its own parameters.
@@ -249,7 +249,7 @@ class OWLMPretrainer(OWWidget):
     def _collect_options(self) -> dict:
         return {
             "tokenizer_level": LEVEL_VALUES[self.tokenizer_level_index],
-            "context_size": self.context_size,
+            "max_context_width": self.max_context_width,
             "epochs": self.epochs,
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,

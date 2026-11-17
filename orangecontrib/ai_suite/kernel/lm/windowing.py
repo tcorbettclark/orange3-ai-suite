@@ -6,13 +6,13 @@ vocabulary.
 
 The stream is self-describing: EOS closes every unit, so unit structure travels
 inside the data and windows cannot cross a boundary even by accident. Nothing
-here needs a parallel list of unit lengths; they are derived from the EOS
-targets in :attr:`Windows.unit_lengths`.
+here needs a parallel record of pairs per unit; they are derived from the EOS
+targets in :attr:`Windows.pairs_per_unit`.
 
-For a unit with ids s1..sm and context size k, the windower builds
-``[BOS, s1..sm, EOS]``. The window for each target is the last k tokens before
-it, left-padded with BOS: the first window is all-BOS, and only from window k+1
-onwards is the context fully real tokens. Targets are s1..sm followed by EOS,
+For a unit with ids s1..sm and context width w, the windower builds
+``[BOS, s1..sm, EOS]``. The window for each target is the last w tokens before
+it, left-padded with BOS: the first window is all-BOS, and only from w+1
+onwards is it fully real tokens. Targets are s1..sm followed by EOS,
 so a unit contributes m+1 windows and the stream contributes exactly
 ``len(stream)`` of them. BOS is never a target - it is context construction,
 not data.
@@ -35,20 +35,20 @@ class Windows:
     """All (context, target) training pairs of a corpus, unit-disjoint.
 
     Unit structure is not stored: every unit's last window predicts EOS, so the
-    boundaries are recoverable from ``targets`` (see :attr:`unit_lengths`).
+    boundaries are recoverable from ``targets`` (see :attr:`pairs_per_unit`).
     That keeps one source of truth, and makes an inconsistent object
     unrepresentable rather than merely validated.
     """
 
-    contexts: np.ndarray  # (N, k) int32
+    contexts: np.ndarray  # (N, w) int32
     targets: np.ndarray  # (N,) int32, one EOS per unit
-    context_size: int
+    context_width: int
 
     def __post_init__(self) -> None:
         self.contexts = np.asarray(self.contexts, dtype=np.int32)
         self.targets = np.asarray(self.targets, dtype=np.int32)
-        if self.contexts.shape != (len(self.targets), self.context_size):
-            raise ValueError("contexts must be shaped (n_windows, context_size)")
+        if self.contexts.shape != (len(self.targets), self.context_width):
+            raise ValueError("contexts must be shaped (n_windows, context_width)")
         if len(self.targets) and int(self.targets[-1]) != EOS_ID:
             raise ValueError("targets must end with <eos>: every unit is terminated")
 
@@ -62,8 +62,8 @@ class Windows:
         return np.concatenate(([0], np.flatnonzero(self.targets == EOS_ID) + 1))
 
     @property
-    def unit_lengths(self) -> tuple[int, ...]:
-        """Windows contributed by each unit, in order (tokens + its EOS)."""
+    def pairs_per_unit(self) -> tuple[int, ...]:
+        """Pairs contributed by each unit, in order: its tokens plus one EOS."""
         return tuple(int(b - a) for a, b in pairwise(self._offsets()))
 
     def _content_keys(self, seed: int) -> list[bytes]:
@@ -123,19 +123,19 @@ class Windows:
         offsets = self._offsets()
         if len(units) == 0:
             return Windows(
-                contexts=np.empty((0, self.context_size), dtype=np.int32),
+                contexts=np.empty((0, self.context_width), dtype=np.int32),
                 targets=np.empty((0,), dtype=np.int32),
-                context_size=self.context_size,
+                context_width=self.context_width,
             )
         slices = [slice(offsets[u], offsets[u + 1]) for u in units]
         return Windows(
             contexts=np.concatenate([self.contexts[s] for s in slices]),
             targets=np.concatenate([self.targets[s] for s in slices]),
-            context_size=self.context_size,
+            context_width=self.context_width,
         )
 
 
-def make_windows(stream: Sequence[int], context_size: int) -> Windows:
+def make_windows(stream: Sequence[int], context_width: int) -> Windows:
     """Build all next-token windows of an EOS-terminated token stream.
 
     The stream is split on ``EOS_ID``; each piece is one unit and is windowed
@@ -146,9 +146,9 @@ def make_windows(stream: Sequence[int], context_size: int) -> Windows:
     A stream that does not end with EOS, or that contains two EOS in a row, is
     rejected: it can only come from something that did not encode a document.
     """
-    if int(context_size) < 1:
-        raise ValueError("context_size must be >= 1")
-    context_size = int(context_size)
+    if int(context_width) < 1:
+        raise ValueError("context_width must be >= 1")
+    context_width = int(context_width)
 
     ids = np.asarray(stream, dtype=np.int32)
     ends = np.flatnonzero(ids == EOS_ID)
@@ -161,16 +161,16 @@ def make_windows(stream: Sequence[int], context_size: int) -> Windows:
     if (ends - starts < 1).any():
         raise ValueError("stream has an empty unit (two <eos> in a row)")
 
-    contexts = np.full((len(ids), context_size), BOS_ID, dtype=np.int32)
+    contexts = np.full((len(ids), context_width), BOS_ID, dtype=np.int32)
     targets = np.empty(len(ids), dtype=np.int32)
     row = 0
     for start, end in zip(starts, ends, strict=True):
         # BOS opens the unit's context; EOS is its last target.
         seq = np.concatenate(([BOS_ID], ids[start:end], [EOS_ID]))
         for i in range(1, len(seq)):
-            lo = max(0, i - context_size)
-            contexts[row, context_size - (i - lo) :] = seq[lo:i]
+            lo = max(0, i - context_width)
+            contexts[row, context_width - (i - lo) :] = seq[lo:i]
             targets[row] = seq[i]
             row += 1
 
-    return Windows(contexts=contexts, targets=targets, context_size=context_size)
+    return Windows(contexts=contexts, targets=targets, context_width=context_width)

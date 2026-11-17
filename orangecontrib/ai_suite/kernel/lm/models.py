@@ -62,7 +62,7 @@ class LanguageModel:
 
     architecture: Architecture
     tokenizer: Tokenizer
-    context_size: int
+    context_width: int  # the width the weights were built at, not the maximum
     keras_model: Any  # keras.Model, typed loosely to keep the kernel import-light
     hyperparameters: dict
 
@@ -83,20 +83,22 @@ class LanguageModel:
         never covered, because contexts never cross a unit end.
 
         The prompt is trimmed to its final unit for the same reason; contexts
-        are the last ``context_size`` ids, left-padded with BOS.
+        are the last ``context_width`` ids, left-padded with BOS, which is the
+        width the model was built at.
         """
         if temperature < 0:
             raise ValueError("temperature must be >= 0 (0 = greedy)")
         rng = np.random.default_rng(seed)
         prompt_ids = _last_unit(self.tokenizer.encode(prompt))
-        # Left-pad the prompt's tail with BOS up to the window size; the pad
-        # goes first, because a naive concatenation would exceed the window.
-        tail = prompt_ids[-self.context_size :]
-        context = [BOS_ID] * (self.context_size - len(tail)) + tail
+        # Left-pad the prompt's tail with BOS up to the context width; the pad
+        # goes first, because a naive concatenation would exceed the width.
+        tail = prompt_ids[-self.context_width :]
+        context = [BOS_ID] * (self.context_width - len(tail)) + tail
         generated: list[int] = []
         for _ in range(max_new_tokens):
-            window = self.architecture.take(np.asarray([context], dtype=np.int32))
-            logits = self.keras_model(window, training=False).numpy()[0]
+            logits = self.keras_model(
+                np.asarray([context], dtype=np.int32), training=False
+            ).numpy()[0]
             next_id = _sample(logits, temperature, rng)
             if next_id == EOS_ID:
                 break
@@ -113,10 +115,10 @@ class LanguageModel:
         in-domain / out-of-domain pair: a single-domain model looks good only on
         the domain it was trained on.
         """
-        windows = make_windows(self.tokenizer.encode(text), self.context_size)
+        windows = make_windows(self.tokenizer.encode(text), self.context_width)
         loss = float(
             self.keras_model.evaluate(
-                self.architecture.take(windows.contexts),
+                windows.contexts,
                 windows.targets,
                 batch_size=batch_size,
                 verbose=0,
@@ -137,7 +139,7 @@ class LanguageModel:
                 "name": self.architecture.name,
                 "params": self.architecture.get_params(),
             },
-            "context_size": self.context_size,
+            "context_width": self.context_width,
             "hyperparameters": self.hyperparameters,
             "tokenizer": self.tokenizer.to_dict(),
         }
@@ -154,7 +156,7 @@ class LanguageModel:
         return cls(
             architecture=architecture_from_metadata(meta["architecture"]),
             tokenizer=tokenizer,
-            context_size=meta["context_size"],
+            context_width=meta["context_width"],
             keras_model=keras.models.load_model(src / _MODEL_FILE),
             hyperparameters=meta["hyperparameters"],
         )

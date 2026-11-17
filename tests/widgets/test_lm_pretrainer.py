@@ -31,7 +31,7 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
     w.show()
     w.set_data(text_table)
     w.epochs = 2
-    w.context_size = 8
+    w.max_context_width = 8
     w.mlp_window_embedding_dim = 8
     w.mlp_window_hidden_units = 16
     w.sample_max_new_tokens = 8
@@ -56,7 +56,7 @@ def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
     w.show()
     w.set_data(text_table)
     w.epochs = 200
-    w.context_size = 8
+    w.max_context_width = 8
     w.mlp_window_embedding_dim = 8
     w.mlp_window_hidden_units = 16
 

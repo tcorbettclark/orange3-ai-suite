@@ -26,7 +26,7 @@ def train_language_model(
     text: str,
     architecture: Architecture,
     *,
-    context_size: int = 16,
+    max_context_width: int = 16,
     epochs: int = 15,
     batch_size: int = 256,
     validation_fraction: float = 0.1,
@@ -41,6 +41,11 @@ def train_language_model(
 ) -> LanguageModel:
     """Build windows from one text, split by sentence, train, return the model.
 
+    ``max_context_width`` is the widest context to offer any model. Each
+    architecture declares how much of it it reads
+    (:meth:`Architecture.context_width`), windows are built at that width, and
+    the model records the width it was built at rather than the maximum.
+
     ``stop_requested`` is checked after every epoch; when it returns True the
     Keras loop stops cleanly (cooperative cancellation by the caller).
 
@@ -53,11 +58,15 @@ def train_language_model(
     if not 0.0 < validation_fraction < 1.0:
         raise ValueError("validation_fraction must be strictly between 0 and 1")
 
-    windows = make_windows(tokenizer.encode(text), context_size)
+    windows = make_windows(tokenizer.encode(text), architecture.context_width(max_context_width))
     train, val = windows.split(validation_fraction, seed=seed)
 
     keras_model = compile_model(
-        architecture.build(vocab_size=tokenizer.vocab_size, context_size=context_size, seed=seed),
+        architecture.build(
+            vocab_size=tokenizer.vocab_size,
+            context_width=windows.context_width,
+            seed=seed,
+        ),
         learning_rate=learning_rate,
     )
 
@@ -75,7 +84,9 @@ def train_language_model(
                 "val_perplexity": (math.exp(val_loss) if val_loss is not None else float("nan")),
             }
             if sample_temperature is not None:
-                transient = LanguageModel(architecture, tokenizer, context_size, keras_model, {})
+                transient = LanguageModel(
+                    architecture, tokenizer, windows.context_width, keras_model, {}
+                )
                 stats["sample"] = transient.generate(
                     sample_prompt, sample_temperature, sample_max_new_tokens, sample_seed
                 )
@@ -91,9 +102,9 @@ def train_language_model(
         callbacks.append(_EpochCallback())
 
     history = keras_model.fit(
-        architecture.take(train.contexts),
+        train.contexts,
         train.targets,
-        validation_data=(architecture.take(val.contexts), val.targets),
+        validation_data=(val.contexts, val.targets),
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
@@ -103,12 +114,15 @@ def train_language_model(
     return LanguageModel(
         architecture=architecture,
         tokenizer=tokenizer,
-        context_size=context_size,
+        # The width the weights were built at, not the maximum that was asked
+        # for: windows are always rebuilt at this width from now on.
+        context_width=windows.context_width,
         keras_model=keras_model,
         hyperparameters={
             "architecture": architecture.name,
             "architecture_params": architecture.get_params(),
-            "context_size": context_size,
+            "context_width": windows.context_width,
+            "max_context_width": max_context_width,
             "epochs": epochs,
             "batch_size": batch_size,
             "validation_fraction": validation_fraction,

@@ -34,7 +34,7 @@ def mlp_model(tokenizer):
         tokenizer,
         CORPUS,
         MLPWindow(embedding_dim=8, hidden_units=16),
-        context_size=8,
+        max_context_width=8,
         epochs=30,
         batch_size=32,
         seed=0,
@@ -44,18 +44,33 @@ def mlp_model(tokenizer):
 # ---- builders ------------------------------------------------------------
 
 
-def test_forward_shape_through_take(tokenizer):
+def test_each_architecture_declares_the_width_it_reads():
+    # A declaration, not a filter applied to the batch afterwards: the bigram
+    # cannot use more than the token it conditions on, the others take it all.
+    assert Bigram().context_width(16) == 1
+    assert MLPWindow().context_width(16) == 16
+    assert LSTM().context_width(16) == 16
+    for maximum in (1, 8, 64):
+        for cls in ARCHITECTURES.values():
+            assert 1 <= cls().context_width(maximum) <= maximum
+
+
+def test_graph_accepts_the_declared_width(tokenizer):
     for cls in ARCHITECTURES.values():
         architecture = cls()
-        graph = architecture.build(vocab_size=tokenizer.vocab_size, context_size=8, seed=0)
-        # Feeding what `take` yields is the contract every caller relies on.
-        x = architecture.take(np.zeros((2, 8), dtype=np.int32))
-        assert x.shape[1] == (1 if cls is Bigram else 8)
-        assert tuple(graph(x).shape) == (2, tokenizer.vocab_size)
+        width = architecture.context_width(8)
+        graph = architecture.build(vocab_size=tokenizer.vocab_size, context_width=width, seed=0)
+        assert width == (1 if cls is Bigram else 8)
+        # Order is history plus the target: 2 for a bigram, width + 1 otherwise.
+        assert width + 1 == (2 if cls is Bigram else 9)
+        assert tuple(graph(np.zeros((2, width), dtype=np.int32)).shape) == (
+            2,
+            tokenizer.vocab_size,
+        )
 
 
 def test_bigram_parameter_count_is_the_count_table(tokenizer):
-    model = Bigram().build(vocab_size=tokenizer.vocab_size, context_size=1, seed=0)
+    model = Bigram().build(vocab_size=tokenizer.vocab_size, context_width=1, seed=0)
     assert model.count_params() == tokenizer.vocab_size**2  # Flatten adds none
 
 
@@ -77,13 +92,13 @@ def test_architectures_are_cloneable_estimators():
 
 def test_builder_error_paths(tokenizer):
     with pytest.raises(ValueError, match="vocab_size"):
-        MLPWindow().build(vocab_size=2, context_size=2)
-    with pytest.raises(ValueError, match="context_size"):
-        MLPWindow().build(vocab_size=10, context_size=0)
+        MLPWindow().build(vocab_size=2, context_width=2)
+    with pytest.raises(ValueError, match="context_width"):
+        MLPWindow().build(vocab_size=10, context_width=0)
     with pytest.raises(ValueError, match="layers"):
-        LSTM(layers=3).build(vocab_size=10, context_size=2)
+        LSTM(layers=3).build(vocab_size=10, context_width=2)
     for cls in (MLPWindow, LSTM):
-        cls().build(vocab_size=10, context_size=2)  # constructs fine
+        cls().build(vocab_size=10, context_width=2)  # constructs fine
 
 
 # ---- training ------------------------------------------------------------
@@ -99,7 +114,7 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
         tokenizer,
         CORPUS,
         MLPWindow(embedding_dim=8, hidden_units=16),
-        context_size=8,
+        max_context_width=8,
         epochs=12,
         batch_size=32,
         seed=0,
@@ -118,6 +133,31 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
     assert 0 < hp["validation_fraction"] < 1
 
 
+def test_windows_are_built_at_the_declared_width(tokenizer):
+    model = train_language_model(
+        tokenizer, CORPUS, Bigram(), max_context_width=8, epochs=1, batch_size=32, seed=0
+    )
+    assert model.context_width == 1  # the width, not the maximum that was asked for
+    assert model.keras_model.input_shape == (None, 1)
+    assert model.hyperparameters["context_width"] == 1
+    assert model.hyperparameters["max_context_width"] == 8
+
+
+def test_a_wide_maximum_does_not_change_what_a_bigram_learns(tokenizer):
+    # Its windows are width 1 either way, so the runs must agree: narrowing is
+    # a storage decision, not a change to the experiment.
+    def fit(maximum):
+        return train_language_model(
+            tokenizer, CORPUS, Bigram(), max_context_width=maximum, epochs=3, batch_size=32, seed=0
+        )
+
+    narrow, wide = fit(1), fit(8)
+    assert narrow.hyperparameters["n_windows_total"] == wide.hyperparameters["n_windows_total"]
+    assert narrow.hyperparameters["final_loss"] == pytest.approx(
+        wide.hyperparameters["final_loss"], rel=1e-6
+    )
+
+
 def test_stop_requested_stops_training_cleanly(tokenizer):
     seen = []
 
@@ -131,7 +171,7 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
         tokenizer,
         CORPUS,
         MLPWindow(embedding_dim=8, hidden_units=16),
-        context_size=8,
+        max_context_width=8,
         epochs=50,
         batch_size=32,
         seed=0,
@@ -183,7 +223,7 @@ def test_different_seeds_diverge_at_high_temperature(mlp_model):
 
 
 def test_long_prompt_uses_last_window(mlp_model):
-    # In-vocabulary prompt far longer than context_size 8: only its tail can
+    # In-vocabulary prompt far longer than context width 8: only its tail can
     # influence the continuation.
     long_prompt = "the cat sat " * 6
     out = mlp_model.generate(long_prompt, temperature=0, max_new_tokens=10)
@@ -192,9 +232,12 @@ def test_long_prompt_uses_last_window(mlp_model):
 
 def test_word_level_generate_smoke():
     tok = tokenizer_from_text(CORPUS, "word")
+    # The maximum is 4, but a bigram reads one slot: it trains and generates at
+    # width 1 without anyone trimming its input first.
     model = train_language_model(
-        tok, CORPUS, Bigram(), context_size=1, epochs=8, batch_size=16, seed=0
+        tok, CORPUS, Bigram(), max_context_width=4, epochs=8, batch_size=16, seed=0
     )
+    assert model.context_width == 1
     out = model.generate("the", temperature=0, max_new_tokens=6)
     assert out.startswith("the")
 
@@ -246,7 +289,7 @@ def test_stop_requested_works_without_epoch_hook(tokenizer):
         tokenizer,
         CORPUS,
         MLPWindow(embedding_dim=8, hidden_units=16),
-        context_size=8,
+        max_context_width=8,
         epochs=5,
         batch_size=32,
         stop_requested=lambda: True,
