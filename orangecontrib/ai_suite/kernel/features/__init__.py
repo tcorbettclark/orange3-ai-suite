@@ -6,7 +6,7 @@ features read their input from is part of the feature (``needs_colour``), not
 of any grouping.
 
 Feature groups are membership lists, not a structure: :mod:`groups` holds them
-over the flat feature table in :mod:`index`, so the same feature can belong to
+over the catalogue in the table below, so the same feature can belong to
 several groups and a group is only ever a selection for ablation or display.
 
 Use :func:`extract_features` for values, :func:`all_features` /
@@ -18,6 +18,7 @@ through :func:`extract_features`, which applies the one pipeline the whole
 catalogue is defined against.
 """
 
+from .catalogue import all_count_feature_names, all_feature_names, all_features, get_feature
 from .extraction import FeatureVector, extract_features
 from .feature import Feature
 from .groups import (
@@ -28,7 +29,6 @@ from .groups import (
     features_of_group,
     get_group,
 )
-from .index import all_count_feature_names, all_feature_names, all_features, get_feature
 from .options import FeatureOptions
 
 __all__ = [

@@ -444,8 +444,8 @@ orangecontrib/
     __init__.py
     adapters.py Orange <-> kernel conversion
     kernel/
-      features/   preprocessing, index, extraction front door
-        catalogue/   one module and one class per feature
+      features/   preprocessing, extraction front door
+        catalogue/   one module and one class per feature, plus the index
         groups.py    feature groups as membership lists over the catalogue
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from orangecontrib.ai_suite.kernel.features import Feature
-from orangecontrib.ai_suite.kernel.features.index import _build
+from orangecontrib.ai_suite.kernel.features.catalogue import _build
 
 
 def _make(name, definition, **extra):
@@ -66,14 +66,14 @@ def test_flags_must_be_bools():
         )
 
 
-def test_index_rejects_duplicate_names():
+def test_catalogue_rejects_duplicate_names():
     first = _make("test_feature_contract", "A sentence long enough to pass the check.")()
     second = _make("test_feature_contract", "A different sentence, also long enough.")()
     with pytest.raises(RuntimeError, match="duplicate feature name"):
         _build([first, second])
 
 
-def test_index_rejects_duplicate_definitions():
+def test_catalogue_rejects_duplicate_definitions():
     first = _make("test_feature_contract", "One shared sentence, long enough to count.")()
     second = _make("test_feature_contract", "One shared sentence, long enough to count.")()
     with pytest.raises(RuntimeError, match="repeats the definition"):

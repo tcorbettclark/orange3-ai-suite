@@ -1,20 +1,28 @@
-"""The feature catalogue: one module, one class, one feature.
+"""The feature catalogue: one module, one class, one feature - and its index.
+
+This package is the primary interface to the features. Each feature is a class
+in its own module. The roster below lists them in column order, and the
+accessors are how the rest of the kernel and the widgets read that collection.
 
 Importing this package imports every feature, which is deliberate: each class
 validates itself when it is created (see :mod:`..feature`), so a malformed
 feature fails here rather than during extraction.
 
-``CATALOGUE`` is the roster and the column order - the only place either is
-defined. It is written out rather than discovered by scanning the directory: a
-module that nothing imports would otherwise be silently invisible, which is a
-worse failure than a stale list. The tests assert that the roster and the
-directory agree.
+``_CATALOGUE`` is the roster *and* the column order - the only place either is
+defined - and it is private because :func:`all_features` already returns it. It
+is written out rather than discovered by scanning the directory: a module that
+nothing imports would otherwise be silently invisible, which is a worse failure
+than a stale list. The tests assert that the roster and the directory agree.
 
 Order here is column order and nothing else. Which features belong together is
 a grouping concern (:mod:`..groups`), so neither this file nor the classes it
 lists may group the features into families: a second statement of the grouping
 would only be something else to go stale.
 """
+
+from __future__ import annotations
+
+from collections.abc import Iterable
 
 from ..feature import Feature
 from .anti_diagonal_profile_peaks import AntiDiagonalProfilePeaks
@@ -56,7 +64,7 @@ from .stroke_crossings_median_level import StrokeCrossingsMedianLevel
 from .top_bottom_symmetry import TopBottomSymmetry
 from .vertical_spread import VerticalSpread
 
-CATALOGUE: tuple[Feature, ...] = (
+_CATALOGUE: tuple[Feature, ...] = (
     MeanIntensity(),
     IntensityStd(),
     RobustContrast(),
@@ -97,4 +105,63 @@ CATALOGUE: tuple[Feature, ...] = (
     GreeneryFraction(),
 )
 
-__all__ = ["CATALOGUE"]
+
+def _build(measures: Iterable[Feature]) -> dict[str, Feature]:
+    table: dict[str, Feature] = {}
+    definitions: dict[str, str] = {}
+    problems: list[str] = []
+    for feature in measures:
+        if feature.name in table:
+            problems.append(f"duplicate feature name {feature.name!r}")
+        if feature.definition in definitions:
+            problems.append(
+                f"{feature.name!r} repeats the definition of {definitions[feature.definition]!r}"
+            )
+        definitions[feature.definition] = feature.name
+        table[feature.name] = feature
+    if problems:
+        raise RuntimeError("; ".join(problems))
+    return table
+
+
+_BY_NAME: dict[str, Feature] = _build(_CATALOGUE)
+
+#: Column position of each feature, derived once from the roster order.
+POSITION: dict[str, int] = {name: i for i, name in enumerate(_BY_NAME)}
+
+
+def all_features() -> tuple[Feature, ...]:
+    """All features in stable column order."""
+    return tuple(_BY_NAME.values())
+
+
+def all_feature_names() -> tuple[str, ...]:
+    return tuple(_BY_NAME)
+
+
+def all_count_feature_names() -> tuple[str, ...]:
+    """Names of the integer-valued count features, in column order."""
+    return tuple(feature.name for feature in _BY_NAME.values() if feature.is_count)
+
+
+def is_known(name: str) -> bool:
+    """Whether a feature name exists in the catalogue."""
+    return name in _BY_NAME
+
+
+def get_feature(name: str) -> Feature:
+    """Look up one feature by name; a friendly error for unknown names."""
+    try:
+        return _BY_NAME[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown feature {name!r}; see all_feature_names() ({len(_BY_NAME)} available)"
+        ) from None
+
+
+__all__ = [
+    "all_count_feature_names",
+    "all_feature_names",
+    "all_features",
+    "get_feature",
+]

@@ -7,8 +7,8 @@ from collections.abc import Iterable
 
 import numpy as np
 
+from .catalogue import POSITION, get_feature, is_known
 from .groups import by_group, group_of, selection
-from .index import POSITION, get_feature, is_known
 from .options import FeatureOptions
 from .preprocessing import preprocess, preprocess_colour
 
@@ -18,7 +18,7 @@ class FeatureVector:
 
     Behaves like a read-only dict (``vec["hole_count"]``, ``vec.keys()``,
     ``vec.items()``) and can produce the plain float array used for one Table
-    row. Feature metadata (group, definition sentence) lives in the index:
+    row. Feature metadata (group, definition sentence) lives in the catalogue:
     ``get_feature(name)``.
     """
 

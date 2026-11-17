@@ -1,4 +1,4 @@
-"""The feature index, the feature groups and the extraction API."""
+"""The feature catalogue, the feature groups and the extraction API."""
 
 from pathlib import Path
 
@@ -24,7 +24,7 @@ TOTAL = sum(EXPECTED_GROUP_SIZES.values())
 assert TOTAL == 38
 
 
-def test_index_structure():
+def test_catalogue_structure():
     features = all_features()
     assert len(features) == TOTAL
     assert all_feature_names() == tuple(feature.name for feature in features)
@@ -55,15 +55,15 @@ def test_catalogue_roster_matches_the_directory():
 
     directory = Path(catalogue.__file__).parent
     on_disk = {path.stem for path in directory.glob("*.py")} - {"__init__"}
-    listed = {type(feature).__module__.rsplit(".", 1)[-1] for feature in catalogue.CATALOGUE}
+    listed = {type(feature).__module__.rsplit(".", 1)[-1] for feature in catalogue.all_features()}
     assert on_disk == listed
-    assert len(catalogue.CATALOGUE) == TOTAL
+    assert len(catalogue.all_features()) == TOTAL
 
 
 def test_catalogue_entries_are_feature_instances():
     from orangecontrib.ai_suite.kernel.features import Feature, catalogue
 
-    for feature in catalogue.CATALOGUE:
+    for feature in catalogue.all_features():
         assert isinstance(feature, Feature)
 
 

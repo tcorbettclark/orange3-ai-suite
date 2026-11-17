@@ -7,7 +7,7 @@ features themselves.
 
 Two rules keep the grouping honest, both checked at import:
 
-- every name listed by a group exists in the index, and every feature belongs
+- every name listed by a group exists in the catalogue, and every feature belongs
   to at least one group (an unlisted feature could never be selected);
 - a group is either on by default or opt-in, and opt-in groups are the ones
   holding colour features - the shortcut stays a deliberate choice.
@@ -22,8 +22,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from .catalogue import all_feature_names, get_feature
 from .feature import Feature
-from .index import all_feature_names, get_feature
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,7 @@ class Group:
     members: tuple[str, ...]  # feature names, in column order
 
 
-GROUPS: tuple[Group, ...] = (
+_GROUPS: tuple[Group, ...] = (
     Group(
         "A",
         "global photometry",
@@ -120,17 +120,17 @@ GROUPS: tuple[Group, ...] = (
     ),
 )
 
-GROUP_ORDER: tuple[str, ...] = tuple(group.letter for group in GROUPS)
+GROUP_ORDER: tuple[str, ...] = tuple(group.letter for group in _GROUPS)
 DEFAULT_GROUPS = "ABCDEF"  # the colour shortcut group is opt-in
 
 
 def _validate() -> dict[str, tuple[str, ...]]:
-    """Check the groups against the index; returns name -> member letters."""
+    """Check the groups against the catalogue; returns name -> member letters."""
     problems: list[str] = []
     memberships: dict[str, list[str]] = {}
     if len(set(GROUP_ORDER)) != len(GROUP_ORDER):
         problems.append("duplicate group letters")
-    for group in GROUPS:
+    for group in _GROUPS:
         if not group.title or not group.description:
             problems.append(f"group {group.letter}: missing title or description")
         if len(set(group.members)) != len(group.members):
@@ -147,7 +147,7 @@ def _validate() -> dict[str, tuple[str, ...]]:
             problems.append(f"DEFAULT_GROUPS names unknown group {letter!r}")
 
     default_members = {
-        name for group in GROUPS if group.letter in DEFAULT_GROUPS for name in group.members
+        name for group in _GROUPS if group.letter in DEFAULT_GROUPS for name in group.members
     }
     colour = sorted(name for name in default_members if get_feature(name).needs_colour)
     if colour:
@@ -162,13 +162,13 @@ _MEMBERSHIPS: dict[str, tuple[str, ...]] = _validate()
 
 def all_groups() -> tuple[Group, ...]:
     """All groups, in display order."""
-    return GROUPS
+    return _GROUPS
 
 
 def get_group(letter: str) -> Group:
     """Look up one group by letter."""
     check_groups((letter,))
-    for group in GROUPS:
+    for group in _GROUPS:
         if group.letter == letter:
             return group
     raise AssertionError(f"group {letter!r} is in GROUP_ORDER but missing from GROUPS")
