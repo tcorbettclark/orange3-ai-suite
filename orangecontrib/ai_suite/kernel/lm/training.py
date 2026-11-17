@@ -26,7 +26,6 @@ def train_language_model(
     text: str,
     architecture: Architecture,
     *,
-    max_context_width: int = 16,
     epochs: int = 15,
     batch_size: int = 256,
     validation_fraction: float = 0.1,
@@ -41,10 +40,9 @@ def train_language_model(
 ) -> LanguageModel:
     """Build windows from one text, split by sentence, train, return the model.
 
-    ``max_context_width`` is the widest context to offer any model. Each
-    architecture declares how much of it it reads
-    (:meth:`Architecture.context_width`), windows are built at that width, and
-    the model records the width it was built at rather than the maximum.
+    The context width is the architecture's own: a hyperparameter where it is
+    tunable, the constant 1 for a bigram. Windows are built at that width and
+    the graph is shaped from it, so the two cannot disagree.
 
     ``stop_requested`` is checked after every epoch; when it returns True the
     Keras loop stops cleanly (cooperative cancellation by the caller).
@@ -58,15 +56,11 @@ def train_language_model(
     if not 0.0 < validation_fraction < 1.0:
         raise ValueError("validation_fraction must be strictly between 0 and 1")
 
-    windows = make_windows(tokenizer.encode(text), architecture.context_width(max_context_width))
+    windows = make_windows(tokenizer.encode(text), architecture.context_width)
     train, val = windows.split(validation_fraction, seed=seed)
 
     keras_model = compile_model(
-        architecture.build(
-            vocab_size=tokenizer.vocab_size,
-            context_width=windows.context_width,
-            seed=seed,
-        ),
+        architecture.build(vocab_size=tokenizer.vocab_size, seed=seed),
         learning_rate=learning_rate,
     )
 
@@ -114,15 +108,14 @@ def train_language_model(
     return LanguageModel(
         architecture=architecture,
         tokenizer=tokenizer,
-        # The width the weights were built at, not the maximum that was asked
-        # for: windows are always rebuilt at this width from now on.
+        # The width the weights were built at: windows are always rebuilt at
+        # this width from now on.
         context_width=windows.context_width,
         keras_model=keras_model,
         hyperparameters={
             "architecture": architecture.name,
             "architecture_params": architecture.get_params(),
             "context_width": windows.context_width,
-            "max_context_width": max_context_width,
             "epochs": epochs,
             "batch_size": batch_size,
             "validation_fraction": validation_fraction,

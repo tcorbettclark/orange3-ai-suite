@@ -34,37 +34,31 @@ class Architecture(BaseEstimator, ABC):
 
     name: ClassVar[str]  # registry key, and what saved metadata records
     label: ClassVar[str]  # human-readable, for a dropdown
+    # How many ids of history the model reads: a hyperparameter where it is
+    # tunable (MLPWindow, LSTM), a constant where the architecture fixes it
+    # (Bigram). The windower is told the same number, so data and graph agree.
+    context_width: int
 
-    def context_width(self, max_context_width: int) -> int:
-        """How many window slots this model reads, given the widest available.
-
-        Asked before any window exists, so the windower can build windows of
-        exactly this width and the graph's input then matches the data by
-        construction. A model that cannot use the whole context says so here,
-        once, instead of discarding columns later at every call site.
-        """
-        return max_context_width
-
-    def build(self, *, vocab_size: int, context_width: int, seed: int = 0) -> keras.Model:
+    def build(self, *, vocab_size: int, seed: int = 0) -> keras.Model:
         """Build the graph: ``(n, context_width)`` ids -> ``(n, vocab_size)`` logits.
 
-        ``context_width`` is the width this model will be fed: what
-        :meth:`context_width` returned for the caller's max context width, not
-        the max itself. Seeding lives here because it is a global Keras side
-        effect, and this is the one place that builds a graph.
+        The width comes from the model itself, and that is the same number the
+        windower was given, so the two cannot disagree. Seeding lives here
+        because it is a global Keras side effect, and this is the one place that
+        builds a graph.
         """
         if vocab_size < len(SPECIAL_TOKENS) + 1:
             raise ValueError(
                 f"vocab_size must be at least {len(SPECIAL_TOKENS) + 1}: "
                 "the special tokens plus one real token"
             )
-        if context_width < 1:
+        if self.context_width < 1:
             raise ValueError("context_width must be >= 1")
         keras.utils.set_random_seed(seed)
-        return self._graph(vocab_size=vocab_size, context_width=context_width)
+        return self._graph(vocab_size=vocab_size)
 
     @abstractmethod
-    def _graph(self, *, vocab_size: int, context_width: int) -> keras.Model:
+    def _graph(self, *, vocab_size: int) -> keras.Model:
         """The layers; seeding and input-independent checks live in :meth:`build`."""
 
 
@@ -76,17 +70,19 @@ class Bigram(Architecture):
     token *i*. That is the bigram count table that ``ranked_counts`` would
     describe, fitted by gradient descent instead of counting - which is the
     point of starting the comparison here.
+
+    Its context width is the constant 1, not a hyperparameter: a bigram
+    conditions on one token, and a model that reads more history is an n-gram of
+    higher order - a different model, not a setting. Asking for one is a
+    ``TypeError`` here, because there is no such argument to accept.
     """
 
     name = "bigram"
     label = "Bigram"
+    context_width = 1
 
-    def context_width(self, max_context_width: int) -> int:
-        # A bigram cannot use more than the token it conditions on.
-        return 1
-
-    def _graph(self, *, vocab_size: int, context_width: int) -> keras.Model:
-        inputs = keras.Input(shape=(context_width,), dtype="int32", name="token_ids")
+    def _graph(self, *, vocab_size: int) -> keras.Model:
+        inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
         logits = keras.layers.Flatten(name="next_token_logits")(
             keras.layers.Embedding(vocab_size, vocab_size, name="bigram_table")(inputs)
         )
@@ -104,12 +100,18 @@ class MLPWindow(Architecture):
     name = "mlp_window"
     label = "MLP over window"
 
-    def __init__(self, embedding_dim: int = 32, hidden_units: int = 128):
+    def __init__(
+        self,
+        context_width: int = 16,
+        embedding_dim: int = 32,
+        hidden_units: int = 128,
+    ):
+        self.context_width = context_width
         self.embedding_dim = embedding_dim
         self.hidden_units = hidden_units
 
-    def _graph(self, *, vocab_size: int, context_width: int) -> keras.Model:
-        inputs = keras.Input(shape=(context_width,), dtype="int32", name="token_ids")
+    def _graph(self, *, vocab_size: int) -> keras.Model:
+        inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
         x = keras.layers.Embedding(vocab_size, self.embedding_dim, name="token_embeddings")(inputs)
         x = keras.layers.Flatten(name="concatenate_window")(x)
         x = keras.layers.Dense(self.hidden_units, activation="tanh", name="hidden")(x)
@@ -123,15 +125,22 @@ class LSTM(Architecture):
     name = "lstm"
     label = "LSTM"
 
-    def __init__(self, embedding_dim: int = 32, units: int = 256, layers: int = 1):
+    def __init__(
+        self,
+        context_width: int = 16,
+        embedding_dim: int = 32,
+        units: int = 256,
+        layers: int = 1,
+    ):
+        self.context_width = context_width
         self.embedding_dim = embedding_dim
         self.units = units
         self.layers = layers
 
-    def _graph(self, *, vocab_size: int, context_width: int) -> keras.Model:
+    def _graph(self, *, vocab_size: int) -> keras.Model:
         if self.layers not in (1, 2):
             raise ValueError("layers must be 1 or 2")
-        inputs = keras.Input(shape=(context_width,), dtype="int32", name="token_ids")
+        inputs = keras.Input(shape=(self.context_width,), dtype="int32", name="token_ids")
         x = keras.layers.Embedding(vocab_size, self.embedding_dim, name="token_embeddings")(inputs)
         for i in range(1, self.layers):
             x = keras.layers.LSTM(self.units, return_sequences=True, name=f"lstm_{i}")(x)

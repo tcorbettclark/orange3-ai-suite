@@ -57,7 +57,6 @@ class TrainingWorker(QThread):
                 self.tokenizer,
                 self.text,
                 self.architecture,
-                max_context_width=self.options["max_context_width"],
                 epochs=self.options["epochs"],
                 batch_size=self.options["batch_size"],
                 validation_fraction=self.options["validation_fraction"],
@@ -117,13 +116,14 @@ class OWLMPretrainer(OWWidget):
     # settings
     architecture_index = Setting(1)  # MLP-over-window is the default
     tokenizer_level_index = Setting(0)  # char level: small vocab, long sequences
-    max_context_width = Setting(16)  # widest context to offer any model
     # One setting per (architecture, hyperparameter), named after the estimator
     # parameter it feeds, so a model can never be handed a control that belongs
-    # to another. Defaults agree on embedding_dim: a fair comparison holds it
-    # fixed unless the user changes it.
+    # to another. Defaults agree on embedding_dim and context_width: a fair
+    # comparison holds them fixed unless the user changes one.
+    mlp_window_context_width = Setting(16)
     mlp_window_embedding_dim = Setting(32)
     mlp_window_hidden_units = Setting(128)
+    lstm_context_width = Setting(16)
     lstm_embedding_dim = Setting(32)
     lstm_units = Setting(256)
     lstm_layers = Setting(1)
@@ -155,7 +155,6 @@ class OWLMPretrainer(OWWidget):
             callback=self._show_architecture,
         )
         gui.comboBox(arch_box, self, "tokenizer_level_index", items=LEVEL_LABELS, label="Tokenizer")
-        gui.spin(arch_box, self, "max_context_width", 1, 64, label="Max context")
 
         # Only the selected architecture's controls are shown: the others would
         # be inert, since each estimator declares just its own parameters.
@@ -164,16 +163,18 @@ class OWLMPretrainer(OWWidget):
         gui.label(
             bigram_box,
             self,
-            "No hyperparameters: the model is the vocabulary-size count table.",
+            "No hyperparameters: the vocabulary-size count table, reading one token of history.",
         )
         self._arch_boxes["bigram"] = bigram_box
 
         mlp_box = gui.widgetBox(self.controlArea, "MLP over window")
+        gui.spin(mlp_box, self, "mlp_window_context_width", 1, 64, label="Context width")
         gui.spin(mlp_box, self, "mlp_window_embedding_dim", 2, 512, label="Embedding dim")
         gui.spin(mlp_box, self, "mlp_window_hidden_units", 8, 1024, label="Hidden units")
         self._arch_boxes["mlp_window"] = mlp_box
 
         lstm_box = gui.widgetBox(self.controlArea, "LSTM")
+        gui.spin(lstm_box, self, "lstm_context_width", 1, 64, label="Context width")
         gui.spin(lstm_box, self, "lstm_embedding_dim", 2, 512, label="Embedding dim")
         gui.spin(lstm_box, self, "lstm_units", 16, 1024, label="LSTM units")
         gui.spin(lstm_box, self, "lstm_layers", 1, 2, label="LSTM layers")
@@ -249,7 +250,6 @@ class OWLMPretrainer(OWWidget):
     def _collect_options(self) -> dict:
         return {
             "tokenizer_level": LEVEL_VALUES[self.tokenizer_level_index],
-            "max_context_width": self.max_context_width,
             "epochs": self.epochs,
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,

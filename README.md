@@ -319,6 +319,7 @@ all_features()  # the full catalogue, in stable column order
 
 ```python
 from orangecontrib.ai_suite.kernel.lm import (
+    MLPWindow,
     make_windows,
     tokenizer_from_text,
     train_language_model,
@@ -331,13 +332,11 @@ stream = tokenizer.encode(text)  # every sentence ends with <eos>
 windows = make_windows(stream, context_width=16)
 train, valid = windows.split(val_fraction=0.1, seed=0)
 
+architecture = MLPWindow(context_width=16, embedding_dim=32, hidden_units=128)
 model = train_language_model(
     tokenizer,
     text,
-    "mlp_window",
-    max_context_width=16,
-    embedding_dim=32,
-    hidden_units=128,
+    architecture,  # windows are built at architecture.context_width
     epochs=15,
     validation_fraction=0.1,
     seed=0,

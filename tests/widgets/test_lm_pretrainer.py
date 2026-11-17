@@ -31,7 +31,7 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
     w.show()
     w.set_data(text_table)
     w.epochs = 2
-    w.max_context_width = 8
+    w.mlp_window_context_width = 8
     w.mlp_window_embedding_dim = 8
     w.mlp_window_hidden_units = 16
     w.sample_max_new_tokens = 8
@@ -56,7 +56,7 @@ def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
     w.show()
     w.set_data(text_table)
     w.epochs = 200
-    w.max_context_width = 8
+    w.mlp_window_context_width = 8
     w.mlp_window_embedding_dim = 8
     w.mlp_window_hidden_units = 16
 
@@ -124,12 +124,23 @@ def test_only_the_selected_architectures_controls_are_visible(qapp):
 
 def test_architecture_is_built_from_its_own_settings_only(qapp):
     w = OWLMPretrainer()
+    w.mlp_window_context_width = 8
     w.mlp_window_embedding_dim, w.mlp_window_hidden_units = 8, 16
+    w.lstm_context_width = 12
     w.lstm_embedding_dim, w.lstm_units, w.lstm_layers = 12, 48, 2
 
     w.architecture_index = 1
-    assert w._architecture().get_params() == {"embedding_dim": 8, "hidden_units": 16}
+    assert w._architecture().get_params() == {
+        "context_width": 8,
+        "embedding_dim": 8,
+        "hidden_units": 16,
+    }
     w.architecture_index = 2
-    assert w._architecture().get_params() == {"embedding_dim": 12, "units": 48, "layers": 2}
+    assert w._architecture().get_params() == {
+        "context_width": 12,
+        "embedding_dim": 12,
+        "units": 48,
+        "layers": 2,
+    }
     w.architecture_index = 0
     assert w._architecture().get_params() == {}  # a bigram has no hyperparameters
