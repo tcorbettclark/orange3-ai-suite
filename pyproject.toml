@@ -25,21 +25,18 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
+    # The widget suite is meant to work out of the box: image features need
+    # OpenCV, the language models need Keras on a TensorFlow backend, and the
+    # architectures are scikit-learn estimators.
+    "opencv-python-headless>=4.12,<5",
+    "keras>=3.10.0",
+    "tensorflow>=2.19.0",  # keras' backend, declared rather than implied
+    "scikit-learn>=1.4",
 ]
 
 [project.optional-dependencies]
-# One extra per capability; widgets degrade gracefully with an "install
-# orange3-ai-suite[image]" style message.
-image = [
-    "opencv-python-headless>=4.12,<5",
-]
-lm = [
-    "keras>=3.10.0",
-    "tf-keras>=2.19.0",
-    # the architectures are sklearn estimators (get_params/set_params/clone);
-    # Orange already depends on scikit-learn, so this costs nothing in the app.
-    "scikit-learn>=1.4",
-]
+# Only LoRA is optional: MLX is Apple-silicon-only, so it cannot be a hard
+# requirement. Everything else is a plain dependency.
 lora = [
     # Apple-silicon-only: mlx is not portable.
     'mlx-lm[train]==0.32.2; platform_machine == "arm64" and sys_platform == "darwin"',

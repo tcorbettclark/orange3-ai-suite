@@ -16,7 +16,7 @@ extending the widgets.
    reader; no corpus is committed.
 
 ```bash
-uv run --extra lm python demo/fetch_mnist.py   # only needed to rebuild demo/mnist
+uv run python demo/fetch_mnist.py   # only needed to rebuild demo/mnist
 uv run python demo/fetch_clouds.py     # optional cloud-corpus tutorial
 uv run --extra lora python demo/fetch_britllm.py   # optional LoRA tutorials
 ```

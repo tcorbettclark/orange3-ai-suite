@@ -1,10 +1,10 @@
 """Language-model kernel: tokenizers (with their statistics), windowing, and the
 from-scratch Keras models with their training entry point.
 
-Nothing here imports TensorFlow at module import: Keras is imported inside the
-functions that build or run a graph, so the widget layer can import the kernel -
-and describe an architecture, its parameters and a vocabulary - without the
-optional ``[lm]`` extra. Only running training needs it.
+``builders`` imports Keras, and importing Keras imports its TensorFlow backend,
+so importing this package costs a couple of seconds. That is paid once per
+process and is why Orange takes a moment longer to start; it is not deferrable,
+since every part of the model stack needs it.
 """
 
 from .builders import ARCHITECTURES, LSTM, Bigram, MLPWindow, compile_model

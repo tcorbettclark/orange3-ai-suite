@@ -21,15 +21,13 @@ by adapting a real pretrained model with LoRA instead.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
+import keras
 import numpy as np
 from sklearn.base import BaseEstimator
 
 from .tokenizer import SPECIAL_TOKENS
-
-if TYPE_CHECKING:  # Keras is imported inside the calls that need it
-    import keras
 
 
 class Architecture(BaseEstimator, ABC):
@@ -62,8 +60,6 @@ class Architecture(BaseEstimator, ABC):
             )
         if context_size < 1:
             raise ValueError("context_size must be >= 1")
-        import keras  # local: describing an architecture must not need Keras
-
         keras.utils.set_random_seed(seed)
         return self._graph(vocab_size=vocab_size, context_size=context_size)
 
@@ -90,8 +86,6 @@ class Bigram(Architecture):
         return contexts[:, -1:]
 
     def _graph(self, *, vocab_size: int, context_size: int) -> keras.Model:
-        import keras
-
         inputs = keras.Input(shape=(1,), dtype="int32", name="token_ids")
         logits = keras.layers.Flatten(name="next_token_logits")(
             keras.layers.Embedding(vocab_size, vocab_size, name="bigram_table")(inputs)
@@ -115,8 +109,6 @@ class MLPWindow(Architecture):
         self.hidden_units = hidden_units
 
     def _graph(self, *, vocab_size: int, context_size: int) -> keras.Model:
-        import keras
-
         inputs = keras.Input(shape=(context_size,), dtype="int32", name="token_ids")
         x = keras.layers.Embedding(vocab_size, self.embedding_dim, name="token_embeddings")(inputs)
         x = keras.layers.Flatten(name="concatenate_window")(x)
@@ -137,8 +129,6 @@ class LSTM(Architecture):
         self.layers = layers
 
     def _graph(self, *, vocab_size: int, context_size: int) -> keras.Model:
-        import keras
-
         if self.layers not in (1, 2):
             raise ValueError("layers must be 1 or 2")
         inputs = keras.Input(shape=(context_size,), dtype="int32", name="token_ids")
@@ -161,8 +151,6 @@ def architecture_from_metadata(meta: dict) -> Architecture:
 
 def compile_model(model: keras.Model, learning_rate: float = 1e-3) -> keras.Model:
     """Compile with Adam and sparse cross-entropy over raw logits."""
-    import keras
-
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
         loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),

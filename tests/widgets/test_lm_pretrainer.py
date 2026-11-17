@@ -1,20 +1,10 @@
-"""LM Pre-trainer widget: settings plumbing, threading path, graceful degradation.
-
-The full-training test only runs when Keras is importable in *this* Orange
-environment (the [lm] extra). Without it, the degradation-path test asserts
-the clear 'install' message instead of a crash.
-"""
-
-import importlib.util
+"""LM Pre-trainer widget: settings plumbing, threading path, error reporting."""
 
 import numpy as np
-import pytest
 from Orange.data import ContinuousVariable, Domain, Table
 
 from orangecontrib.ai_suite.adapters import table_texts
 from orangecontrib.ai_suite.widgets.ow_lm_pretrainer import OWLMPretrainer, TrainingWorker
-
-KERAS_AVAILABLE = importlib.util.find_spec("keras") is not None
 
 
 def _numbers_table():
@@ -36,9 +26,7 @@ def test_textless_data_sets_warning(qapp):
 
 
 def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
-    """Full pipeline in-thread (blocking): needs Keras."""
-    if not KERAS_AVAILABLE:
-        pytest.skip("Keras not installed in this Orange environment ([lm] extra)")
+    """Full pipeline in-thread (blocking)."""
     w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
@@ -97,40 +85,15 @@ def test_stop_button_sets_flag(qapp, text_table):
     assert w.worker.request_stop is True
 
 
-def test_missing_keras_message_routing(qapp):
+def test_failure_shows_the_last_traceback_line(qapp):
     w = OWLMPretrainer()
     w.show()
-    w._on_failed("ModuleNotFoundError: No module named 'keras'")
-    assert w.Error.keras_missing.is_shown()
-    assert not w.Error.training_failed.is_shown()
-
-    w._on_failed("RuntimeError: kapow")
+    w._on_failed("Traceback (most recent call last):\n  ...\nRuntimeError: kapow")
     assert w.Error.training_failed.is_shown()
+    assert "kapow" in w.Error.training_failed.formatted
     assert not w.Information.training.is_shown()
 
 
-@pytest.mark.skipif(
-    KERAS_AVAILABLE,
-    reason="exercises the degradation path, which only exists without Keras",
-)
-def test_start_training_without_keras_shows_install_hint(qapp, text_table):
-    """Graceful degradation: no crash, a clear install hint.
-
-    Uses the blocking variant: same lazy-import path as the threaded one,
-    without a live QThread (offscreen teardown of threads is fragile).
-    """
-    w = OWLMPretrainer()
-    w.show()
-    w.set_data(text_table)
-    w.run_training_blocking()
-    assert w.Error.keras_missing.is_shown()
-    assert not w.Information.training.is_shown()
-
-
-@pytest.mark.skipif(
-    not KERAS_AVAILABLE,
-    reason="needs Keras to patch the real kernel path (runs once [lm] is installed)",
-)
 def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
     w = OWLMPretrainer()
     w.show()
@@ -139,7 +102,9 @@ def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
     def failing_train(*args, **kwargs):
         raise RuntimeError("kapow")
 
-    monkeypatch.setattr("orangecontrib.ai_suite.kernel.lm.train_language_model", failing_train)
+    monkeypatch.setattr(
+        "orangecontrib.ai_suite.widgets.ow_lm_pretrainer.train_language_model", failing_train
+    )
     w.epochs = 2
     w.run_training_blocking()
     assert w.Error.training_failed.is_shown()

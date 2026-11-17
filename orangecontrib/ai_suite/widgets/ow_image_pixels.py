@@ -7,10 +7,10 @@ encoding and no feature engineering - just the pixels.
 
 from __future__ import annotations
 
-import importlib.util
 import traceback
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 from AnyQt.QtCore import QThread, pyqtSignal
 from AnyQt.QtWidgets import QLabel
@@ -64,8 +64,6 @@ class PixelFeatureWorker(QThread):
 
     def run(self):
         try:
-            import cv2
-
             from orangecontrib.ai_suite.kernel.pixels import pixel_features
 
             rows = []
@@ -137,10 +135,6 @@ class OWImagePixels(OWWidget):
 
     class Error(OWWidget.Error):
         imageanalytics_missing = Msg("Orange3-ImageAnalytics is required (Options > Add-ons).")
-        opencv_missing = Msg(
-            "OpenCV is not available. Install the [image] extra: "
-            "pip install orange3-ai-suite[image]"
-        )
         extraction_failed = Msg("Pixel extraction failed:\n{}")
 
     dimensions = Setting(10)
@@ -203,7 +197,6 @@ class OWImagePixels(OWWidget):
         self.Warning.rows_skipped.clear()
         self.Warning.no_images.clear()
         self.Error.imageanalytics_missing.clear()
-        self.Error.opencv_missing.clear()
         self.Error.extraction_failed.clear()
         if self.data is None:
             self._generation += 1
@@ -225,20 +218,13 @@ class OWImagePixels(OWWidget):
                 self.Error.imageanalytics_missing()
             elif "no image column" in message:
                 self.Warning.no_image_column(message)
-            elif "OpenCV" in message or "cv2" in message:
-                self.Error.opencv_missing()
             else:
                 self.Error.extraction_failed(message)
         except Exception as exc:
             self.Outputs.features.send(None)
-            if isinstance(exc, ModuleNotFoundError) and "cv2" in str(exc):
-                self.Error.opencv_missing()
-            else:
-                self.Error.extraction_failed(f"{type(exc).__name__}: {exc}")
+            self.Error.extraction_failed(f"{type(exc).__name__}: {exc}")
 
     def _extract_and_send(self):
-        if importlib.util.find_spec("cv2") is None:
-            raise ValueError("OpenCV not available - install the [image] extra")
         _, paths = image_paths(self.data)
         kept = tuple((i, path) for i, path in enumerate(paths) if path)
         self._generation += 1

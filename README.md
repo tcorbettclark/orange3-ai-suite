@@ -27,19 +27,21 @@ One wheel, one install, three toolbox categories.
 ## Installation
 
 Requirements: Python 3.11+, Orange 3.39+ for the widget layer, and macOS on
-Apple Silicon for LoRA training. Optional dependencies are grouped per
-capability:
+Apple Silicon for LoRA training.
 
-| Extra | Brings | Used by |
-|---|---|---|
-| `image` | OpenCV | Image Features, Image Pixels |
-| `lm` | Keras / TensorFlow | LM Pre-trainer, LM Generator, LM Vocab Viewer |
-| `lora` | `mlx-lm[train]` (Apple Silicon only) | LoRA Pre-trainer, LoRA SFT |
+Everything except LoRA is a plain dependency: OpenCV for the image widgets,
+Keras on a TensorFlow backend for the from-scratch language models. Only LoRA is
+an extra, because MLX runs on Apple Silicon alone:
+
+```bash
+pip install orange3-ai-suite            # everything but LoRA
+pip install "orange3-ai-suite[lora]"    # plus LoRA (Apple Silicon)
+```
 
 Development (kernel tests run without Orange):
 
 ```bash
-uv sync --extra lm
+uv sync
 uv run pytest
 ```
 
@@ -67,17 +69,17 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 
 ## Widgets
 
-| Widget | Category | Input | Output | Extra |
-|---|---|---|---|---|
-| Image Features | Image Analytics | Images | Features, Selected image (Table) | `image` |
-| Image Pixels | Image Analytics | Images | Features (Table) | `image` |
-| LM Text Loader | Language Models | none | Data (Table) | none |
-| LM Pre-trainer | Language Models | Data (text) | Model, Checkpoint (Table) | `lm` |
-| LM Generator | Language Models | Model | Generations (Table) | `lm` / `lora` |
-| LoRA Pre-trainer | Language Models | Data (text) | Model | `lora` |
-| LoRA SFT | Language Models | Data (prompt / completion) | Model | `lora` |
-| LM Vocab Viewer | Language Models | Model or Data | none (read-only) | `lm` |
-| Neural Network Viewer | Visualize | Model | none (read-only) | none |
+| Widget | Category | Input | Output | Needs `lora` |
+|---|---|---|---|
+| Image Features | Image Analytics | Images | Features, Selected image (Table) | no |
+| Image Pixels | Image Analytics | Images | Features (Table) | no |
+| LM Text Loader | Language Models | none | Data (Table) | no |
+| LM Pre-trainer | Language Models | Data (text) | Model, Checkpoint (Table) | no |
+| LM Generator | Language Models | Model | Generations (Table) | no |
+| LoRA Pre-trainer | Language Models | Data (text) | Model | yes |
+| LoRA SFT | Language Models | Data (prompt / completion) | Model | yes |
+| LM Vocab Viewer | Language Models | Model or Data | none (read-only) | no |
+| Neural Network Viewer | Visualize | Model | none (read-only) | no |
 
 Each widget class has a docstring describing its inputs, outputs and controls.
 

@@ -12,15 +12,14 @@ import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+import keras
 import numpy as np
 
+from .builders import Architecture, architecture_from_metadata
 from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict
 from .windowing import make_windows
-
-if TYPE_CHECKING:  # a builders import would pull Keras in at module import
-    from .builders import Architecture
 
 _META_FILE = "meta.json"
 _MODEL_FILE = "model.keras"
@@ -149,12 +148,8 @@ class LanguageModel:
     @classmethod
     def load(cls, path: str | Path) -> LanguageModel:
         """Load a model directory saved by :meth:`save`."""
-        import keras  # local import: only needed when materialising weights
-
         src = Path(path)
         meta = json.loads((src / _META_FILE).read_text())
-        from .builders import architecture_from_metadata  # local: pulls in Keras
-
         tokenizer = tokenizer_from_dict(meta["tokenizer"])
         return cls(
             architecture=architecture_from_metadata(meta["architecture"]),

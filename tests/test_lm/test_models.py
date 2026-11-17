@@ -1,8 +1,7 @@
 """Keras builder + LanguageModel tests.
 
-These tests need the [lm] extra (Keras/TensorFlow) and run in plain Python:
-no Orange, no Qt. They must also stay collectible under the Orange
-interpreter, where they are skipped when Keras is absent.
+These run in plain Python - no Orange, no Qt - and need only the package's own
+dependencies.
 """
 
 import math
@@ -10,11 +9,8 @@ import os
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # before any TF import
 
-import pytest
-
-pytest.importorskip("keras", reason="[lm] extra (Keras) not installed")
-
 import numpy as np
+import pytest
 
 from orangecontrib.ai_suite.kernel.lm import (
     LanguageModel,

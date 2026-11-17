@@ -15,11 +15,10 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 uv run --extra lora python demo/fetch_britllm.py
 ```
 
-The development environment needs the `[lm]` extra for the MNIST builder and
-the kernel model tests:
+Keras, TensorFlow and OpenCV are plain dependencies, so one sync is enough:
 
 ```bash
-uv sync --extra lm
+uv sync
 ```
 
 Launch the canvas from the repository root:

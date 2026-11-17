@@ -4,9 +4,6 @@ A thin shell over :mod:`orangecontrib.ai_suite.kernel.lm`: options, a live loss 
 checkpoint table. Training runs in a background QThread and streams per-epoch
 stats into pyqtgraph; all substance (tokenizer, windowing, Keras builders,
 sampling) lives in the kernel.
-
-The kernel's Keras-dependent parts are imported lazily, so a missing ``[lm]``
-extra shows an install hint instead of crashing the canvas.
 """
 
 from __future__ import annotations
@@ -21,7 +18,12 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
-from orangecontrib.ai_suite.kernel.lm import ARCHITECTURES, tokenizer_from_text, tokenizer_levels
+from orangecontrib.ai_suite.kernel.lm import (
+    ARCHITECTURES,
+    tokenizer_from_text,
+    tokenizer_levels,
+    train_language_model,
+)
 
 # Architecture names and labels come from the kernel registry, so neither
 # dropdown can drift from the classes it offers.
@@ -51,8 +53,6 @@ class TrainingWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.lm import train_language_model  # lazy: Keras heavy
-
             model = train_language_model(
                 self.tokenizer,
                 self.text,
@@ -109,9 +109,6 @@ class OWLMPretrainer(OWWidget):
         nothing_to_train = Msg("Press Train once data is connected.")
 
     class Error(OWWidget.Error):
-        keras_missing = Msg(
-            "Keras is not available. Install the [lm] extra: pip install orange3-ai-suite[lm]"
-        )
         training_failed = Msg("Training failed:\n{}")
 
     class Information(OWWidget.Information):
@@ -267,7 +264,6 @@ class OWLMPretrainer(OWWidget):
 
     def _prepare_worker(self) -> TrainingWorker | None:
         self.Warning.nothing_to_train.clear()
-        self.Error.keras_missing.clear()
         self.Error.training_failed.clear()
         if self.text is None:
             return None
@@ -345,14 +341,9 @@ class OWLMPretrainer(OWWidget):
 
     def _on_failed(self, tb: str):
         self.Information.training.clear()
-        self.Error.keras_missing.clear()
         self.Error.training_failed.clear()
         last = tb.strip().splitlines()[-1] if tb.strip() else "unknown error"
-        broken_import = "ModuleNotFoundError" in tb or ("ImportError" in tb and "halted" in tb)
-        if broken_import and ("keras" in tb or "tensorflow" in tb):
-            self.Error.keras_missing()
-        else:
-            self.Error.training_failed(last)
+        self.Error.training_failed(last)
 
     def onDeleteWidget(self):
         if self.worker is not None:

@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 
+import keras
+
 from .builders import Architecture, compile_model
 from .models import LanguageModel
 from .tokenizer import Tokenizer
@@ -61,7 +63,6 @@ def train_language_model(
 
     callbacks = []
     if on_epoch is not None or stop_requested is not None:
-        import keras  # local: callback subclassing needs the real Keras type
 
         def _emit(epoch: int, logs: dict) -> None:
             loss = logs.get("loss")
