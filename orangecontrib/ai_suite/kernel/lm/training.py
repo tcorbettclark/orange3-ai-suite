@@ -9,7 +9,7 @@ is the caller's business - the kernel never needs to know about it.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 
 from .builders import ARCHITECTURES, build_model, compile_model
 from .models import LanguageModel
@@ -20,8 +20,8 @@ EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity[, sample
 
 
 def train_language_model(
-    texts: Iterable[str],
     tokenizer: Tokenizer,
+    text: str,
     architecture: str,
     context_size: int = 16,
     embedding_dim: int = 32,
@@ -40,7 +40,7 @@ def train_language_model(
     sample_max_new_tokens: int = 32,
     sample_seed: int = 0,
 ) -> LanguageModel:
-    """Build windows, split by sentence, train, and return a LanguageModel.
+    """Build windows from one text, split by sentence, train, return the model.
 
     ``stop_requested`` is checked after every epoch; when it returns True the
     Keras loop stops cleanly (cooperative cancellation by the caller).
@@ -56,7 +56,7 @@ def train_language_model(
     if not 0.0 < validation_fraction < 1.0:
         raise ValueError("validation_fraction must be strictly between 0 and 1")
 
-    windows = make_windows(tokenizer.encode_corpus(texts), context_size)
+    windows = make_windows(tokenizer.encode(text), context_size)
     train, val = windows.split(validation_fraction, seed=seed)
 
     keras_model = compile_model(

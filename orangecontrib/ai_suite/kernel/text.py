@@ -140,6 +140,11 @@ def split_sentences(text: str) -> list[str]:
     on characters that tokenization may discard. Callers that work in the
     token domain get sentence structure from the tokenizer, which closes every
     sentence with EOS (see ``Tokenizer.encode``).
+
+    Because a newline always breaks, documents joined by newlines cannot merge
+    the last sentence of one into the first of the next - which is why a corpus
+    can be assembled outside the kernel, with no separator convention to
+    remember beyond "newline between documents".
     """
     out: list[str] = []
     for line in text.splitlines():

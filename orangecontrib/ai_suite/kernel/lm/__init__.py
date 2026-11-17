@@ -16,8 +16,8 @@ from .tokenizer import (
     CharTokenizer,
     Tokenizer,
     WordTokenizer,
-    tokenizer_from_corpus,
     tokenizer_from_dict,
+    tokenizer_from_text,
     tokenizer_levels,
 )
 from .windowing import Windows, make_windows
@@ -57,8 +57,8 @@ __all__ = [
     "build_model",
     "compile_model",
     "make_windows",
-    "tokenizer_from_corpus",
     "tokenizer_from_dict",
+    "tokenizer_from_text",
     "tokenizer_levels",
     "train_language_model",
 ]

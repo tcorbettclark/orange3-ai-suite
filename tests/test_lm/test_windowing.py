@@ -11,7 +11,7 @@ therefore every token in the stream, in order - ``len(stream)`` windows, always.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import make_windows, tokenizer_from_corpus
+from orangecontrib.ai_suite.kernel.lm import make_windows, tokenizer_from_text
 from orangecontrib.ai_suite.kernel.lm.windowing import Windows
 
 BOS, EOS = 0, 2
@@ -105,8 +105,8 @@ def test_error_paths():
 
 
 def test_encoded_corpus_needs_no_text():
-    tok = tokenizer_from_corpus(["AB.", "CD."], "char")
-    stream = tok.encode_corpus(["AB.", "CD."])
+    tok = tokenizer_from_text("AB.\nCD.", "char")
+    stream = tok.encode("AB.\nCD.")
     assert stream == tok.encode("AB.") + tok.encode("CD.")
     windows = make_windows(stream, context_size=3)
     assert windows.unit_lengths == (4, 4)
@@ -115,10 +115,10 @@ def test_encoded_corpus_needs_no_text():
 
 
 def test_documents_are_not_merged_into_one_unit():
-    # "AB" has no terminator: concatenating the *texts* would fuse the two
-    # documents, concatenating their streams cannot.
-    tok = tokenizer_from_corpus(["AB", "CD"], "char")
-    windows = make_windows(tok.encode_corpus(["AB", "CD"]), context_size=1)
+    # "AB" has no terminator: a space-joined corpus would fuse the two documents,
+    # a newline-joined one cannot - the same rule that splits inside a document.
+    tok = tokenizer_from_text("AB\nCD", "char")
+    windows = make_windows(tok.encode("AB\nCD"), context_size=1)
     assert windows.unit_lengths == (3, 3)
 
 

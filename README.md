@@ -305,10 +305,10 @@ directly and is off by default.
 from orangecontrib.ai_suite.kernel.features import all_features, extract_features, get_feature
 
 vec = extract_features(rgb_image, groups="ABCDEF")
-vec["hole_count"]                 # a feature value
-vec.to_array()                    # one float per selected feature
-get_feature("hole_count").definition   # the human-readable sentence
-all_features()                    # the full catalogue, in stable column order
+vec["hole_count"]  # a feature value
+vec.to_array()  # one float per selected feature
+get_feature("hole_count").definition  # the human-readable sentence
+all_features()  # the full catalogue, in stable column order
 ```
 
 ## Kernel API
@@ -318,24 +318,31 @@ all_features()                    # the full catalogue, in stable column order
 ```python
 from orangecontrib.ai_suite.kernel.lm import (
     make_windows,
-    tokenizer_from_corpus,
+    tokenizer_from_text,
     train_language_model,
 )
 
-tokenizer = tokenizer_from_corpus(texts, "char")
-tokenizer = tokenizer.keep_top(2000)       # or .drop_rare(min_count=3); pure, chainable
-stream = tokenizer.encode_corpus(texts)    # every sentence ends with <eos>
+text = "\n".join(texts)  # join documents outside the kernel
+tokenizer = tokenizer_from_text(text, "char")
+tokenizer = tokenizer.keep_top(2000)  # or .drop_rare(min_count=3); pure, chainable
+stream = tokenizer.encode(text)  # every sentence ends with <eos>
 windows = make_windows(stream, context_size=16)
 train, valid = windows.split(val_fraction=0.1, seed=0)
 
 model = train_language_model(
-    texts, tokenizer, "mlp_window",
-    context_size=16, embedding_dim=32, hidden_units=128,
-    epochs=15, validation_fraction=0.1, seed=0,
+    tokenizer,
+    text,
+    "mlp_window",
+    context_size=16,
+    embedding_dim=32,
+    hidden_units=128,
+    epochs=15,
+    validation_fraction=0.1,
+    seed=0,
 )
 model.generate("the ", temperature=0.8, max_new_tokens=64)
-model.perplexity(held_out_texts)          # {'loss': ..., 'perplexity': ...}
-model.save("my-model")                    # weights + tokenizer + metadata
+model.perplexity(held_out_text)  # {'loss': ..., 'perplexity': ...}
+model.save("my-model")  # weights + tokenizer + metadata
 ```
 
 `LanguageModel.load(path)` reads the directory back as one object. The
@@ -347,14 +354,16 @@ Python callables; the kernel never imports Qt.
 ```python
 from orangecontrib.ai_suite.kernel.lora import LoraData, LoraOptions, LoRAModel, train_lora
 
-data = LoraData.from_texts(corpus)        # or LoraData.from_pairs(pairs)
+data = LoraData.from_texts(corpus)  # or LoraData.from_pairs(pairs)
 adapter = train_lora(
-    "data/models/britllm-4bit", data, "my-adapter",
+    "data/models/britllm-4bit",
+    data,
+    "my-adapter",
     options=LoraOptions(iters=300, num_layers=16),
 )
 model = LoRAModel(adapter.base_model, adapter.adapter_path)
 model.generate("In the second century", temperature=0)
-model.adapter_enabled = False             # the same base model, before adaptation
+model.adapter_enabled = False  # the same base model, before adaptation
 ```
 
 `train_lora` runs the documented `python -m mlx_lm lora` command in a

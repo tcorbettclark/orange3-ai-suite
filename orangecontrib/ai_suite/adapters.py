@@ -74,6 +74,16 @@ def table_texts(table: Table) -> list[str]:
     return ["\n".join(str(row[var]) for var in text_metas).strip() for row in table]
 
 
+def corpus_text(table: Table) -> str:
+    """All documents of a table as the one text the kernel takes.
+
+    Rows are separated by a newline, which is a hard break for sentence
+    splitting, so joining cannot merge the last sentence of one row into the
+    first of the next - inside a row or at a seam, the same rule applies.
+    """
+    return "\n".join(table_texts(table))
+
+
 def table_pairs(table: Table) -> list[tuple[str, str]]:
     """Prompt-response pairs from a Table, the supervised fine-tuning format.
 

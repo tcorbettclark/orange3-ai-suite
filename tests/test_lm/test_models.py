@@ -18,25 +18,25 @@ import numpy as np
 
 from orangecontrib.ai_suite.kernel.lm import (
     LanguageModel,
-    tokenizer_from_corpus,
+    tokenizer_from_text,
     train_language_model,
 )
 from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, build_model
 from orangecontrib.ai_suite.kernel.lm.models import _sample
 
-CORPUS = ["the cat sat on the mat. the cat saw the dog. a dog and a cat ran."]
+CORPUS = "the cat sat on the mat. the cat saw the dog. a dog and a cat ran."
 
 
 @pytest.fixture(scope="module")
 def tokenizer():
-    return tokenizer_from_corpus(CORPUS, "char")
+    return tokenizer_from_text(CORPUS, "char")
 
 
 @pytest.fixture(scope="module")
 def mlp_model(tokenizer):
     return train_language_model(
-        CORPUS,
         tokenizer,
+        CORPUS,
         "mlp_window",
         context_size=8,
         embedding_dim=8,
@@ -94,8 +94,8 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
         seen.append(stats)
 
     model = train_language_model(
-        CORPUS,
         tokenizer,
+        CORPUS,
         "mlp_window",
         context_size=8,
         embedding_dim=8,
@@ -128,8 +128,8 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
         return len(seen) >= 2  # the widget's Stop button analogue
 
     model = train_language_model(
-        CORPUS,
         tokenizer,
+        CORPUS,
         "mlp_window",
         context_size=8,
         embedding_dim=8,
@@ -147,17 +147,17 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
 def test_train_validation_split_is_mandatory():
     with pytest.raises(ValueError, match="validation_fraction"):
         train_language_model(
-            CORPUS, tokenizer_from_corpus(CORPUS, "char"), "mlp_window", validation_fraction=0.0
+            tokenizer_from_text(CORPUS, "char"), CORPUS, "mlp_window", validation_fraction=0.0
         )
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
         train_language_model(
-            ["one sentence only."],
-            tokenizer_from_corpus(["one sentence only."], "char"),
+            tokenizer_from_text("one sentence only.", "char"),
+            "one sentence only.",
             "mlp_window",
         )
     with pytest.raises(ValueError, match="epochs"):
-        train_language_model(CORPUS, tokenizer_from_corpus(CORPUS, "char"), "mlp_window", epochs=0)
+        train_language_model(tokenizer_from_text(CORPUS, "char"), CORPUS, "mlp_window", epochs=0)
 
 
 # ---- sampling ------------------------------------------------------------
@@ -193,9 +193,9 @@ def test_long_prompt_uses_last_window(mlp_model):
 
 
 def test_word_level_generate_smoke():
-    tok = tokenizer_from_corpus(CORPUS, "word")
+    tok = tokenizer_from_text(CORPUS, "word")
     model = train_language_model(
-        CORPUS, tok, "bigram", context_size=1, epochs=8, batch_size=16, seed=0
+        tok, CORPUS, "bigram", context_size=1, epochs=8, batch_size=16, seed=0
     )
     out = model.generate("the", temperature=0, max_new_tokens=6)
     assert out.startswith("the")
@@ -212,8 +212,8 @@ def test_sample_temperature_zero_is_argmax():
 
 
 def test_perplexity_prefers_indomain_text(mlp_model):
-    in_domain = mlp_model.perplexity(["the cat sat on the mat. the cat saw the dog."])
-    out_domain = mlp_model.perplexity(["zx qv jk wp lk bf hg."])
+    in_domain = mlp_model.perplexity("the cat sat on the mat. the cat saw the dog.")
+    out_domain = mlp_model.perplexity("zx qv jk wp lk bf hg.")
     assert in_domain["perplexity"] > 1.0
     assert in_domain["perplexity"] < out_domain["perplexity"]
 
@@ -245,8 +245,8 @@ def test_language_model_is_serialisable_in_principle(mlp_model):
 def test_stop_requested_works_without_epoch_hook(tokenizer):
     """The stop flag must not depend on an on_epoch callback being present."""
     model = train_language_model(
-        CORPUS,
         tokenizer,
+        CORPUS,
         "mlp_window",
         context_size=8,
         embedding_dim=8,

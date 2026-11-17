@@ -106,14 +106,14 @@ class LanguageModel:
             context = context[1:] + [next_id]
         return self.tokenizer.decode(prompt_ids + generated)
 
-    def perplexity(self, texts: Iterable[str], batch_size: int = 256) -> dict[str, float]:
-        """Loss and perplexity (e^loss) over the windows of the given texts.
+    def perplexity(self, text: str, batch_size: int = 256) -> dict[str, float]:
+        """Loss and perplexity (e^loss) over the windows of the given text.
 
         Run it on the training corpus and on unrelated text to get the
         in-domain / out-of-domain pair: a single-domain model looks good only on
         the domain it was trained on.
         """
-        windows = make_windows(self.tokenizer.encode_corpus(texts), self.context_size)
+        windows = make_windows(self.tokenizer.encode(text), self.context_size)
         # bigram consumes only the last token of a window (builders.py)
         x = windows.contexts[:, -1:] if self.architecture == "bigram" else windows.contexts
         loss = float(

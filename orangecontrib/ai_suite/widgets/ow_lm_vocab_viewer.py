@@ -17,7 +17,7 @@ from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.widget import Input, Msg, OWWidget
 
-from orangecontrib.ai_suite.adapters import table_texts
+from orangecontrib.ai_suite.adapters import corpus_text
 
 
 def _fill_table(table_widget: QTableWidget, rows: list[tuple]) -> None:
@@ -102,11 +102,11 @@ class OWLMVocabViewer(OWWidget):
         self.Warning.model_preferred(shown=self._model_tokenizer is not None and table is not None)
         if table is not None:
             try:
-                texts = table_texts(table)
-                from orangecontrib.ai_suite.kernel.lm import tokenizer_from_corpus  # pure Python
+                text = corpus_text(table)
+                from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text  # pure Python
 
-                self._char_tokenizer = tokenizer_from_corpus(texts, "char")
-                self._word_tokenizer = tokenizer_from_corpus(texts, "word")
+                self._char_tokenizer = tokenizer_from_text(text, "char")
+                self._word_tokenizer = tokenizer_from_text(text, "word")
             except ValueError as exc:
                 self.Warning.text_not_supported(str(exc))
         self.refresh()

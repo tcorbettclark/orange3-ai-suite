@@ -6,23 +6,19 @@ and never feed back into training.
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import tokenizer_from_corpus
+from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text
 
-CORPUS = [
-    "the cat sat on the mat",
-    "the cat saw the dog",
-    "a dog and a cat",
-]
+CORPUS = "the cat sat on the mat\nthe cat saw the dog\na dog and a cat"
 
 
 @pytest.fixture(scope="module")
 def word_tok():
-    return tokenizer_from_corpus(CORPUS, "word")
+    return tokenizer_from_text(CORPUS, "word")
 
 
 @pytest.fixture(scope="module")
 def char_tok():
-    return tokenizer_from_corpus(CORPUS, "char")
+    return tokenizer_from_text(CORPUS, "char")
 
 
 def test_frequency_table_ranks(word_tok):
@@ -60,8 +56,8 @@ def test_small_vocab_char_vs_word_is_the_lesson():
     # A word-rich but alphabet-poor corpus: the whole point of the LM Pre-trainer's
     # tokenizer dropdown — char level = far smaller vocab, longer sequences.
     words = " ".join(a + b for a in "abcd" for b in "abcdef")
-    char_tok = tokenizer_from_corpus([words], "char")
-    word_tok = tokenizer_from_corpus([words], "word")
+    char_tok = tokenizer_from_text(words, "char")
+    word_tok = tokenizer_from_text(words, "word")
     assert char_tok.stats()["vocab_size"] < word_tok.stats()["vocab_size"]
     text = "aa ab ac"
     assert len(char_tok.encode(text)) > len(word_tok.encode(text))
@@ -70,15 +66,15 @@ def test_small_vocab_char_vs_word_is_the_lesson():
 def test_longest_tokens_ties_are_deterministic():
     # Equal-length hapaxes used to inherit vocabulary order, which is undefined;
     # the view must break the tie itself.
-    corpus = ["abc abd xyz"]
-    a = tokenizer_from_corpus(corpus, "word").stats()["longest_tokens"]
-    b = tokenizer_from_corpus(["abd xyz abc"], "word").stats()["longest_tokens"]
+    corpus = "abc abd xyz"
+    a = tokenizer_from_text(corpus, "word").stats()["longest_tokens"]
+    b = tokenizer_from_text("abd xyz abc", "word").stats()["longest_tokens"]
     assert a == b == [("abc", 1), ("abd", 1), ("xyz", 1)]
 
 
 def test_shares_are_of_the_corpus_not_the_retained_vocab():
     # The Zipf lesson must not change when the vocabulary is pruned.
-    tok = tokenizer_from_corpus(["the cat sat", "the cat saw the dog"], "word")
+    tok = tokenizer_from_text("the cat sat\nthe cat saw the dog", "word")
     pruned = tok.keep_top(2)
     assert pruned.total_token_count == tok.total_token_count
     assert pruned.zipf_summary()["top1_share"] == pytest.approx(tok.zipf_summary()["top1_share"])
@@ -95,6 +91,6 @@ def test_reporting_methods_are_read_only(word_tok):
 
 def test_empty_zipf_summary():
     # Only specials left: reporting must not divide by zero.
-    tok = tokenizer_from_corpus(["a"], "word")
+    tok = tokenizer_from_text("a", "word")
     assert tok.zipf_summary(top=0) == {"n": 0}
     assert tok.stats()["mean_token_length"] == pytest.approx(1.0)

@@ -1,8 +1,8 @@
 """Window construction for next-token training pairs, in the token domain.
 
-The input is an EOS-terminated token stream - what ``Tokenizer.encode`` /
-``Tokenizer.encode_corpus`` produce - so this module deals in integers only:
-no text, no tokenizer, no vocabulary.
+The input is an EOS-terminated token stream - what ``Tokenizer.encode``
+produces - so this module deals in integers only: no text, no tokenizer, no
+vocabulary.
 
 The stream is self-describing: EOS closes every unit, so unit structure travels
 inside the data and windows cannot cross a boundary even by accident. Nothing

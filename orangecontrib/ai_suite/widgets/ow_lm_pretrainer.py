@@ -20,8 +20,8 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from orangecontrib.ai_suite.adapters import checkpoint_table, table_texts
-from orangecontrib.ai_suite.kernel.lm import tokenizer_from_corpus, tokenizer_levels
+from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
+from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text, tokenizer_levels
 
 ARCHITECTURE_LABELS = ["Bigram", "MLP-over-window", "LSTM"]
 ARCHITECTURE_VALUES = ["bigram", "mlp_window", "lstm"]
@@ -39,9 +39,9 @@ class TrainingWorker(QThread):
     finished_ok = pyqtSignal(object)
     failed = pyqtSignal(str)
 
-    def __init__(self, texts, tokenizer, options, parent=None):
+    def __init__(self, text, tokenizer, options, parent=None):
         super().__init__(parent)
-        self.texts = texts
+        self.text = text
         self.tokenizer = tokenizer
         self.options = options
         self.request_stop = False
@@ -51,8 +51,8 @@ class TrainingWorker(QThread):
             from orangecontrib.ai_suite.kernel.lm import train_language_model  # lazy: Keras heavy
 
             model = train_language_model(
-                self.texts,
                 self.tokenizer,
+                self.text,
                 self.options["architecture"],
                 context_size=self.options["context_size"],
                 embedding_dim=self.options["embedding_dim"],
@@ -139,7 +139,7 @@ class OWLMPretrainer(OWWidget):
     def __init__(self):
         super().__init__()
         self.data = None
-        self.texts: list[str] | None = None
+        self.text: str | None = None
         self.worker: TrainingWorker | None = None
         self.model = None
         self.epoch_stats: list[dict] = []
@@ -194,14 +194,14 @@ class OWLMPretrainer(OWWidget):
     @Inputs.data
     def set_data(self, table):
         self.data = table
-        self.texts = None
+        self.text = None
         self.Warning.no_text.clear()
         if table is not None:
             try:
-                self.texts = table_texts(table)
+                self.text = corpus_text(table)
             except ValueError:
                 self.Warning.no_text()
-        self.Warning.nothing_to_train(shown=self.texts is None)
+        self.Warning.nothing_to_train(shown=self.text is None)
 
     # ---- lifecycle ---------------------------------------------------------
 
@@ -230,7 +230,7 @@ class OWLMPretrainer(OWWidget):
         self.Warning.nothing_to_train.clear()
         self.Error.keras_missing.clear()
         self.Error.training_failed.clear()
-        if self.texts is None:
+        if self.text is None:
             return None
         self.Outputs.model.send(None)
         self.Outputs.checkpoint.send(None)
@@ -241,11 +241,11 @@ class OWLMPretrainer(OWWidget):
         self.status_label.setText("")
 
         options = self._collect_options()
-        tokenizer = tokenizer_from_corpus(self.texts, options.pop("tokenizer_level"))
+        tokenizer = tokenizer_from_text(self.text, options.pop("tokenizer_level"))
         max_vocab = options.pop("max_vocab")
         if max_vocab:
             tokenizer = tokenizer.keep_top(max_vocab)  # real tokens, specials always kept
-        worker = TrainingWorker(self.texts, tokenizer, options)
+        worker = TrainingWorker(self.text, tokenizer, options)
         worker.epoch_signal.connect(self._on_epoch)
         worker.finished_ok.connect(self._on_done)
         worker.failed.connect(self._on_failed)

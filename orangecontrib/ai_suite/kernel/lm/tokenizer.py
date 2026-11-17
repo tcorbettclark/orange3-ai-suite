@@ -14,7 +14,7 @@ There are two tokenizers, both subclasses of an abstract :class:`Tokenizer`:
   is dropped, case is preserved, and rendering a unit re-inserts spaces except
   around punctuation.
 
-Use :func:`tokenizer_from_corpus` to build either level.
+Use :func:`tokenizer_from_text` to build either level.
 
 Order
 -----
@@ -50,7 +50,7 @@ import inspect
 import re
 from abc import ABC, abstractmethod
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 from typing import ClassVar
@@ -70,7 +70,7 @@ SPECIAL_TOKENS = (BOS, UNK, EOS)
 class Tokenizer(ABC):
     """A frozen vocabulary with corpus frequencies.
 
-    Abstract: build one with :func:`tokenizer_from_corpus`, which dispatches on
+    Abstract: build one with :func:`tokenizer_from_text`, which dispatches on
     ``level`` to :class:`CharTokenizer` or :class:`WordTokenizer`.
     """
 
@@ -194,10 +194,6 @@ class Tokenizer(ABC):
                 stream.extend(ids)
                 stream.append(EOS_ID)
         return stream
-
-    def encode_corpus(self, texts: Iterable[str]) -> list[int]:
-        """Documents -> one terminated stream, in corpus order."""
-        return [i for text in texts for i in self.encode(text)]
 
     @classmethod
     @abstractmethod
@@ -341,16 +337,15 @@ class WordTokenizer(Tokenizer):
 # ---- construction -----------------------------------------------------------
 #
 # Factories, not methods: the class you get is decided by the ``level`` name, not
-# by the class you asked, so on the class they would let
-# CharTokenizer.from_corpus(texts, "word") build a WordTokenizer. Building a
-# tokenizer from data is a function; asking one for its data (to_dict) is a
-# method.
+# by the class you asked, so as classmethods they would let a call on one level
+# build the other. Building a tokenizer from data is a function; asking one for
+# its data (to_dict) is a method.
 
 
 def tokenizer_levels() -> tuple[tuple[str, str], ...]:
     """(level, one-line description) for each concrete level, in definition order.
 
-    The level can be passed to :func:`tokenizer_from_corpus` to construct a
+    The level can be passed to :func:`tokenizer_from_text` to construct a
     concrete tokenizer; the description is the class's own docstring summary.
     """
     return tuple(
@@ -373,16 +368,19 @@ def _class_for(level: str) -> type[Tokenizer]:
     raise ValueError(f"level must be one of {available}, got {level!r}")
 
 
-def tokenizer_from_corpus(texts: Iterable[str], level: str) -> Tokenizer:
-    """Count tokens over the documents and fix the vocabulary.
+def tokenizer_from_text(text: str, level: str) -> Tokenizer:
+    """Count tokens over the text and fix the vocabulary.
 
     ``level`` chooses the class, so this is the single entry point for both
-    levels; :func:`tokenizer_levels` lists the names it accepts.
+    levels; :func:`tokenizer_levels` lists the names it accepts. A corpus of
+    several documents arrives as one text: counts do not care where documents
+    end, so nothing is lost by joining them first.
     """
     impl = _class_for(level)
-    counts: Counter[str] = Counter()
-    for text in texts:
-        counts.update(impl.segment(text))
+    # Count what encode will actually tokenize: the sentences, not the raw text,
+    # so a newline or the space after a terminator is never a token and
+    # total_token_count stays the number of tokens the model can see.
+    counts: Counter[str] = Counter(t for s in split_sentences(text) for t in impl.segment(s))
     if not counts:
         raise ValueError("corpus produced no tokens (empty or whitespace-only)")
     pairs = list(counts.items())
