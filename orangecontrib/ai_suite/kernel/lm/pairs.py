@@ -36,10 +36,9 @@ from .tokenizer import BOS_ID, EOS_ID
 class Pairs:
     """All (context, target) pairs of a corpus, one per prediction, unit-disjoint.
 
-    Unit structure is not stored: every unit's last pair predicts EOS, so the
-    boundaries are recoverable from ``targets`` (see :attr:`pairs_per_unit`).
-    That keeps one source of truth, and makes an inconsistent object
-    unrepresentable rather than merely validated.
+    Unit structure is derived, never stored: every unit's last pair predicts EOS,
+    so the boundaries are recoverable from ``targets`` (see
+    :attr:`pairs_per_unit`).
     """
 
     contexts: np.ndarray  # (N, w) int32

@@ -3,9 +3,7 @@
 An adapter is meaningless without the exact base model it was trained against,
 so a :class:`LoRAAdapter` is a directory containing the adapter weights, its
 config, and a ``lora_meta.json`` with the base-model identity and
-hyperparameters. Loading the artifact reproduces the trained setup, and the
-adapter on/off switch gives the before/after comparison on the identical base
-model.
+hyperparameters. Loading the artifact reproduces the trained setup.
 """
 
 from __future__ import annotations

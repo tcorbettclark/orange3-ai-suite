@@ -103,7 +103,7 @@ def test_architectures_declare_only_their_own_parameters():
     # Discovery, not registration: definition order, and a clear error for a typo.
     assert [(cls.architecture_name(), summary) for cls, summary in architectures()] == [
         ("bigram", "Next token from the current token alone: the count table, learned."),
-        ("mlp", "A fixed, visible memory: the whole context concatenated into one hidden layer."),
+        ("mlp", "The whole context concatenated into one hidden layer."),
         ("lstm", "Recurrence: position is carried by state rather than by concatenation."),
     ]
     assert architectures()[1][0] is MLP

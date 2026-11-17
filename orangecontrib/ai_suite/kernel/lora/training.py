@@ -1,6 +1,6 @@
 """LoRA training: the two data formats and the streaming run.
 
-Two data formats teach two distinct lessons through one mechanism:
+Two data formats:
 
 1. **Raw domain corpus -> continued pre-training.** Self-supervised
    next-token loss; rows are ``{"text": ...}``.

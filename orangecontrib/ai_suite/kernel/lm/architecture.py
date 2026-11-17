@@ -3,22 +3,17 @@
 Bigram, MLP and LSTM are separate architectures that happen to share an input
 contract - a ``(context_width,)`` int32 context of token ids - and an output
 contract - logits over the vocabulary, so softmax lives in the loss and in the
-sampling loop. They are offered side by side for comparison, not as one thing
-that grows: each declares its own hyperparameters, so no architecture can be
-handed a parameter it would ignore.
+sampling loop. They are offered side by side for comparison.
 
 Each is a scikit-learn estimator: the constructor stores hyperparameters
 verbatim and does nothing else, checks happen in :meth:`Architecture.build` or in
-the graph builder where they depend on the layers, and ``get_params`` /
+the Keras graph builder where they depend on the layers, and ``get_params`` /
 ``set_params`` / ``clone`` come from ``BaseEstimator``. That
-lets a caller enumerate an architecture's parameters instead of guessing a
-superset - Orange's controls and parameter sweeps are driven from exactly this.
-A model is an instance of an architecture with a tokenizer and weights; see
+lets a caller enumerate an architecture's parameters e.g. to surface in a UI like
+Orange. A model is an instance of an architecture with a tokenizer and weights; see
 :class:`~.language_model.LanguageModel`.
 
-No transformer is offered here. At classroom scale an LSTM is at least as
-accurate and far cheaper to train on CPU; the transformer lesson is delivered
-by adapting a real pretrained model with LoRA instead.
+No transformer is offered.
 """
 
 from __future__ import annotations
@@ -79,9 +74,8 @@ class Bigram(Architecture):
 
     Takes no hyperparameters, because it has none: row *i* of the
     ``(vocab_size, vocab_size)`` embedding is the next-token logit vector given
-    token *i*. That is the bigram count table that ``ranked_counts`` would
-    describe, fitted by gradient descent instead of counting - which is the
-    point of starting the comparison here.
+    token *i*. It is the count table ``ranked_counts`` describes, fitted by
+    gradient descent instead of counting.
 
     Its context width is the constant 1, not a hyperparameter: a bigram
     conditions on one token, and a model that reads more history is an n-gram of
@@ -100,7 +94,7 @@ class Bigram(Architecture):
 
 
 class MLP(Architecture):
-    """A fixed, visible memory: the whole context concatenated into one hidden layer.
+    """The whole context concatenated into one hidden layer.
 
     Position is carried by concatenation order, so the model can only ever look
     ``context_width`` ids back - the contrast with the LSTM, which carries

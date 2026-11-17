@@ -1,13 +1,12 @@
 """Training settings, results, and the two Keras details that training owns.
 
-An architecture describes a graph and its own hyperparameters; training decides
+An architecture describes a Keras graph and its own hyperparameters; training decides
 the optimizer, the loss, how long to fit, when to stop and what counts as a
 result. The loop itself lives on :class:`~.language_model.LanguageModel`, which
 is the object that owns the weights; this module holds the nouns a run is
 described and measured by, the optimizer/loss pair, and the epoch callback.
 
-Sampling from the model during training is deliberately *not* here: it is a
-reporting concern, so a caller does it in its own ``on_epoch`` hook.
+Sampling during training happens in the caller's ``on_epoch`` hook, not here.
 """
 
 from __future__ import annotations
@@ -46,9 +45,7 @@ class TrainingOptions:
 class TrainingResults:
     """What one run produced, beyond the weights: the counts and the final losses.
 
-    Perplexity is ``e^loss`` - the same measurement, re-scaled to "how many equally
-    likely tokens the model behaves as if it were choosing between" - so it is a
-    property of the loss rather than a second number that could disagree with it.
+    Perplexity is ``e^loss``, derived from the loss rather than stored.
     """
 
     n_pairs_total: int
@@ -71,7 +68,7 @@ def compile_keras_model(keras_model: keras.Model, learning_rate: float = 1e-3) -
 
     The weights move for the first time in ``fit``; all this fixes is what that
     fit minimises. Sparse cross-entropy reads the model's raw logits, so softmax
-    stays out of the graph.
+    stays out of the Keras graph.
     """
     keras_model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=learning_rate),

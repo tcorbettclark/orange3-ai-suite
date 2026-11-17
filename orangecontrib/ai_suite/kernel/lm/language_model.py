@@ -1,7 +1,7 @@
 """The trained language-model object.
 
 A model is an instance of an architecture: the architecture is the recipe (a
-graph and its hyperparameters), the model is that recipe with a tokenizer and
+Keras graph and its hyperparameters), the model is that recipe with a tokenizer and
 weights. It is trained by :meth:`LanguageModel.fit`, and it generates,
 evaluates, saves and loads. The ``generate`` interface is the kernel-wide
 convention, shared with the MLX/LoRA models.
@@ -157,16 +157,15 @@ class LanguageModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ) -> str:
-        """Autoregressive sampling of one unit: low temperature = repetitive, high = salad.
+        """Autoregressive sampling of one unit.
 
         Training, evaluation and generation share one unit, so this generates a
-        sentence and stops when the model emits EOS. ``max_new_tokens`` is only
-        a safety cap: an undertrained model that never emits EOS still returns a
-        run-on, which is the honest picture - and a step that samples ``<bos>``
-        is spent rather than spent appending it, since ``<bos>`` is never a
-        target. Asking for more than one unit would
-        mean sampling from contexts that contain EOS - a distribution training
-        never covered, because contexts never cross a unit end.
+        sentence and stops when the model emits EOS. ``max_new_tokens`` is a
+        safety cap: a model that never emits EOS returns a run-on. A sampled
+        ``<bos>`` is not appended - it is never a target - so that step is
+        spent. Asking for more than one unit would mean sampling from contexts
+        that contain EOS - a distribution training never covered, because
+        contexts never cross a unit end.
 
         The prompt is trimmed to its final unit for the same reason; contexts
         are the last ``context_width`` ids, left-padded with BOS.
