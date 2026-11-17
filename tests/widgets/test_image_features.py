@@ -19,9 +19,9 @@ def test_image_paths_adapter(images_table, image_dir):
 
 
 def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
-    from orangecontrib.ai_suite.kernel.features import group_names  # default = A–F, colour excluded
+    from orangecontrib.ai_suite.kernel.features import get_group  # default = A–F, colour excluded
 
-    expected = [n for g in ("A", "B", "C", "D", "E", "F") for n in group_names(g)]
+    expected = [n for g in ("A", "B", "C", "D", "E", "F") for n in get_group(g).members]
 
     w = OWImageFeatures()
     w.show()

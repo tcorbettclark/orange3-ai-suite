@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, preprocess, to_luminance
+from orangecontrib.ai_suite.kernel.features import FeatureOptions
+from orangecontrib.ai_suite.kernel.features.preprocessing import preprocess, to_luminance
 from synth import uniform_image
 
 

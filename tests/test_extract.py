@@ -16,7 +16,6 @@ from orangecontrib.ai_suite.kernel.features import (
     features_of_group,
     get_feature,
     get_group,
-    group_names,
 )
 from synth import cloud_image
 
@@ -46,9 +45,9 @@ def test_definitions_are_non_empty_sentences():
         assert isinstance(d, str) and len(d) >= 20 and d[0].isupper(), feature.name
 
 
-def test_group_names_matches_features_of_group():
+def test_group_members_match_features_of_group():
     for letter in GROUP_ORDER:
-        assert group_names(letter) == tuple(f.name for f in features_of_group(letter))
+        assert get_group(letter).members == tuple(f.name for f in features_of_group(letter))
 
 
 def test_catalogue_roster_matches_the_directory():
@@ -73,7 +72,7 @@ def test_group_metadata_covers_group_order():
     for letter in GROUP_ORDER:
         meta = get_group(letter)
         assert meta.title and meta.description
-        assert group_names(letter)  # every group contributes features
+        assert get_group(letter).members  # every group contributes features
 
 
 def test_count_features_are_flagged():
@@ -116,7 +115,7 @@ def test_extraction_rgb_and_rgba_input():
 
 def test_group_subsetting_ablation():
     vec = extract_features(cloud_image(seed=1), groups="AD")
-    assert vec.names() == group_names("A") + group_names("D")
+    assert vec.names() == get_group("A").members + get_group("D").members
     assert len(vec) == EXPECTED_GROUP_SIZES["A"] + EXPECTED_GROUP_SIZES["D"]
     assert vec.group_of("mean_intensity") == "A"
     assert vec.group_of("edge_density") == "D"
@@ -133,7 +132,7 @@ def test_feature_level_exclusion():
 
 def test_feature_vector_dict_protocol():
     vec = extract_features(cloud_image(seed=1), groups="E")
-    assert set(vec.keys()) == set(group_names("E"))
+    assert set(vec.keys()) == set(get_group("E").members)
     assert len(list(vec)) == len(vec) == len(list(vec.items()))
     assert vec.get("hole_count") == vec["hole_count"]
     assert vec.get("not_a_feature") is None
@@ -145,8 +144,8 @@ def test_by_group_view():
     vec = extract_features(cloud_image(seed=1), groups="EF")
     by = vec.by_group()
     assert set(by) == {"E", "F"}
-    assert set(by["E"]) == set(group_names("E"))
-    assert set(by["F"]) == set(group_names("F"))
+    assert set(by["E"]) == set(get_group("E").members)
+    assert set(by["F"]) == set(get_group("F").members)
 
 
 def test_error_paths():

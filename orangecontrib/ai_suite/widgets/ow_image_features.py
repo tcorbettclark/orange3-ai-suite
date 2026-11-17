@@ -41,8 +41,10 @@ from orangecontrib.ai_suite.adapters import image_paths
 from orangecontrib.ai_suite.kernel import features
 
 # Group letters, titles and help text come from the kernel's group table.
-GROUP_LABELS = tuple((group.letter, f"{group.letter}: {group.title}") for group in features.GROUPS)
-GROUP_HELP = {group.letter: group.description for group in features.GROUPS}
+GROUP_LABELS = tuple(
+    (group.letter, f"{group.letter}: {group.title}") for group in features.all_groups()
+)
+GROUP_HELP = {group.letter: group.description for group in features.all_groups()}
 _ALL_GROUPS = "".join(features.GROUP_ORDER)
 _THUMBNAIL_SIZE = 48
 _GRID_ITEM_SIZE = QSize(66, 76)
@@ -967,7 +969,7 @@ class OWImageFeatures(OWWidget):
             name
             for letter, _ in GROUP_LABELS
             if letter in self.groups_enabled
-            for name in features.group_names(letter)
+            for name in features.get_group(letter).members
         ]
         columns = {name: i for i, name in enumerate(feature_cache.names)}
         values = feature_cache.values[:, [columns[name] for name in ordered]]
