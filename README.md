@@ -316,6 +316,13 @@ get_feature("hole_count").definition  # the human-readable sentence
 all_features()  # the full catalogue, in stable column order
 ```
 
+A runnable script lives in `examples/image_features.py`
+(`uv run python examples/image_features.py`). It reads three real cloud
+photographs from `examples/` (credits in `examples/CREDITS.md`) and shows the
+catalogue and its definitions, the extraction and ablation selections, fine
+texture on wispy cirrus against coarse texture on a roll cloud, and the colour
+shortcut separating a blue sky from ground vegetation.
+
 ## Kernel API
 
 ### Language models
