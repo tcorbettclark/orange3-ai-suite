@@ -1,4 +1,4 @@
-"""LM Vocab Viewer: a read-only window into a tokenizer.
+"""LM Vocab Viewer: a read-only view of a tokenizer.
 
 Input is a model (preferred: its embedded tokenizer is shown) or data with text
 columns (then character-level and word-level tokenizers are built side by side,

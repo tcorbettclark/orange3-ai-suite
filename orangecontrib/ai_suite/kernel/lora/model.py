@@ -167,7 +167,7 @@ class LoRAModel:
 
         Returns ``{'loss', 'perplexity'}`` on the same convention as the Keras
         ``LanguageModel.perplexity``, for in-domain / out-of-domain tables.
-        Chunks long text into non-overlapping windows.
+        Splits long text into non-overlapping segments.
         """
         import math
 
@@ -179,19 +179,19 @@ class LoRAModel:
         if len(ids) < 2:
             return {"loss": float("nan"), "perplexity": float("nan")}
         nll_sum, n_tokens = 0.0, 0
-        step = _MAX_SEQ_LEN - 1  # no overlap between windows
+        step = _MAX_SEQ_LEN - 1  # no overlap between segments
         limit = min(len(ids), max_tokens)
         for start in range(0, limit - 1, step):
-            window = ids[start : min(start + _MAX_SEQ_LEN, limit)]
-            if len(window) < 2:
+            segment = ids[start : min(start + _MAX_SEQ_LEN, limit)]
+            if len(segment) < 2:
                 continue
-            x = mx.array([window[:-1]])
-            targets = mx.array(window[1:])
+            x = mx.array([segment[:-1]])
+            targets = mx.array(segment[1:])
             logits = model(x)
             log_probs = nn.log_softmax(logits.reshape(logits.shape[1], -1), axis=-1)
-            picked = log_probs[mx.arange(len(window) - 1), targets]
+            picked = log_probs[mx.arange(len(segment) - 1), targets]
             nll_sum += float(-picked.sum())
-            n_tokens += len(window) - 1
+            n_tokens += len(segment) - 1
         loss = nll_sum / max(n_tokens, 1)
         return {"loss": float(loss), "perplexity": float(math.exp(loss))}
 

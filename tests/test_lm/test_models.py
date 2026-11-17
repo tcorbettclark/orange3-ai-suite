@@ -17,7 +17,7 @@ from orangecontrib.ai_suite.kernel.lm import (
     tokenizer_from_text,
     train_language_model,
 )
-from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, LSTM, Bigram, MLPWindow
+from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, LSTM, MLP, Bigram
 from orangecontrib.ai_suite.kernel.lm.models import _sample
 
 CORPUS = "the cat sat on the mat. the cat saw the dog. a dog and a cat ran."
@@ -33,7 +33,7 @@ def mlp_model(tokenizer):
     return train_language_model(
         tokenizer,
         CORPUS,
-        MLPWindow(context_width=8, embedding_dim=8, hidden_units=16),
+        MLP(context_width=8, embedding_dim=8, hidden_units=16),
         epochs=30,
         batch_size=32,
         seed=0,
@@ -47,14 +47,14 @@ def test_context_width_is_a_hyperparameter_only_where_it_is_tunable():
     # The width belongs to the model: a bigram's is the constant 1, so there is
     # no argument to pass and no invalid value to validate.
     assert Bigram().context_width == 1
-    assert MLPWindow(context_width=4).context_width == 4
+    assert MLP(context_width=4).context_width == 4
     assert LSTM(context_width=4).context_width == 4
     with pytest.raises(TypeError):
         Bigram(context_width=8)
 
 
 def test_graph_accepts_the_models_own_width(tokenizer):
-    for architecture in (Bigram(), MLPWindow(context_width=8), LSTM(context_width=8)):
+    for architecture in (Bigram(), MLP(context_width=8), LSTM(context_width=8)):
         width = architecture.context_width
         graph = architecture.build(vocab_size=tokenizer.vocab_size, seed=0)
         # Order is history plus the target: 2 for a bigram, width + 1 otherwise.
@@ -73,7 +73,7 @@ def test_bigram_parameter_count_is_the_count_table(tokenizer):
 def test_architectures_declare_only_their_own_parameters():
     # The point of one estimator per model: nothing to ignore.
     assert Bigram().get_params() == {}
-    assert MLPWindow().get_params() == {
+    assert MLP().get_params() == {
         "context_width": 16,
         "embedding_dim": 32,
         "hidden_units": 128,
@@ -84,13 +84,13 @@ def test_architectures_declare_only_their_own_parameters():
         "units": 256,
         "layers": 1,
     }
-    assert list(ARCHITECTURES) == ["bigram", "mlp_window", "lstm"]
+    assert list(ARCHITECTURES) == ["bigram", "mlp", "lstm"]
 
 
 def test_architectures_are_cloneable_estimators():
     from sklearn.base import clone
 
-    config = MLPWindow(context_width=4, embedding_dim=8, hidden_units=16)
+    config = MLP(context_width=4, embedding_dim=8, hidden_units=16)
     assert clone(config).get_params() == config.get_params()
     assert config.set_params(hidden_units=64).hidden_units == 64
     assert config.set_params(context_width=12).context_width == 12
@@ -98,12 +98,12 @@ def test_architectures_are_cloneable_estimators():
 
 def test_builder_error_paths(tokenizer):
     with pytest.raises(ValueError, match="vocab_size"):
-        MLPWindow(context_width=2).build(vocab_size=2)
+        MLP(context_width=2).build(vocab_size=2)
     with pytest.raises(ValueError, match="context_width"):
-        MLPWindow(context_width=0).build(vocab_size=10)
+        MLP(context_width=0).build(vocab_size=10)
     with pytest.raises(ValueError, match="layers"):
         LSTM(context_width=2, layers=3).build(vocab_size=10)
-    for architecture in (MLPWindow(context_width=2), LSTM(context_width=2)):
+    for architecture in (MLP(context_width=2), LSTM(context_width=2)):
         architecture.build(vocab_size=10)  # constructs fine
 
 
@@ -119,7 +119,7 @@ def test_training_reduces_loss_and_reports_stats(tokenizer):
     model = train_language_model(
         tokenizer,
         CORPUS,
-        MLPWindow(context_width=8, embedding_dim=8, hidden_units=16),
+        MLP(context_width=8, embedding_dim=8, hidden_units=16),
         epochs=12,
         batch_size=32,
         seed=0,
@@ -170,7 +170,7 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
     model = train_language_model(
         tokenizer,
         CORPUS,
-        MLPWindow(context_width=8, embedding_dim=8, hidden_units=16),
+        MLP(context_width=8, embedding_dim=8, hidden_units=16),
         epochs=50,
         batch_size=32,
         seed=0,
@@ -184,17 +184,17 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
 def test_train_validation_split_is_mandatory():
     with pytest.raises(ValueError, match="validation_fraction"):
         train_language_model(
-            tokenizer_from_text(CORPUS, "char"), CORPUS, MLPWindow(), validation_fraction=0.0
+            tokenizer_from_text(CORPUS, "char"), CORPUS, MLP(), validation_fraction=0.0
         )
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
         train_language_model(
             tokenizer_from_text("one sentence only.", "char"),
             "one sentence only.",
-            MLPWindow(),
+            MLP(),
         )
     with pytest.raises(ValueError, match="epochs"):
-        train_language_model(tokenizer_from_text(CORPUS, "char"), CORPUS, MLPWindow(), epochs=0)
+        train_language_model(tokenizer_from_text(CORPUS, "char"), CORPUS, MLP(), epochs=0)
 
 
 # ---- sampling ------------------------------------------------------------
@@ -285,7 +285,7 @@ def test_stop_requested_works_without_epoch_hook(tokenizer):
     model = train_language_model(
         tokenizer,
         CORPUS,
-        MLPWindow(context_width=8, embedding_dim=8, hidden_units=16),
+        MLP(context_width=8, embedding_dim=8, hidden_units=16),
         epochs=5,
         batch_size=32,
         stop_requested=lambda: True,

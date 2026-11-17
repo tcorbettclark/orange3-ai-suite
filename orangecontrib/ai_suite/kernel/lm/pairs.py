@@ -60,7 +60,7 @@ class Pairs:
     # ---- unit structure, derived -------------------------------------------
 
     def _offsets(self) -> np.ndarray:
-        """Window index where each unit starts, plus a trailing sentinel."""
+        """Pair index where each unit starts, plus a trailing sentinel."""
         return np.concatenate(([0], np.flatnonzero(self.targets == EOS_ID) + 1))
 
     @property

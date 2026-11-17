@@ -136,8 +136,8 @@ Pre-trains a small language model from scratch on a text corpus. The architectur
 selects:
 
 - **Bigram** - context of one token; the floor that any learning achieves.
-- **MLP over a fixed window** - embeds the last *w* tokens and predicts the
-  next; the default.
+- **MLP** - embeds the last *w* ids and concatenates them into one hidden
+  layer, so its memory is fixed and visible; the default.
 - **LSTM** - recurrent state; smoother but slower on CPU.
 
 The tokenizer can be character-level or word-level, which visibly changes
@@ -228,7 +228,7 @@ previous one exposes.
 
 Use **LM Pre-trainer** on a single-domain corpus loaded with **LM Text Loader**, for
 example a public-domain short story. Start with the bigram, then the
-MLP-over-window, then the LSTM. Compare
+MLP, then the LSTM. Compare
 loss curves and checkpoint samples: the bigram plateaus quickly, the MLP has a
 fixed and visible memory, and the LSTM trains more smoothly at a higher cost.
 Switch between character and word tokenization and watch the vocabulary and
@@ -319,7 +319,7 @@ all_features()  # the full catalogue, in stable column order
 
 ```python
 from orangecontrib.ai_suite.kernel.lm import (
-    MLPWindow,
+    MLP,
     make_pairs,
     tokenizer_from_text,
     train_language_model,
@@ -332,7 +332,7 @@ stream = tokenizer.encode(text)  # every sentence ends with <eos>
 pairs = make_pairs(stream, context_width=16)
 train, valid = pairs.split(validation_fraction=0.1, seed=0)
 
-architecture = MLPWindow(context_width=16, embedding_dim=32, hidden_units=128)
+architecture = MLP(context_width=16, embedding_dim=32, hidden_units=128)
 model = train_language_model(
     tokenizer,
     text,

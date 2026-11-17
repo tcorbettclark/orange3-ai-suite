@@ -34,11 +34,11 @@ Connect **Checkpoint** to **Data Table**. There is one row per epoch. Read the
 `sample` column from top to bottom. This is the checkpoint table: the text
 evolving as the model learns.
 
-## 3. MLP over a window: the default
+## 3. MLP: the default
 
 Set:
 
-- **Architecture**: MLP-over-window
+- **Architecture**: MLP
 - **Context width**: 16
 - **Embedding dim**: 32
 - **Hidden units**: 128
@@ -71,8 +71,8 @@ Set:
 - **Batch size**: 128
 
 Press **Train**. The LSTM carries a compressed hidden state instead of a fixed
-window. Its curve is usually smoother, and it costs more per epoch. Treat it as
-a launch-and-return experiment: start it, then inspect the samples when it
+context. Its curve is usually smoother, and it costs more per epoch. Treat it
+as a launch-and-return experiment: start it, then inspect the samples when it
 finishes.
 
 ## 5. Character level versus word level

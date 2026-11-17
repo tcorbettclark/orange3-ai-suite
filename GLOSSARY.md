@@ -63,7 +63,7 @@ Tokens are built by the tokenizer (`kernel/lm/tokenizer.py`).
   **rightmost slot holds the id immediately before the target**, and moving
   left goes further back.
 - **context width `w`** — how many slots a context has: how far back the model
-  reads. A hyperparameter of `MLPWindow` and `LSTM`, enumerable through
+  reads. A hyperparameter of `MLP` and `LSTM`, enumerable through
   `get_params()`, and the constant 1 for `Bigram`, which has no such parameter: a
   model that reads more history is an n-gram of higher order, a different model
   rather than a setting.
@@ -114,14 +114,14 @@ context is padded out with BOS, or when a unit is shorter than `w`.
 
 ## Model
 
-- **architecture** — one buildable model class: `Bigram`, `MLPWindow`, `LSTM`.
+- **architecture** — one buildable model class: `Bigram`, `MLP`, `LSTM`.
 - **hyperparameter** — a setting for an architecture, e.g. `context_width`,
   `units` or `hidden_units`. Enumerable through `get_params()`.
 - **order** — how many tokens a prediction involves: its `w` ids of history plus
   the target, so `order = w + 1`. A bigram conditions on one token, so its order
-  is fixed at 2; an `MLPWindow` or `LSTM` order follows its context width.
+  is fixed at 2; an `MLP` or `LSTM` order follows its context width.
 - **n-gram** — a model of order `n`, conditioning on `n - 1` ids: `Bigram` is
-  the `n = 2` member. `MLPWindow` and `LSTM` are trainable relatives of the same
+  the `n = 2` member. `MLP` and `LSTM` are trainable relatives of the same
   family, whose order is chosen instead of fixed.
 - **logits** — one score per token in the vocabulary, unnormalised. Softmax is
   computed where it is needed: inside the training loss and in the sampler.
@@ -146,7 +146,7 @@ context is padded out with BOS, or when a unit is shorter than `w`.
 
 ```
 w = 1                     Bigram: a constant, not a parameter
-w = a hyperparameter      MLPWindow, LSTM
+w = a hyperparameter      MLP, LSTM
 order = w + 1             Bigram 2; the others chosen with their width
 N = sum(pairs per unit)   independent of w
 contexts.shape = (N, w)
@@ -154,7 +154,7 @@ contexts.shape = (N, w)
 
 ## Example: one small corpus, three architectures
 
-Corpus: two units, `a b` and `c`. The `MLPWindow` and `LSTM` are given a
+Corpus: two units, `a b` and `c`. The `MLP` and `LSTM` are given a
 context width of 3; the `Bigram` has no width to be given and reads 1.
 
 ```
@@ -163,7 +163,7 @@ unit "a b": seq = [BOS, a, b, EOS]    pairs: 3  (2 tokens + EOS)
 unit "c":   seq = [BOS, c, EOS]       pairs: 2  (1 token + EOS)
 ```
 
-| # | target | `Bigram` context (`w = 1`) | `MLPWindow` context (`w = 3`) | `LSTM` context (`w = 3`) |
+| # | target | `Bigram` context (`w = 1`) | `MLP` context (`w = 3`) | `LSTM` context (`w = 3`) |
 |---|---|---|---|---|
 | 1 | `a` | `[BOS]` | `[BOS, BOS, BOS]` | `[BOS, BOS, BOS]` |
 | 2 | `b` | `[a]` | `[BOS, BOS, a]` | `[BOS, BOS, a]` |
@@ -173,7 +173,7 @@ unit "c":   seq = [BOS, c, EOS]       pairs: 2  (1 token + EOS)
 
 What the table shows:
 
-- **Width belongs to the model.** The `MLPWindow` and `LSTM` were set to 3, the
+- **Width belongs to the model.** The `MLP` and `LSTM` were set to 3, the
   `Bigram` cannot be set at all; it reads 1 slot because that is what a bigram
   is.
 - **Order follows `w`.** These five predictions are order 2 for `Bigram` and
@@ -192,5 +192,5 @@ And why the architectures differ at all, with `V` = `vocab_size`, `d` =
 | architecture | reads | order | parameters |
 |---|---|---|---|
 | `Bigram` | 1 slot | 2 | `V²`, independent of `w` |
-| `MLPWindow` | all `w` slots | `w + 1` | grows with `w` (first dense layer is `w*d` wide) |
+| `MLP` | all `w` slots | `w + 1` | grows with `w` (first dense layer is `w*d` wide) |
 | `LSTM` | all `w` slots | `w + 1` | independent of `w` (shared weights over steps) |

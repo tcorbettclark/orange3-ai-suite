@@ -1,6 +1,6 @@
 """Keras model builders for the three from-scratch architectures.
 
-Bigram, MLP-over-window and LSTM are separate models that happen to share an
+Bigram, MLP and LSTM are separate models that happen to share an
 input contract - a ``(context_width,)`` int32 context of token ids - and an
 output
 contract - logits over the vocabulary, so softmax lives in the loss and in the
@@ -90,17 +90,16 @@ class Bigram(Architecture):
         return keras.Model(inputs, logits, name=self.name)
 
 
-class MLPWindow(Architecture):
+class MLP(Architecture):
     """A fixed, visible memory: the whole context concatenated into one hidden layer.
 
     Position is carried by concatenation order, so the model can only ever look
-    ``context_width`` ids back - the contrast with the LSTM, which carries position
-    in its state. Named for the fixed span (the `window`) it reads; the span itself
-    is the model's context, not a separate object.
+    ``context_width`` ids back - the contrast with the LSTM, which carries
+    position in its state.
     """
 
-    name = "mlp_window"
-    label = "MLP over window"
+    name = "mlp"
+    label = "MLP"
 
     def __init__(
         self,
@@ -151,7 +150,7 @@ class LSTM(Architecture):
         return keras.Model(inputs, logits, name=self.name)
 
 
-ARCHITECTURES: dict[str, type[Architecture]] = {cls.name: cls for cls in (Bigram, MLPWindow, LSTM)}
+ARCHITECTURES: dict[str, type[Architecture]] = {cls.name: cls for cls in (Bigram, MLP, LSTM)}
 
 
 def architecture_from_metadata(meta: dict) -> Architecture:

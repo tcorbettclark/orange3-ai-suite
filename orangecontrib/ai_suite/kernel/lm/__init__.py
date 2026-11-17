@@ -7,7 +7,7 @@ process and is why Orange takes a moment longer to start; it is not deferrable,
 since every part of the model stack needs it.
 """
 
-from .builders import ARCHITECTURES, LSTM, Bigram, MLPWindow, compile_model
+from .builders import ARCHITECTURES, LSTM, MLP, Bigram, compile_model
 from .models import LanguageModel
 from .pairs import Pairs, make_pairs
 from .tokenizer import (
@@ -33,12 +33,12 @@ __all__ = [
     "EOS",
     "EOS_ID",
     "LSTM",
+    "MLP",
     "UNK",
     "UNK_ID",
     "Bigram",
     "CharTokenizer",
     "LanguageModel",
-    "MLPWindow",
     "Pairs",
     "Tokenizer",
     "WordTokenizer",

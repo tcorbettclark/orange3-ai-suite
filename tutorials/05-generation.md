@@ -64,7 +64,7 @@ Train a bigram and an MLP on the same corpus. Connect each to its own Generator
 (or swap the connection) and use the same prompt and temperature.
 
 The bigram should sound locally plausible but lose the thread quickly. The MLP
-should keep a short window of context. The comparison is the point: the
+should keep a short context. The comparison is the point: the
 architecture's memory is visible in the text.
 
 ## 7. LoRA models

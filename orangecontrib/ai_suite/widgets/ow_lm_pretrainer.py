@@ -82,8 +82,7 @@ class OWLMPretrainer(OWWidget):
     table: one row per epoch with loss, perplexity and, optionally, a sample of
     generated text.
 
-    The architecture dropdown selects the bigram, MLP-over-window or LSTM
-    model; the tokenizer dropdown switches between character and word level.
+    The architecture dropdown selects the bigram, MLP or LSTM model; the tokenizer dropdown switches between character and word level.
     Running several architectures on one corpus is the central experiment:
     the bigram plateaus, the MLP has a fixed visible memory, and the LSTM
     trains smoothly at a higher cost. Training/validation loss is plotted live
@@ -114,15 +113,15 @@ class OWLMPretrainer(OWWidget):
         training = Msg("Training in progress; press Stop to end early.")
 
     # settings
-    architecture_index = Setting(1)  # MLP-over-window is the default
+    architecture_index = Setting(1)  # MLP is the default
     tokenizer_level_index = Setting(0)  # char level: small vocab, long sequences
     # One setting per (architecture, hyperparameter), named after the estimator
     # parameter it feeds, so a model can never be handed a control that belongs
     # to another. Defaults agree on embedding_dim and context_width: a fair
     # comparison holds them fixed unless the user changes one.
-    mlp_window_context_width = Setting(16)
-    mlp_window_embedding_dim = Setting(32)
-    mlp_window_hidden_units = Setting(128)
+    mlp_context_width = Setting(16)
+    mlp_embedding_dim = Setting(32)
+    mlp_hidden_units = Setting(128)
     lstm_context_width = Setting(16)
     lstm_embedding_dim = Setting(32)
     lstm_units = Setting(256)
@@ -167,11 +166,11 @@ class OWLMPretrainer(OWWidget):
         )
         self._arch_boxes["bigram"] = bigram_box
 
-        mlp_box = gui.widgetBox(self.controlArea, "MLP over window")
-        gui.spin(mlp_box, self, "mlp_window_context_width", 1, 64, label="Context width")
-        gui.spin(mlp_box, self, "mlp_window_embedding_dim", 2, 512, label="Embedding dim")
-        gui.spin(mlp_box, self, "mlp_window_hidden_units", 8, 1024, label="Hidden units")
-        self._arch_boxes["mlp_window"] = mlp_box
+        mlp_box = gui.widgetBox(self.controlArea, "MLP")
+        gui.spin(mlp_box, self, "mlp_context_width", 1, 64, label="Context width")
+        gui.spin(mlp_box, self, "mlp_embedding_dim", 2, 512, label="Embedding dim")
+        gui.spin(mlp_box, self, "mlp_hidden_units", 8, 1024, label="Hidden units")
+        self._arch_boxes["mlp"] = mlp_box
 
         lstm_box = gui.widgetBox(self.controlArea, "LSTM")
         gui.spin(lstm_box, self, "lstm_context_width", 1, 64, label="Context width")
