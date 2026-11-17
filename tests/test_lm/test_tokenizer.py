@@ -10,7 +10,7 @@ import dataclasses
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import (
+from orangecontrib.ai_suite.kernel.lm.tokenizer import (
     BOS,
     BOS_ID,
     EOS,
