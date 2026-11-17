@@ -281,6 +281,18 @@ def test_word_level_generate_smoke():
     assert out.startswith("the")
 
 
+def test_generate_rejects_a_negative_temperature(mlp_model):
+    with pytest.raises(ValueError, match="temperature"):
+        mlp_model.generate("the", temperature=-1.0)
+
+
+def test_fit_on_empty_text_says_so(tokenizer):
+    with pytest.raises(ValueError, match="empty"):
+        fit(tokenizer, "", Bigram())
+    with pytest.raises(ValueError, match="empty"):
+        LanguageModel(Bigram(), tokenizer).fit("  \n  ", TrainingOptions(epochs=1))
+
+
 def test_sample_temperature_zero_is_argmax():
     rng = np.random.default_rng(0)
     logits = np.array([1.0, 3.0, 2.0])
@@ -314,6 +326,10 @@ def test_save_load_round_trip(mlp_model, tmp_path):
     assert mlp_model.generate(prompt, temperature=0, max_new_tokens=20) == loaded.generate(
         prompt, temperature=0, max_new_tokens=20
     )
+    # the loaded model is compiled as well as weighted, so it can still be scored
+    assert loaded.evaluate("the cat sat on the mat.")["perplexity"] == pytest.approx(
+        mlp_model.evaluate("the cat sat on the mat.")["perplexity"]
+    )
 
 
 def test_language_model_is_serialisable_in_principle(mlp_model):
@@ -342,3 +358,14 @@ def test_unfitted_model_says_so():
         model.generate("the")
     with pytest.raises(RuntimeError, match="fit"):
         model.evaluate("the cat sat.")
+    with pytest.raises(RuntimeError, match="fit"):
+        model.parameter_count()
+
+
+def test_saving_an_unfitted_model_writes_nothing(tmp_path):
+    model = LanguageModel(Bigram(), tokenizer_from_text(CORPUS, "char"))
+    target = tmp_path / "never-written"
+    with pytest.raises(RuntimeError, match="fit"):
+        model.save(target)
+    # the guard runs before the directory is made: no orphan meta.json
+    assert not target.exists()

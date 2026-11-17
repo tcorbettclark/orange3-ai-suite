@@ -8,8 +8,9 @@ that grows: each declares its own hyperparameters, so no architecture can be
 handed a parameter it would ignore.
 
 Each is a scikit-learn estimator: the constructor stores hyperparameters
-verbatim and does nothing else, every check happens in :meth:`Architecture.build`,
-and ``get_params`` / ``set_params`` / ``clone`` come from ``BaseEstimator``. That
+verbatim and does nothing else, checks happen in :meth:`Architecture.build` or in
+the graph builder where they depend on the layers, and ``get_params`` /
+``set_params`` / ``clone`` come from ``BaseEstimator``. That
 lets a caller enumerate an architecture's parameters instead of guessing a
 superset - Orange's controls and parameter sweeps are driven from exactly this.
 A model is an instance of an architecture with a tokenizer and weights; see
@@ -39,7 +40,8 @@ class Architecture(BaseEstimator, ABC):
         """The name this architecture is known by outside the kernel: ``"mlp"``.
 
         Derived from the class name, lower-cased, so it is ready to be passed back
-        in to :func:`architecture` and cannot drift from the class.
+        in - :func:`architecture_from_dict` takes it - and cannot drift from the
+        class.
         """
         return cls.__name__.lower()
 

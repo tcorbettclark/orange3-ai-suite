@@ -49,7 +49,11 @@ def _last_unit(stream: Iterable[int]) -> list[int]:
 
 
 def _sample(logits: np.ndarray, temperature: float, rng: np.random.Generator) -> int:
-    """Temperature sampling; temperature <= 0 means greedy (argmax)."""
+    """Temperature sampling; 0 means greedy (argmax), and negatives are treated alike.
+
+    ``generate`` rejects a negative temperature, so only 0 reaches here from the
+    public path.
+    """
     logits = np.asarray(logits, dtype=np.float64)
     if temperature <= 0.0:
         return int(np.argmax(logits))
@@ -104,7 +108,8 @@ class LanguageModel:
         """Train on one text and return self, so the call can be chained.
 
         Pairs are built at the architecture's own context width and split by
-        unit, so no unit is on both sides. ``options`` carries everything about
+        unit, so no unit is on both sides - except the degenerate corpus whose
+        units are all identical, which :meth:`Pairs.split` documents. ``options`` carries everything about
         the run and nothing about the architecture. The Keras model is assigned
         before fitting begins, so an ``on_epoch`` hook can generate from the model
         as it currently stands - that is where a per-epoch sample belongs, not in
@@ -157,7 +162,9 @@ class LanguageModel:
         Training, evaluation and generation share one unit, so this generates a
         sentence and stops when the model emits EOS. ``max_new_tokens`` is only
         a safety cap: an undertrained model that never emits EOS still returns a
-        run-on, which is the honest picture. Asking for more than one unit would
+        run-on, which is the honest picture - and a step that samples ``<bos>``
+        is spent rather than spent appending it, since ``<bos>`` is never a
+        target. Asking for more than one unit would
         mean sampling from contexts that contain EOS - a distribution training
         never covered, because contexts never cross a unit end.
 
@@ -212,6 +219,12 @@ class LanguageModel:
     # ---- persistence (vocab + weights as ONE unit) -------------------------
 
     def save(self, path: str | Path) -> Path:
+        """Write weights, tokenizer and the run's record as one directory.
+
+        The weights are checked for before anything is written, so an unfitted
+        model raises without leaving a half-written directory behind.
+        """
+        keras_model = self._fitted
         out = Path(path)
         out.mkdir(parents=True, exist_ok=True)
         meta = {
@@ -222,7 +235,7 @@ class LanguageModel:
             "tokenizer": self.tokenizer.to_dict(),
         }
         (out / _META_FILE).write_text(json.dumps(meta, indent=2))
-        self._fitted.save(out / _MODEL_FILE)
+        keras_model.save(out / _MODEL_FILE)
         return out
 
     @classmethod

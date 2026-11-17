@@ -91,7 +91,10 @@ def test_bos_is_never_a_target_but_eos_is():
 def test_error_paths():
     with pytest.raises(ValueError, match="context_width"):
         make_pairs([A, EOS], context_width=0)
-    with pytest.raises(ValueError, match="must end with <eos>"):
+    with pytest.raises(ValueError, match="whole number"):
+        make_pairs([A, EOS], context_width=2.5)  # no silent truncation
+    # empty text is not a malformed stream: say what actually happened
+    with pytest.raises(ValueError, match="stream is empty"):
         make_pairs([], context_width=2)
     with pytest.raises(ValueError, match="must end with <eos>"):
         make_pairs([A, B, C], context_width=2)  # unterminated stream
@@ -99,6 +102,40 @@ def test_error_paths():
         make_pairs([A, EOS, EOS], context_width=2)
     with pytest.raises(ValueError, match="empty unit"):
         make_pairs([EOS, A, EOS], context_width=2)
+
+
+# ---- what the split does and does not promise ------------------------------
+
+
+def _one_token_units(tokens):
+    """One stream of single-token units, so every unit is distinct."""
+    stream = []
+    for token in tokens:
+        stream.extend([token, EOS])
+    return stream
+
+
+def test_split_survives_reordering_but_not_appending():
+    units = list(range(100, 120))
+    base = make_pairs(_one_token_units(units), context_width=1)
+    _train, val = base.split(0.1, seed=0)
+    held_out = set(val.targets.tolist())
+
+    # Reordering and re-fetching cannot change the assignment: hashes do not care.
+    reordered = make_pairs(_one_token_units(list(reversed(units))), context_width=1)
+    _train, val_reordered = reordered.split(0.1, seed=0)
+    assert set(val_reordered.targets.tolist()) == held_out
+
+    # Appending can: the held-out count follows the unit count, and selection is a
+    # prefix in key order, so a new unit that sorts inside it evicts an old one.
+    evicted = set()
+    for extra in range(200, 400):
+        grown = make_pairs(_one_token_units([*units, extra]), context_width=1)
+        _train, val_grown = grown.split(0.1, seed=0)
+        evicted = held_out - set(val_grown.targets.tolist())
+        if evicted:
+            break
+    assert evicted, "the docs say appending is not stable; this pins that"
 
 
 # ---- end to end: an encoded corpus is a self-describing stream -------------

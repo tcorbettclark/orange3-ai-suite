@@ -9,8 +9,8 @@
   that minimise the loss.
 - **model**: `context` → `logits` — one score per token in the vocabulary.
 - **sampler**: `logits` → `id` — one id per step of a generation.
-- **evaluate**: `model` + `text` → loss and perplexity, on text the weights were
-  not trained on.
+- **evaluate**: `model` + `text` → loss and perplexity, on any text. Report it on
+  text the weights were not trained on to see the in-domain / out-of-domain gap.
 
 ## Text
 
@@ -40,8 +40,8 @@ Tokens are built by the tokenizer (`kernel/lm/tokenizer.py`).
 - **rank** — a real token's position when tokens are ordered by count, the most
   frequent first; equal counts are ordered by spelling. Vocabulary order is not
   rank: it carries no meaning at all.
-- **frequency table** — the top `n` real tokens as (rank, token, count), which is
-  what the vocabulary viewer shows.
+- **frequency table** — the top `n` real tokens as (rank, token, count). The Zipf
+  summary is built from it; the vocabulary viewer shows the whole rank order.
 - **total token count** — the corpus tokens counted when the vocabulary was
   built. Pruning leaves it alone, so shares stay corpus-relative rather than
   being measured against the survivors.
@@ -88,9 +88,8 @@ Pairs are built by the pair builder (`kernel/lm/pairs.py`).
   contributes `m + 1` pairs, because every token is predicted once and EOS is predicted too.
 - **split** — the division of pairs into training and validation sets. Made per
   unit, so the pairs from a unit are either in the training or the validation
-  set, not both. Which units go where is decided by a salted hash of each unit's
-  own ids, so the split is deterministic under a seed, independent of the order
-  the corpus arrived in, and stable when more text is appended.
+  set, not both. How units are chosen, and what that guarantees under reordering
+  or appending, is documented on :meth:`Pairs.split`.
 - **batch** — a stack of pairs handed to the model at once.
 
 ## Shapes
@@ -110,7 +109,7 @@ row 3 (target EOS)  BOS      a       b
 - **column** — one slot: the same distance back from the target, in every row.
 
 `Pairs` keeps the targets **outside** this array: `contexts` is `(N, w)` and
-`targets` is `(N,)`. The id in the last column of row *i* is row *i+1*'s target
+`targets` is `(N,)`. The target of row *i* is the last column of row *i+1*,
 wherever both rows belong to the same unit - that is what the slide does. The
 pair builder does not exploit it: it writes both arrays from the same
 `[BOS, s1..sm, EOS]` sequence, so a row's target stays unambiguous even when its
@@ -200,5 +199,5 @@ And why the architectures differ at all, with `V` = `vocab_size`, `d` =
 | architecture | reads | order | parameters |
 |---|---|---|---|
 | `Bigram` | 1 slot | 2 | `V²`, independent of `w` |
-| `MLP` | all `w` slots | `w + 1` | grows with `w` (first dense layer is `w*d` wide) |
+| `MLP` | all `w` slots | `w + 1` | grows with `w` (first dense layer takes `w*d` inputs) |
 | `LSTM` | all `w` slots | `w + 1` | independent of `w` (shared weights over steps) |

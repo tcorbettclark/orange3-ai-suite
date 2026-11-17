@@ -6,8 +6,9 @@ Two tokenizers
 ---------------
 
 There are two, both subclasses of an abstract :class:`Tokenizer`. A tokenizer is
-a string outside the kernel ("char", "word") and the class behind it inside;
-:func:`tokenizers` lists the strings and :func:`tokenizer` returns the class.
+a string outside the kernel ("char", "word") and the class behind it inside:
+:func:`tokenizers` lists the classes and the names they answer to, and
+:func:`tokenizer_from_text` takes one of those names.
 
 - :class:`CharTokenizer` - every character is a token, including spaces.
 - :class:`WordTokenizer` - every word is a token, identified with a regex.
@@ -44,9 +45,9 @@ Special tokens (ids the same for every tokenizer)
 - id 1 = ``<unk>``: out-of-vocabulary input (an unknown word for the word
   tokenizer, an unknown character for the char tokenizer, or a token removed by
   pruning).
-- id 2 = ``<eos>``: closes every unit, emitted by :meth:`Tokenizer.encode`. It
-  is the only special that travels in the stream, and is the target so generation
-  can learn to stop.
+- id 2 = ``<eos>``: closes every unit, emitted by :meth:`Tokenizer.encode`. It is
+  the one special ``encode`` always adds, and it is a target so generation can
+  learn to stop. ``<unk>`` is the other special that can appear in a stream.
 
 """
 
@@ -217,10 +218,10 @@ class Tokenizer(ABC):
     def decode(self, ids: Sequence[int]) -> str:
         """Token ids -> text: units rendered independently, joined by one space.
 
-        Both specials are dropped, so ``<eos>`` closes a unit rather than
+        ``<bos>`` and ``<eos>`` are dropped, so ``<eos>`` closes a unit rather than
         appearing in the text. The separator between units is not a token, so a
-        newline or a run of spaces comes back as a single space. ``<unk>``
-        shows literally.
+        newline or a run of spaces comes back as a single space. ``<unk>`` is not
+        dropped: it shows literally.
         """
         units: list[list[int]] = [[]]
         for i in map(int, ids):
@@ -239,7 +240,7 @@ class Tokenizer(ABC):
     # Read-only statistics from the vocabulary frequencies.
 
     def stats(self) -> dict:
-        """Summary of the vocabulary: size, longest tokens, spread, hapax fraction, pruning."""
+        """Summary of the vocabulary: size, longest tokens, hapax fraction, pruning."""
         real = self.counted()
         by_length = sorted(real, key=lambda tc: (-len(tc[0]), -tc[1], tc[0]))
         lengths = [len(t) for t, _ in real]
@@ -378,9 +379,11 @@ def _tokenizer(tokenizer_name: str) -> type[Tokenizer]:
 def tokenizer_from_text(text: str, tokenizer_name: str) -> Tokenizer:
     """Count tokens over the text and fix the vocabulary.
 
-    ``tokenizer_name`` chooses the tokenizer; :func:`tokenizers` lists the names it
-    accepts. A corpus of several documents arrives as one text: counts do not
-    care where documents end, so nothing is lost by joining them first.
+    ``tokenizer_name`` chooses the tokenizer: the names are what
+    ``cls.tokenizer_name()`` reports for the classes :func:`tokenizers` lists. A
+    corpus of several documents arrives as one text joined by newlines (as
+    ``adapters.corpus_text`` does), because the sentence splitter treats a newline
+    as a boundary; joining with spaces would fuse units instead.
     """
     impl = _tokenizer(tokenizer_name)
     # Count what encode will actually tokenize: the sentences, not the raw text,

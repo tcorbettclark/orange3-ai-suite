@@ -82,9 +82,12 @@ class Pairs:
         """Unit-level train/validation split, deterministic under a seed.
 
         Units are selected by a salted hash of their own ids, in key order, so
-        the split is a function of ``(seed, the set of units)`` - never of the
-        order the corpus arrived in. Reordering or re-fetching the corpus cannot
-        change it, and appending text does not move existing assignments.
+        the split is a function of ``(seed, the units)`` - never of the order the
+        corpus arrived in: reordering or re-fetching the corpus cannot change it.
+
+        It is *not* stable under appending. The held-out count is a fraction of
+        the unit count and the selection is a prefix in key order, so a new unit
+        whose key sorts inside that prefix evicts one that was held out before.
 
         Selection is atomic per key: two units with identical ids hash alike and
         are therefore always assigned together, so a unit can never appear in
@@ -150,11 +153,12 @@ def make_pairs(stream: Sequence[int], context_width: int) -> Pairs:
     rejected: only ``Tokenizer.encode`` produces a stream that carries its own
     unit structure.
     """
-    if int(context_width) < 1:
-        raise ValueError("context_width must be >= 1")
-    context_width = int(context_width)
+    if int(context_width) != context_width or context_width < 1:
+        raise ValueError("context_width must be a whole number >= 1")
 
     ids = np.asarray(stream, dtype=np.int32)
+    if len(ids) == 0:
+        raise ValueError("stream is empty: empty or whitespace-only text has no units")
     ends = np.flatnonzero(ids == EOS_ID)
     if len(ends) == 0 or ends[-1] != len(ids) - 1:
         raise ValueError(
