@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._stats import scaled_slope
-from ..feature import Feature, FeatureOptions
+from .._conventions import scaled_slope
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class ColumnProfileTrend(Feature):

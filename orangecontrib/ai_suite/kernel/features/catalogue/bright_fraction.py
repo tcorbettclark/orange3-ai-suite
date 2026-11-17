@@ -7,7 +7,8 @@ absolute threshold would silently encode the dataset's lighting.
 
 import numpy as np
 
-from ..feature import Feature, FeatureOptions
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class BrightFraction(Feature):

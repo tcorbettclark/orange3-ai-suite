@@ -8,9 +8,10 @@ near a corner does not change the unit.
 
 import numpy as np
 
-from .._primitives import mass_moments
-from .._stats import EPS, scaled_slope
-from ..feature import Feature, FeatureOptions
+from .._conventions import EPS, scaled_slope
+from .._imaging import mass_moments
+from ..feature import Feature
+from ..options import FeatureOptions
 
 RADIAL_BINS = 8
 

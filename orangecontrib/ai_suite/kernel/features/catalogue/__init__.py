@@ -11,7 +11,7 @@ worse failure than a stale list. The tests assert that the roster and the
 directory agree.
 
 Order here is column order and nothing else. Which features belong together is
-an assembly concern (:mod:`..groups`), so neither this file nor the classes it
+a grouping concern (:mod:`..groups`), so neither this file nor the classes it
 lists may group the features into families: a second statement of the grouping
 would only be something else to go stale.
 """

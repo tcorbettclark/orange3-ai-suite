@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import peak_count
-from ..feature import Feature, FeatureOptions
+from .._imaging import peak_count
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class ColumnProfilePeaks(Feature):

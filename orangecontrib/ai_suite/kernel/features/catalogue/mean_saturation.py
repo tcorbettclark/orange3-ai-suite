@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from ..feature import Feature, FeatureOptions
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class MeanSaturation(Feature):

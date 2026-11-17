@@ -40,11 +40,9 @@ from Orange.widgets.widget import Input, Msg, Output, OWWidget
 from orangecontrib.ai_suite.adapters import image_paths
 from orangecontrib.ai_suite.kernel import features
 
-# Group letters, titles and help text come from the kernel assembly.
-GROUP_LABELS = tuple(
-    (group.letter, f"{group.letter}: {group.title}") for group in features.ASSEMBLIES
-)
-GROUP_HELP = {group.letter: group.description for group in features.ASSEMBLIES}
+# Group letters, titles and help text come from the kernel's group table.
+GROUP_LABELS = tuple((group.letter, f"{group.letter}: {group.title}") for group in features.GROUPS)
+GROUP_HELP = {group.letter: group.description for group in features.GROUPS}
 _ALL_GROUPS = "".join(features.GROUP_ORDER)
 _THUMBNAIL_SIZE = 48
 _GRID_ITEM_SIZE = QSize(66, 76)

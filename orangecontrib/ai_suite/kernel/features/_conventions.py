@@ -1,8 +1,9 @@
-"""Shared numeric conventions for the feature groups.
+"""Shared numeric conventions: what "zero", "flat" and "net change" mean.
 
-These helpers exist because more than one group needs the same rule. One copy
-means the epsilon, the flat-input policy and the "net change across a profile"
-scaling cannot drift apart between groups.
+These are rules, not measurements. More than one feature needs each of them, so
+one copy means the epsilon, the flat-input policy and the across-a-profile
+scaling cannot drift apart between features. Image measurements live in
+:mod:`_imaging`.
 """
 
 from __future__ import annotations

@@ -8,9 +8,10 @@ and wispy cirrus low, which is why this carries so much cloud signal.
 
 import numpy as np
 
-from .._primitives import block_mean_variance, local_std_mean
-from .._stats import EPS
-from ..feature import Feature, FeatureOptions
+from .._conventions import EPS
+from .._imaging import block_mean_variance, local_std_mean
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class CoarseToFineTextureRatio(Feature):

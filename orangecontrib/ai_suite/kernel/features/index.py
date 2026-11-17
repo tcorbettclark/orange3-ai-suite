@@ -3,9 +3,9 @@
 The table is built from the catalogue roster, and column order *is* roster
 order, so there is no second place for an index to go stale.
 
-Nothing here knows about groups. Grouping is an assembly over these names and
-lives in :mod:`groups`; this module only answers "which features are there,
-and in what order".
+Nothing here knows about groups. Grouping is a set of membership lists over
+these names and lives in :mod:`groups`; this module only answers "which
+features are there, and in what order".
 """
 
 from __future__ import annotations

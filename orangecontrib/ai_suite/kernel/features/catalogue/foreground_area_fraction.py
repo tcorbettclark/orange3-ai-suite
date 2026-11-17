@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import otsu_foreground
-from ..feature import Feature, FeatureOptions
+from .._imaging import otsu_foreground
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class ForegroundAreaFraction(Feature):

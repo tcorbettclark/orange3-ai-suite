@@ -288,7 +288,7 @@ Experiments that the widgets make easy:
 
 Each feature is a class in `orangecontrib.ai_suite.kernel.features.catalogue`,
 carrying its own name, definition sentence and computation. Groups are a
-lightweight assembly over that flat catalogue
+set of membership lists over that flat catalogue
 (`orangecontrib.ai_suite.kernel.features.groups`): membership lists used for
 ablation and display, so a feature can belong to more than one group and the
 grouping never touches the feature itself.
@@ -439,7 +439,7 @@ orangecontrib/
     kernel/
       features/   preprocessing, index, extraction front door
         catalogue/   one module and one class per feature
-        groups.py    feature groups as an assembly over the catalogue
+        groups.py    feature groups as membership lists over the catalogue
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects

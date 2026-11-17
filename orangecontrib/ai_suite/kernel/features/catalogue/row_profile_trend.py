@@ -6,8 +6,9 @@ intensity units rather than a per-row rate that shrinks as images grow.
 
 import numpy as np
 
-from .._stats import scaled_slope
-from ..feature import Feature, FeatureOptions
+from .._conventions import scaled_slope
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class RowProfileTrend(Feature):

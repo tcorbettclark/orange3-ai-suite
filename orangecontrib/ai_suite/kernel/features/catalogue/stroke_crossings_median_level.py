@@ -12,7 +12,8 @@ coincides with the background level of a minority bright object.
 
 import numpy as np
 
-from ..feature import Feature, FeatureOptions
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class StrokeCrossingsMedianLevel(Feature):

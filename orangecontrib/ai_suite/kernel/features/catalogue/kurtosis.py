@@ -6,8 +6,9 @@ uniform distribution.
 
 import numpy as np
 
-from .._stats import EPS
-from ..feature import Feature, FeatureOptions
+from .._conventions import EPS
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class Kurtosis(Feature):

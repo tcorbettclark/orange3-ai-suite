@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import gradient_magnitude
-from ..feature import Feature, FeatureOptions
+from .._imaging import gradient_magnitude
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class MeanGradientMagnitude(Feature):

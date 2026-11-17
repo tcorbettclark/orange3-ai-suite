@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import block_mean_variance
-from ..feature import Feature, FeatureOptions
+from .._imaging import block_mean_variance
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class CoarseTexture(Feature):

@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import local_std_mean
-from ..feature import Feature, FeatureOptions
+from .._imaging import local_std_mean
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class FineTexture(Feature):

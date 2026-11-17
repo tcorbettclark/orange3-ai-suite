@@ -6,8 +6,9 @@ features deliberately do not restate it from their projections.
 
 import numpy as np
 
-from .._primitives import mass_moments
-from ..feature import Feature, FeatureOptions
+from .._imaging import mass_moments
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class CentreOfMassX(Feature):

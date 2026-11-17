@@ -6,8 +6,9 @@ structure, which is what makes them informative together.
 
 import numpy as np
 
-from .._primitives import diagonal_profile, peak_count
-from ..feature import Feature, FeatureOptions
+from .._imaging import diagonal_profile, peak_count
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class AntiDiagonalProfilePeaks(Feature):

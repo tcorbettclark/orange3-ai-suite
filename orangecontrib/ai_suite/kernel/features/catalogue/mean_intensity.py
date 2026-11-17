@@ -7,7 +7,8 @@ images, and also why it cannot answer "was this photo dark?".
 
 import numpy as np
 
-from ..feature import Feature, FeatureOptions
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class MeanIntensity(Feature):

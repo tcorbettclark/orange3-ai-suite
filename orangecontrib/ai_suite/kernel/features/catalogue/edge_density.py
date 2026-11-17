@@ -9,9 +9,10 @@ rather than naming a number.
 
 import numpy as np
 
-from .._primitives import gradient_magnitude
-from .._stats import EPS
-from ..feature import Feature, FeatureOptions
+from .._conventions import EPS
+from .._imaging import gradient_magnitude
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class EdgeDensity(Feature):

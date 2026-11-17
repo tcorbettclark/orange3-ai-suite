@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
-from .options import FeatureOptions
+if TYPE_CHECKING:  # annotations only: the feature contract takes options, it does not own them
+    from .options import FeatureOptions
 
-__all__ = ["Feature", "FeatureOptions"]
+__all__ = ["Feature"]
 
 _NAME = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
 _MIN_DEFINITION = 20

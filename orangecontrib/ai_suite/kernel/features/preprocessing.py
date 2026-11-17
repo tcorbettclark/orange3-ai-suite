@@ -14,7 +14,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from ._stats import EPS
+from ._conventions import EPS
 from .options import FeatureOptions
 
 # ITU-R BT.601 luma weights, RGB channel order. Callers must convert OpenCV's

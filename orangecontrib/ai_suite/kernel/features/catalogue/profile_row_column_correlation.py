@@ -6,8 +6,9 @@ structure to agree or disagree about, so it returns 0.0 rather than a NaN.
 
 import numpy as np
 
-from .._stats import safe_corr
-from ..feature import Feature, FeatureOptions
+from .._conventions import safe_corr
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class ProfileRowColumnCorrelation(Feature):

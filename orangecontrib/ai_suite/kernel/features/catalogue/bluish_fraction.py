@@ -8,8 +8,9 @@ features on is the shortcut-learning demonstration, not an improvement.
 
 import numpy as np
 
-from .._primitives import colour_channels
-from ..feature import Feature, FeatureOptions
+from .._imaging import colour_channels
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class BluishFraction(Feature):

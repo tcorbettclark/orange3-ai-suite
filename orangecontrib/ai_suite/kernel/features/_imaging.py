@@ -1,12 +1,13 @@
-"""Shared computation helpers for features.
+"""Image measurements shared by more than one feature.
 
 Every function here is pure and stateless: it recomputes what it returns. Two
-features may call the same helper, but no value is ever cached or handed from
-one feature to another — that independence is the point of one class per
+features may call the same measurement, but no value is ever cached or handed
+from one feature to another — that independence is the point of one class per
 feature, and it is what keeps a feature's cost attributable to that feature.
 
-Helpers live here only when more than one feature needs them; a computation
-used by a single feature belongs in that feature's module.
+A measurement lives here only when more than one feature needs it; anything used
+by a single feature belongs in that feature's module. Numeric *rules* (the
+epsilon, the flat-input policy, the slope scaling) live in :mod:`_conventions`.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import cv2
 import numpy as np
 from scipy.signal import find_peaks
 
-from ._stats import EPS, safe_corr
+from ._conventions import EPS, safe_corr
 from .options import FeatureOptions
 
 LOCAL_STD_WINDOW = 5

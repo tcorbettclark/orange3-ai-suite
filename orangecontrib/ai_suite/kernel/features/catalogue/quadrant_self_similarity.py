@@ -9,8 +9,9 @@ pixel and correlation needs matching shapes.
 import cv2
 import numpy as np
 
-from .._stats import safe_corr
-from ..feature import Feature, FeatureOptions
+from .._conventions import safe_corr
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class QuadrantSelfSimilarity(Feature):

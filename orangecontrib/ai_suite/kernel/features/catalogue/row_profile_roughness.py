@@ -6,8 +6,9 @@ a slow wave - which is the point: bands are structure, gradients are not.
 
 import numpy as np
 
-from .._primitives import roughness
-from ..feature import Feature, FeatureOptions
+from .._imaging import roughness
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class RowProfileRoughness(Feature):

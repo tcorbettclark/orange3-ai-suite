@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import mirror_corr
-from ..feature import Feature, FeatureOptions
+from .._imaging import mirror_corr
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class TopBottomSymmetry(Feature):

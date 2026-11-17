@@ -11,7 +11,8 @@ numpy), and the obvious target if extraction ever needs to be faster.
 
 import numpy as np
 
-from ..feature import Feature, FeatureOptions
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 def _upcrossings(line: np.ndarray) -> float:

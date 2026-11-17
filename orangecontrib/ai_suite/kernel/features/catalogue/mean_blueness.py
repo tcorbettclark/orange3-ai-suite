@@ -5,8 +5,9 @@ The definition is deliberately naive; that naivety is the point.
 
 import numpy as np
 
-from .._primitives import colour_channels
-from ..feature import Feature, FeatureOptions
+from .._imaging import colour_channels
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class MeanBlueness(Feature):

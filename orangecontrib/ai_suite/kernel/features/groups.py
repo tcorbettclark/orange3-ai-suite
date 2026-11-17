@@ -1,11 +1,11 @@
-"""Feature groups: a lightweight assembly over the flat feature table.
+"""Feature groups: membership lists over the flat feature table.
 
 A group owns no feature and computes nothing. It is a membership list plus the
 words to describe it, so the same feature may appear in several groups - that
 overlap is what makes alternative ablations possible without touching the
 features themselves.
 
-Two rules keep the assembly honest, both checked at import:
+Two rules keep the grouping honest, both checked at import:
 
 - every name listed by a group exists in the index, and every feature belongs
   to at least one group (an unlisted feature could never be selected);
@@ -27,7 +27,7 @@ from .index import all_feature_names, get_feature
 
 
 @dataclass(frozen=True)
-class Assembly:
+class Group:
     """One group of features: a letter, the words, and its members."""
 
     letter: str
@@ -36,8 +36,8 @@ class Assembly:
     members: tuple[str, ...]  # feature names, in column order
 
 
-ASSEMBLIES: tuple[Assembly, ...] = (
-    Assembly(
+GROUPS: tuple[Group, ...] = (
+    Group(
         "A",
         "global photometry",
         "Global photometry: brightness, contrast, skewness, kurtosis and "
@@ -51,7 +51,7 @@ ASSEMBLIES: tuple[Assembly, ...] = (
             "bright_fraction",
         ),
     ),
-    Assembly(
+    Group(
         "B",
         "profile summaries",
         "Profile summaries: dense row, column and diagonal projections. "
@@ -69,7 +69,7 @@ ASSEMBLIES: tuple[Assembly, ...] = (
             "profile_median_crossing_count",
         ),
     ),
-    Assembly(
+    Group(
         "C",
         "spatial mass",
         "Spatial mass: where the bright matter sits, how wide or tall it is, "
@@ -83,7 +83,7 @@ ASSEMBLIES: tuple[Assembly, ...] = (
             "radial_gradient",
         ),
     ),
-    Assembly(
+    Group(
         "D",
         "texture",
         "Texture: gradient strength, edge density, fine and coarse texture, "
@@ -97,20 +97,20 @@ ASSEMBLIES: tuple[Assembly, ...] = (
             "autocorrelation_half_width",
         ),
     ),
-    Assembly(
+    Group(
         "E",
         "topology",
         "Topology: Otsu foreground, enclosed-background hole count and stroke "
         "crossings. The classic digit features.",
         ("hole_count", "foreground_area_fraction", "stroke_crossings_median_level"),
     ),
-    Assembly(
+    Group(
         "F",
         "symmetry",
         "Symmetry: left-right, top-bottom and quadrant self-similarity.",
         ("left_right_symmetry", "top_bottom_symmetry", "quadrant_self_similarity"),
     ),
-    Assembly(
+    Group(
         "G",
         "colour",
         "Colour: bluish fraction, blueness, saturation and greenery. A "
@@ -120,24 +120,24 @@ ASSEMBLIES: tuple[Assembly, ...] = (
     ),
 )
 
-GROUP_ORDER: tuple[str, ...] = tuple(assembly.letter for assembly in ASSEMBLIES)
+GROUP_ORDER: tuple[str, ...] = tuple(group.letter for group in GROUPS)
 DEFAULT_GROUPS = "ABCDEF"  # the colour shortcut group is opt-in
 
 
 def _validate() -> dict[str, tuple[str, ...]]:
-    """Check the assembly against the index; returns name -> member letters."""
+    """Check the groups against the index; returns name -> member letters."""
     problems: list[str] = []
     memberships: dict[str, list[str]] = {}
     if len(set(GROUP_ORDER)) != len(GROUP_ORDER):
         problems.append("duplicate group letters")
-    for assembly in ASSEMBLIES:
-        if not assembly.title or not assembly.description:
-            problems.append(f"group {assembly.letter}: missing title or description")
-        if len(set(assembly.members)) != len(assembly.members):
-            problems.append(f"group {assembly.letter}: duplicate members")
-        for name in assembly.members:
+    for group in GROUPS:
+        if not group.title or not group.description:
+            problems.append(f"group {group.letter}: missing title or description")
+        if len(set(group.members)) != len(group.members):
+            problems.append(f"group {group.letter}: duplicate members")
+        for name in group.members:
             get_feature(name)  # raises with a friendly message
-            memberships.setdefault(name, []).append(assembly.letter)
+            memberships.setdefault(name, []).append(group.letter)
 
     unlisted = set(all_feature_names()) - set(memberships)
     if unlisted:
@@ -147,10 +147,7 @@ def _validate() -> dict[str, tuple[str, ...]]:
             problems.append(f"DEFAULT_GROUPS names unknown group {letter!r}")
 
     default_members = {
-        name
-        for assembly in ASSEMBLIES
-        if assembly.letter in DEFAULT_GROUPS
-        for name in assembly.members
+        name for group in GROUPS if group.letter in DEFAULT_GROUPS for name in group.members
     }
     colour = sorted(name for name in default_members if get_feature(name).needs_colour)
     if colour:
@@ -163,18 +160,18 @@ def _validate() -> dict[str, tuple[str, ...]]:
 _MEMBERSHIPS: dict[str, tuple[str, ...]] = _validate()
 
 
-def all_groups() -> tuple[Assembly, ...]:
+def all_groups() -> tuple[Group, ...]:
     """All groups, in display order."""
-    return ASSEMBLIES
+    return GROUPS
 
 
-def get_group(letter: str) -> Assembly:
+def get_group(letter: str) -> Group:
     """Look up one group by letter."""
     check_groups((letter,))
-    for assembly in ASSEMBLIES:
-        if assembly.letter == letter:
-            return assembly
-    raise AssertionError(f"group {letter!r} is in GROUP_ORDER but has no assembly")
+    for group in GROUPS:
+        if group.letter == letter:
+            return group
+    raise AssertionError(f"group {letter!r} is in GROUP_ORDER but missing from GROUPS")
 
 
 def check_groups(letters: Iterable[str]) -> tuple[str, ...]:

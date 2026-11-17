@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from .._primitives import roughness
-from ..feature import Feature, FeatureOptions
+from .._imaging import roughness
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class ColumnProfileRoughness(Feature):

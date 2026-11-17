@@ -8,8 +8,9 @@ would produce a NaN and poison the whole feature vector.
 
 import numpy as np
 
-from .._primitives import mirror_corr
-from ..feature import Feature, FeatureOptions
+from .._imaging import mirror_corr
+from ..feature import Feature
+from ..options import FeatureOptions
 
 
 class LeftRightSymmetry(Feature):

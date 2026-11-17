@@ -10,7 +10,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from .features.preprocess import to_luminance
+from .features.preprocessing import to_luminance
 
 
 def _checked_size(size: int) -> int:

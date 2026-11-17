@@ -10,7 +10,7 @@ import numpy as np
 from .groups import by_group, group_of, selection
 from .index import POSITION, get_feature, is_known
 from .options import FeatureOptions
-from .preprocess import preprocess, preprocess_colour
+from .preprocessing import preprocess, preprocess_colour
 
 
 class FeatureVector:

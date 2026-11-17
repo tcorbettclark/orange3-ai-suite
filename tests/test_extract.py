@@ -1,4 +1,4 @@
-"""The feature index, the group assembly and the extraction API."""
+"""The feature index, the feature groups and the extraction API."""
 
 from pathlib import Path
 
