@@ -44,8 +44,8 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
     w.set_data(text_table)
     w.epochs = 2
     w.context_size = 8
-    w.embedding_dim = 8
-    w.hidden_units = 16
+    w.mlp_window_embedding_dim = 8
+    w.mlp_window_hidden_units = 16
     w.sample_max_new_tokens = 8
     model_sent = capture(w.Outputs.model)
     checkpoint_sent = capture(w.Outputs.checkpoint)
@@ -69,8 +69,8 @@ def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
     w.set_data(text_table)
     w.epochs = 200
     w.context_size = 8
-    w.embedding_dim = 8
-    w.hidden_units = 16
+    w.mlp_window_embedding_dim = 8
+    w.mlp_window_hidden_units = 16
 
     original = w._on_epoch
     calls = {"n": 0}
@@ -144,3 +144,27 @@ def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
     w.run_training_blocking()
     assert w.Error.training_failed.is_shown()
     assert not w.Information.training.is_shown()
+
+
+def test_only_the_selected_architectures_controls_are_visible(qapp):
+    """Every architecture owns its hyperparameters, so the others' are hidden."""
+    w = OWLMPretrainer()
+    w.show()
+    for index, expected in enumerate(["bigram", "mlp_window", "lstm"]):
+        w.architecture_index = index
+        w._show_architecture()
+        visible = [name for name, box in w._arch_boxes.items() if box.isVisible()]
+        assert visible == [expected]
+
+
+def test_architecture_is_built_from_its_own_settings_only(qapp):
+    w = OWLMPretrainer()
+    w.mlp_window_embedding_dim, w.mlp_window_hidden_units = 8, 16
+    w.lstm_embedding_dim, w.lstm_units, w.lstm_layers = 12, 48, 2
+
+    w.architecture_index = 1
+    assert w._architecture().get_params() == {"embedding_dim": 8, "hidden_units": 16}
+    w.architecture_index = 2
+    assert w._architecture().get_params() == {"embedding_dim": 12, "units": 48, "layers": 2}
+    w.architecture_index = 0
+    assert w._architecture().get_params() == {}  # a bigram has no hyperparameters

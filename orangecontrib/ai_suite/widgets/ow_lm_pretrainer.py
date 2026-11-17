@@ -120,11 +120,16 @@ class OWLMPretrainer(OWWidget):
     # settings
     architecture_index = Setting(1)  # MLP-over-window is the default
     tokenizer_level_index = Setting(0)  # char level: small vocab, long sequences
-    context_size = Setting(16)
-    embedding_dim = Setting(32)
-    hidden_units = Setting(128)
+    context_size = Setting(16)  # window width: data, not a model parameter
+    # One setting per (architecture, hyperparameter), named after the estimator
+    # parameter it feeds, so a model can never be handed a control that belongs
+    # to another. Defaults agree on embedding_dim: a fair comparison holds it
+    # fixed unless the user changes it.
+    mlp_window_embedding_dim = Setting(32)
+    mlp_window_hidden_units = Setting(128)
+    lstm_embedding_dim = Setting(32)
     lstm_units = Setting(256)
-    lstm_layers_index = Setting(0)  # combo: 1 or 2 layers
+    lstm_layers = Setting(1)
     epochs = Setting(15)
     batch_size = Setting(256)
     learning_rate = Setting(1e-3)
@@ -145,16 +150,38 @@ class OWLMPretrainer(OWWidget):
 
         arch_box = gui.widgetBox(self.controlArea, "Architecture")
         gui.comboBox(
-            arch_box, self, "architecture_index", items=ARCHITECTURE_LABELS, label="Architecture"
+            arch_box,
+            self,
+            "architecture_index",
+            items=ARCHITECTURE_LABELS,
+            label="Architecture",
+            callback=self._show_architecture,
         )
         gui.comboBox(arch_box, self, "tokenizer_level_index", items=LEVEL_LABELS, label="Tokenizer")
         gui.spin(arch_box, self, "context_size", 1, 64, label="Context window")
-        gui.spin(arch_box, self, "embedding_dim", 2, 512, label="Embedding dim")
-        gui.spin(arch_box, self, "hidden_units", 8, 1024, label="Hidden units (MLP)")
+
+        # Only the selected architecture's controls are shown: the others would
+        # be inert, since each estimator declares just its own parameters.
+        self._arch_boxes = {}
+        bigram_box = gui.widgetBox(self.controlArea, "Bigram")
+        gui.label(
+            bigram_box,
+            self,
+            "No hyperparameters: the model is the vocabulary-size count table.",
+        )
+        self._arch_boxes["bigram"] = bigram_box
+
+        mlp_box = gui.widgetBox(self.controlArea, "MLP over window")
+        gui.spin(mlp_box, self, "mlp_window_embedding_dim", 2, 512, label="Embedding dim")
+        gui.spin(mlp_box, self, "mlp_window_hidden_units", 8, 1024, label="Hidden units")
+        self._arch_boxes["mlp_window"] = mlp_box
 
         lstm_box = gui.widgetBox(self.controlArea, "LSTM")
+        gui.spin(lstm_box, self, "lstm_embedding_dim", 2, 512, label="Embedding dim")
         gui.spin(lstm_box, self, "lstm_units", 16, 1024, label="LSTM units")
-        gui.comboBox(lstm_box, self, "lstm_layers_index", items=["1 layer", "2 layers"])
+        gui.spin(lstm_box, self, "lstm_layers", 1, 2, label="LSTM layers")
+        self._arch_boxes["lstm"] = lstm_box
+        self._show_architecture()
 
         train_box = gui.widgetBox(self.controlArea, "Training")
         gui.spin(train_box, self, "epochs", 1, 500, label="Epochs")
@@ -204,22 +231,23 @@ class OWLMPretrainer(OWWidget):
 
     # ---- lifecycle ---------------------------------------------------------
 
-    def _architecture(self):
-        """The selected model, given the hyperparameters it declares.
+    def _show_architecture(self):
+        """Show only the selected architecture's controls."""
+        selected = ARCHITECTURE_VALUES[self.architecture_index]
+        for name, box in self._arch_boxes.items():
+            box.setVisible(name == selected)
 
-        The spin boxes exist for every architecture; ``get_params`` is what says
-        which of them actually belong to the one selected, so an MLP is never
-        handed ``lstm_units``. Trimming the controls per architecture is a
-        widget job for later - this keeps the kernel from accepting the noise.
+    def _architecture(self):
+        """The selected model, configured from the settings it declares.
+
+        ``get_params`` names the hyperparameters, and each setting is named
+        after the parameter it feeds, so the wiring is derived from the
+        estimator rather than restated here - a new parameter on a model needs a
+        control and nothing else.
         """
         cls = ARCHITECTURES[ARCHITECTURE_VALUES[self.architecture_index]]
-        values = {
-            "embedding_dim": self.embedding_dim,
-            "hidden_units": self.hidden_units,
-            "units": self.lstm_units,
-            "layers": self.lstm_layers_index + 1,
-        }
-        return cls(**{k: v for k, v in values.items() if k in cls().get_params()})
+        values = {param: getattr(self, f"{cls.name}_{param}") for param in cls().get_params()}
+        return cls(**values)
 
     def _collect_options(self) -> dict:
         return {
