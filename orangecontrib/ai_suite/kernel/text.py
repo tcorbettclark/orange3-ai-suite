@@ -138,8 +138,8 @@ def split_sentences(text: str) -> list[str]:
     Text-level on purpose: the two rules it encodes - a newline ends a
     sentence, a terminator ends one only when whitespace follows - both depend
     on characters that tokenization may discard. Callers that work in the
-    token domain get sentence structure from the tokenizer, which marks every
-    sentence start with BOS (see ``Tokenizer.encode``).
+    token domain get sentence structure from the tokenizer, which closes every
+    sentence with EOS (see ``Tokenizer.encode``).
     """
     out: list[str] = []
     for line in text.splitlines():

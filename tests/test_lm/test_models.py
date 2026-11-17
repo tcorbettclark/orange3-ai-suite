@@ -16,7 +16,11 @@ pytest.importorskip("keras", reason="[lm] extra (Keras) not installed")
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.lm import LanguageModel, Tokenizer, train_language_model
+from orangecontrib.ai_suite.kernel.lm import (
+    LanguageModel,
+    tokenizer_from_corpus,
+    train_language_model,
+)
 from orangecontrib.ai_suite.kernel.lm.builders import ARCHITECTURES, build_model
 from orangecontrib.ai_suite.kernel.lm.models import _sample
 
@@ -25,7 +29,7 @@ CORPUS = ["the cat sat on the mat. the cat saw the dog. a dog and a cat ran."]
 
 @pytest.fixture(scope="module")
 def tokenizer():
-    return Tokenizer.from_corpus(CORPUS, "char")
+    return tokenizer_from_corpus(CORPUS, "char")
 
 
 @pytest.fixture(scope="module")
@@ -143,17 +147,17 @@ def test_stop_requested_stops_training_cleanly(tokenizer):
 def test_train_validation_split_is_mandatory():
     with pytest.raises(ValueError, match="validation_fraction"):
         train_language_model(
-            CORPUS, Tokenizer.from_corpus(CORPUS, "char"), "mlp_window", validation_fraction=0.0
+            CORPUS, tokenizer_from_corpus(CORPUS, "char"), "mlp_window", validation_fraction=0.0
         )
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
         train_language_model(
             ["one sentence only."],
-            Tokenizer.from_corpus(["one sentence only."], "char"),
+            tokenizer_from_corpus(["one sentence only."], "char"),
             "mlp_window",
         )
     with pytest.raises(ValueError, match="epochs"):
-        train_language_model(CORPUS, Tokenizer.from_corpus(CORPUS, "char"), "mlp_window", epochs=0)
+        train_language_model(CORPUS, tokenizer_from_corpus(CORPUS, "char"), "mlp_window", epochs=0)
 
 
 # ---- sampling ------------------------------------------------------------
@@ -189,7 +193,7 @@ def test_long_prompt_uses_last_window(mlp_model):
 
 
 def test_word_level_generate_smoke():
-    tok = Tokenizer.from_corpus(CORPUS, "word")
+    tok = tokenizer_from_corpus(CORPUS, "word")
     model = train_language_model(
         CORPUS, tok, "bigram", context_size=1, epochs=8, batch_size=16, seed=0
     )

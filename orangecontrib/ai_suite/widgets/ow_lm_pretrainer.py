@@ -21,13 +21,13 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import checkpoint_table, table_texts
-from orangecontrib.ai_suite.kernel.lm import Tokenizer
+from orangecontrib.ai_suite.kernel.lm import tokenizer_from_corpus, tokenizer_levels
 
 ARCHITECTURE_LABELS = ["Bigram", "MLP-over-window", "LSTM"]
 ARCHITECTURE_VALUES = ["bigram", "mlp_window", "lstm"]
 # Level identifiers come from the kernel, so the dropdown cannot drift from the
 # classes; only the short label formatting is decided here.
-LEVELS = Tokenizer.levels()
+LEVELS = tokenizer_levels()
 LEVEL_VALUES = [name for name, _ in LEVELS]
 LEVEL_LABELS = [f"{name.capitalize()} level" for name, _ in LEVELS]
 
@@ -241,7 +241,7 @@ class OWLMPretrainer(OWWidget):
         self.status_label.setText("")
 
         options = self._collect_options()
-        tokenizer = Tokenizer.from_corpus(self.texts, options.pop("tokenizer_level"))
+        tokenizer = tokenizer_from_corpus(self.texts, options.pop("tokenizer_level"))
         max_vocab = options.pop("max_vocab")
         if max_vocab:
             tokenizer = tokenizer.keep_top(max_vocab)  # real tokens, specials always kept

@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from .tokenizer import BOS_ID, EOS_ID, Tokenizer
+from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict
 from .windowing import make_windows
 
 _META_FILE = "meta.json"
@@ -146,7 +146,7 @@ class LanguageModel:
 
         src = Path(path)
         meta = json.loads((src / _META_FILE).read_text())
-        tokenizer = Tokenizer.from_dict(meta["tokenizer"])
+        tokenizer = tokenizer_from_dict(meta["tokenizer"])
         return cls(
             architecture=meta["architecture"],
             tokenizer=tokenizer,

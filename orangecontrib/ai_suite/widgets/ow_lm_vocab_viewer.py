@@ -103,10 +103,10 @@ class OWLMVocabViewer(OWWidget):
         if table is not None:
             try:
                 texts = table_texts(table)
-                from orangecontrib.ai_suite.kernel.lm import Tokenizer  # kernel import; pure Python
+                from orangecontrib.ai_suite.kernel.lm import tokenizer_from_corpus  # pure Python
 
-                self._char_tokenizer = Tokenizer.from_corpus(texts, "char")
-                self._word_tokenizer = Tokenizer.from_corpus(texts, "word")
+                self._char_tokenizer = tokenizer_from_corpus(texts, "char")
+                self._word_tokenizer = tokenizer_from_corpus(texts, "word")
             except ValueError as exc:
                 self.Warning.text_not_supported(str(exc))
         self.refresh()

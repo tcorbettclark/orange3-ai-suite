@@ -316,11 +316,15 @@ all_features()                    # the full catalogue, in stable column order
 ### Language models
 
 ```python
-from orangecontrib.ai_suite.kernel.lm import Tokenizer, make_windows, train_language_model
+from orangecontrib.ai_suite.kernel.lm import (
+    make_windows,
+    tokenizer_from_corpus,
+    train_language_model,
+)
 
-tokenizer = Tokenizer.from_corpus(texts, "char")
+tokenizer = tokenizer_from_corpus(texts, "char")
 tokenizer = tokenizer.keep_top(2000)       # or .drop_rare(min_count=3); pure, chainable
-stream = tokenizer.encode_corpus(texts)    # BOS marks every sentence start
+stream = tokenizer.encode_corpus(texts)    # every sentence ends with <eos>
 windows = make_windows(stream, context_size=16)
 train, valid = windows.split(val_fraction=0.1, seed=0)
 
