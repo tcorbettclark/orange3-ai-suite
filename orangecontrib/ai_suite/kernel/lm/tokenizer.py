@@ -335,11 +335,6 @@ class WordTokenizer(Tokenizer):
 
 
 # ---- construction -----------------------------------------------------------
-#
-# Factories, not methods: the class you get is decided by the ``level`` name, not
-# by the class you asked, so as classmethods they would let a call on one level
-# build the other. Building a tokenizer from data is a function; asking one for
-# its data (to_dict) is a method.
 
 
 def tokenizer_levels() -> tuple[tuple[str, str], ...]:
