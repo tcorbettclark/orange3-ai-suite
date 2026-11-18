@@ -6,20 +6,34 @@ import argparse
 import sys
 from pathlib import Path
 
-from .catalogue import ASSETS, BRITLLM_4BIT
+from .catalogue import ASSETS
 from .hf import AssetError, cached_path, ensure
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=("fetch", "list"))
-    parser.add_argument("asset", nargs="?", default=BRITLLM_4BIT.name)
-    parser.add_argument(
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
         "--cache",
         help=(
             "cache root (default: the Hugging Face hub cache for models, "
             "the datasets cache for prepared datasets)"
         ),
+    )
+    parser = argparse.ArgumentParser(
+        prog="orange-ai-assets",
+        description="Download and cache the suite's Hugging Face models and datasets.",
+    )
+    commands = parser.add_subparsers(dest="command", required=True, metavar="{fetch,list}")
+    fetch = commands.add_parser(
+        "fetch",
+        parents=[common],
+        help="download or reuse one asset and print its local path",
+    )
+    fetch.add_argument("asset", choices=tuple(ASSETS), help="asset to fetch (run 'list' for names)")
+    commands.add_parser(
+        "list",
+        parents=[common],
+        help="list assets with size and cache status",
     )
     args = parser.parse_args(argv)
     cache = Path(args.cache) if args.cache else None
@@ -31,10 +45,7 @@ def main(argv: list[str] | None = None) -> int:
             status = "cached" if cached_path(asset, cache) is not None else "missing"
             print(f"{asset.name:32} {asset.repo_type:8} {size:>8}  {status:7}  {asset.repo_id}")
         return 0
-    asset = ASSETS.get(args.asset)
-    if asset is None:
-        parser.error(f"unknown asset {args.asset!r}; choose from {', '.join(ASSETS)}")
-
+    asset = ASSETS[args.asset]
     last = [-1]
 
     def report(done: int, total: int) -> None:
