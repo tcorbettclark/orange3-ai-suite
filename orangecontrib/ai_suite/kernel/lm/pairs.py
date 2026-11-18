@@ -22,13 +22,13 @@ not data.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 
 import numpy as np
 
+from .._split import key_order
 from .tokenizer import BOS_ID, EOS_ID
 
 
@@ -67,14 +67,6 @@ class Pairs:
         """Pairs contributed by each unit, in order: its tokens plus one EOS."""
         return tuple(int(b - a) for a, b in pairwise(self._offsets()))
 
-    def _content_keys(self, seed: int) -> list[bytes]:
-        """One salted hash per unit, computed from the unit's own ids."""
-        salt = np.uint64(seed).tobytes()
-        return [
-            hashlib.blake2b(salt + self.targets[a:b].tobytes(), digest_size=8).digest()
-            for a, b in pairwise(self._offsets())
-        ]
-
     # ---- splitting ---------------------------------------------------------
 
     def split(self, validation_fraction: float = 0.1, seed: int = 0) -> tuple[Pairs, Pairs]:
@@ -83,8 +75,9 @@ class Pairs:
         Units are selected by a salted hash of their own ids, in key order, so
         the split is a function of ``(seed, the units)`` - never of the order the
         corpus arrived in: reordering or re-fetching the corpus cannot change it.
-
-        It is *not* stable under appending. The held-out count is a fraction of
+        The hashing itself is shared with lora's row split (see
+        :mod:`.._split`); this method owns only the unit-level policy. It is
+        *not* stable under appending. The held-out count is a fraction of
         the unit count and the selection is a prefix in key order, so a new unit
         whose key sorts inside that prefix evicts one that was held out before.
 
@@ -103,12 +96,15 @@ class Pairs:
             raise ValueError("need at least 2 units to split")
 
         groups: dict[bytes, list[int]] = {}
-        for index, key in enumerate(self._content_keys(seed)):
+        for index, key in enumerate(
+            self.targets[a:b].tobytes() for a, b in pairwise(self._offsets())
+        ):
             groups.setdefault(key, []).append(index)
 
         target = min(max(1, round(n * validation_fraction)), n - 1)
         val_units: list[int] = []
-        for key in sorted(groups):
+        group_keys = list(groups)
+        for key in (group_keys[i] for i in key_order(group_keys, seed)):
             group = groups[key]
             if len(val_units) >= target or len(val_units) + len(group) >= n:
                 break  # enough held out, and training keeps at least one unit

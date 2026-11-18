@@ -22,7 +22,6 @@ disagree.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -37,6 +36,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
+from .._split import key_order
 from .model import _ADAPTER_CONFIG, _ADAPTER_WEIGHTS, LoRAAdapter
 
 Format = Literal["text", "pairs"]
@@ -123,20 +123,18 @@ class LoRAData:
     def split(self, valid_fraction: float, seed: int) -> tuple[Rows, Rows]:
         """Train and validation rows, ordered by a salted hash of each row.
 
-        A row's side depends on ``(seed, the row)``, not on the order the rows
-        arrived in. At least one row stays on each side; identical rows hash
-        alike and may land in both splits.
+        The hashing is shared with lm's unit split (see :mod:`.._split`); this
+        method owns the row-level policy: ``0`` means no validation at all,
+        and at least one row stays on each side. A row's side depends on
+        ``(seed, the row)``, not on the order the rows arrived in. Identical
+        rows hash alike and may land in both splits.
         """
         if not 0.0 <= valid_fraction < 1.0:
             raise ValueError("valid_fraction must be in [0, 1)")
         if valid_fraction == 0.0:
             return list(self.rows), []
         n_valid = min(max(1, round(len(self.rows) * valid_fraction)), len(self.rows) - 1)
-        salt = str(seed).encode()
-        ordered = sorted(
-            self.rows,
-            key=lambda row: hashlib.blake2b(salt + repr(row).encode(), digest_size=8).digest(),
-        )
+        ordered = [self.rows[i] for i in key_order([repr(row).encode() for row in self.rows], seed)]
         return ordered[n_valid:], ordered[:n_valid]
 
 
