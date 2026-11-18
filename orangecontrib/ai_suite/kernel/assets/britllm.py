@@ -10,10 +10,10 @@ BRITLLM_4BIT = Asset(
     name="britllm-3b-v0.1-4bit-mlx",
     repo_id="tcorbettclark/britllm-3b-v0.1-4bit-mlx",
     repo_type="model",
-    revision=None,
+    revision="02241a91ab39f8296bb98e6c25afa5a98c676a4f",
     patterns=("*.json", "*.safetensors", "*.model"),
     sha256="7b67b9b99848cfc7be1d6ce5f60ef0240501e27e453dcda9ec5e02416fe608e8",
-    size_bytes=1_504_298_599,
+    size_bytes=1_504_298_117,
     weights="model.safetensors",
 )
 
