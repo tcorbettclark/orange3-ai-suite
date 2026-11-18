@@ -60,7 +60,7 @@ Connect **Data** to **LoRA SFT** **Data**. The Table has `prompt` and
 
 Set:
 
-- **Base model**: absolute path to `data/models/britllm-4bit`
+- **Base model**: connected from **BritLLM Models** (**Model path** -> **Base model**)
 - **Iterations**: 20 for the first pass
 - **Learning rate**: 1e-4
 - **Fine-tuned layers**: 16

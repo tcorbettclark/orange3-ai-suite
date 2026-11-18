@@ -170,13 +170,27 @@ checkbox switches between the adapted model and its raw base model. Model
 persistence is intentionally not part of the training or generation widgets; a
 dedicated Load LM/Save LM pair will own that role.
 
+### BritLLM Models
+
+Downloads and caches the base model the LoRA tutorials start from: a pinned
+4-bit MLX conversion of `britllm/britllm-3b-v0.1` (2.67B parameters, 1.4 GB).
+Press **Download**; the progress bar reads bytes written into the cache. The
+model goes into the standard Hugging Face hub cache (`HF_HUB_CACHE`, else
+`$HF_HOME/hub`); set `HF_HOME` to share a lab cache. The **Model path** output
+is the local snapshot directory - connect it to **Base model** on LoRA
+Pre-trainer or LoRA SFT. The LoRA widgets do not look the path up themselves.
+
+Start with this 4-bit model. The Base model field also accepts other local MLX
+model directories or Hugging Face ids; 8-bit or unquantised bases work if the
+machine has the memory.
+
 ### LoRA Pre-trainer
 
-Continues pre-training a pretrained model with 4-bit QLoRA on Apple Silicon.
-Input is a raw text corpus, one document per row. The model is still
-self-supervised: the corpus supplies the next-token targets, and the adapter
-only restricts which weights change. Use this for domain adaptation, not for
-teaching a response pattern.
+Continues pre-training a pretrained model with LoRA (QLoRA with the 4-bit
+BritLLM) on Apple Silicon. Input is a raw text corpus, one document per row.
+The model is still self-supervised: the corpus supplies the next-token targets,
+and the adapter only restricts which weights change. Use this for domain
+adaptation, not for teaching a response pattern.
 
 The live curve shows training and validation loss per iteration. The output is
 a `LoRAModel`: the base model plus its adapter. The adapter can be switched off
@@ -184,17 +198,17 @@ in the Generator to compare the same base model before and after adaptation.
 
 ### LoRA SFT
 
-Supervised fine-tuning with 4-bit QLoRA on Apple Silicon. Input is a Table with
-`prompt` and `completion` text columns. A human authored the prompt and the
-desired completion; mlx-lm masks the prompt tokens so loss is computed on the
-completion only. The prompt/response contract covers Q&A, instruction
-following and tool use; it is not tied to the `Q:`/`A:` grammar of the text
-loader.
+Supervised fine-tuning with LoRA (QLoRA with the 4-bit BritLLM) on Apple
+Silicon. Input is a Table with `prompt` and `completion` text columns. A human
+authored the prompt and the desired completion; mlx-lm masks the prompt tokens
+so loss is computed on the completion only. The prompt/response contract covers
+Q&A, instruction following and tool use; it is not tied to the `Q:`/`A:`
+grammar of the text loader.
 
 Both LoRA widgets share the same training controls, live loss curve and Model
-output. Only 4-bit quantised models are accepted. `demo/fetch_britllm.py`
-downloads and converts the default model; a Hugging Face id is treated as
-unquantised because its quantisation cannot be verified without downloading it.
+output. The Base model input takes the path from BritLLM Models; the line edit
+also accepts any local MLX model directory or Hugging Face id. The course uses
+the 4-bit model; larger or unquantised bases need more memory.
 
 ### LM Vocab Viewer
 
@@ -393,11 +407,13 @@ callables; the kernel never imports Qt.
 ### LoRA
 
 ```python
+from orangecontrib.ai_suite.kernel.assets import BRITLLM_4BIT, ensure
 from orangecontrib.ai_suite.kernel.lora import LoRAData, LoRAOptions, LoRAModel, train_lora
 
+base = ensure(BRITLLM_4BIT)  # pinned 4-bit MLX weights, cached on first use
 data = LoRAData.from_texts(corpus)  # or LoRAData.from_pairs(pairs)
 adapter = train_lora(
-    "data/models/britllm-4bit",
+    base,
     data,
     "my-adapter",
     options=LoRAOptions(iters=300, num_layers=16),
@@ -425,9 +441,12 @@ the first one raises `TrainingStopped` and produces no model.
   International Cloud Atlas into `data/clouds/`. The images are untracked and
   remain the property of their photographers; they are not covered by this
   repository's code licence.
-- `demo/fetch_britllm.py` - downloads `britllm/britllm-3b-v0.1` and converts it
-  to a 4-bit MLX model in `data/models/britllm-4bit/`. The weights keep their
-  own licence.
+- `examples/fetch_britllm.py` - fetches the pinned 4-bit MLX BritLLM into the
+  Hugging Face cache (the headless form of the BritLLM Models widget).
+- `examples/build_britllm_4bit.py` - maintainer script that downloads the fp16
+  source, converts it, adds the chat template and (optionally) uploads the
+  artifact. It builds in a temporary directory unless `--target` is given, so
+  the repository is not written to.
 - `demo/mnist_features.ows`, `demo/cloud_features.ows` - ready-made canvas
   workflows. Regenerate them with `demo/make_workflows.py`; the Import Images
   paths inside are machine-local, so re-point the File widget if needed.
@@ -435,8 +454,14 @@ the first one raises `TrainingStopped` and produces no model.
 ```bash
 uv run python demo/fetch_mnist.py
 uv run python demo/fetch_clouds.py
-uv run python demo/fetch_britllm.py
+uv run --extra lora python examples/fetch_britllm.py
 uv run python demo/make_workflows.py
+```
+
+Or, after installing the `[lora]` extra, the console script:
+
+```bash
+orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx
 ```
 
 ## Verification
@@ -464,7 +489,7 @@ QT_QPA_PLATFORM=offscreen \
 
 The kernel suite must pass in a plain Python environment; the widget suite must
 pass in the Orange interpreter. One slow test is skipped in the default widget
-run unless the converted MLX model is present.
+run unless the pinned 4-bit model is already in the Hugging Face cache.
 
 ## Reviewing a change
 
@@ -516,4 +541,4 @@ MIT for the code in this repository.
 Third-party material keeps its own terms: MNIST is publicly redistributed,
 downloaded text keeps its own licence, WMO Cloud Atlas images remain the
 property of their photographers and are used for personal, non-commercial
-teaching, and BritLLM weights keep their model licence.
+teaching, and the 4-bit BritLLM artifact keeps the source model's ODC-BY licence.

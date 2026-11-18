@@ -18,7 +18,7 @@ extending the widgets.
 ```bash
 uv run python demo/fetch_mnist.py   # only needed to rebuild demo/mnist
 uv run python demo/fetch_clouds.py     # optional cloud-corpus tutorial
-uv run --extra lora python demo/fetch_britllm.py   # optional LoRA tutorials
+uv run --extra lora python examples/fetch_britllm.py   # optional LoRA tutorials
 ```
 
 ## Conventions

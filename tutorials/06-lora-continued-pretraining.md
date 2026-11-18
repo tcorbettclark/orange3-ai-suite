@@ -9,20 +9,15 @@ You need:
 
 - macOS on Apple Silicon;
 - the `[lora]` extra installed in the Orange interpreter;
-- a converted 4-bit model at `data/models/britllm-4bit/`.
+- the 4-bit BritLLM model from **BritLLM Models** (1.4 GB, cached once).
 
-The setup tutorial has the install and conversion commands:
+The setup tutorial has the install and download steps:
 [00 - Setup](00-setup.md#1-install-and-launch).
 
-Get the absolute model path:
-
-```bash
-python -c "from pathlib import Path; print(Path('data/models/britllm-4bit').resolve())"
-```
-
-Paste that path into the LoRA Pre-trainer's **Base model** field. A Hugging Face
-id is treated as unquantised and is rejected; the widget only accepts a
-verifiably 4-bit model.
+Add **BritLLM Models**, press **Download**, and connect its **Model path**
+output to **Base model** on **LoRA Pre-trainer**. The path is the local snapshot
+directory; the Base model field also accepts any other local MLX model
+directory or Hugging Face id if the machine has the memory.
 
 ## 1. Load the corpus Table
 

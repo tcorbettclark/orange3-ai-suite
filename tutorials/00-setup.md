@@ -7,13 +7,17 @@ tutorials builds on this page.
 
 Follow the project [README](../README.md#installation) to install the add-on
 into the Orange interpreter. For the LoRA tutorials you also need the `[lora]`
-extra in that interpreter and a converted BritLLM model:
+extra in that interpreter:
 
 ```bash
 uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
-    "mlx-lm[train]==0.32.2"
-uv run --extra lora python demo/fetch_britllm.py
+    "orange3-ai-suite[lora]"
 ```
+
+The LoRA tutorials also need the 4-bit BritLLM model. Add **BritLLM Models** to
+the canvas and press **Download** (1.4 GB); the model is cached in the Hugging
+Face hub cache (`HF_HOME`, default `~/.cache/huggingface`). Connect its
+**Model path** output to **Base model** on LoRA Pre-trainer or LoRA SFT.
 
 Keras, TensorFlow and OpenCV are plain dependencies, so one sync is enough:
 
@@ -36,13 +40,16 @@ The committed demo data is enough for the image tutorials:
 
 - `demo/mnist/train/` - PNG digits in one subfolder per label.
 
-The cloud corpus and the BritLLM model are optional. Fetch them when a tutorial
-asks for them:
+The cloud corpus is optional. Fetch it when a tutorial asks for it:
 
 ```bash
 uv run python demo/fetch_clouds.py
-uv run --extra lora python demo/fetch_britllm.py
 ```
+
+The BritLLM model is downloaded by the **BritLLM Models** widget (or headlessly
+with `orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`). In a source checkout
+you can also run `uv run --extra lora python examples/fetch_britllm.py` and
+paste the printed path into **Base model**.
 
 For the language-model tutorials, download a public-domain short story. The
 tutorials use Charlotte Perkins Gilman's *The Yellow Wallpaper*, but any UTF-8
