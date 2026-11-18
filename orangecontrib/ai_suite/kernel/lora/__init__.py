@@ -21,7 +21,6 @@ from .training import (
     LoRAData,
     LoRAOptions,
     TrainingStopped,
-    parse_metric,
     split_for_training,
     train_lora,
 )
@@ -32,7 +31,6 @@ __all__ = [
     "LoRAData",
     "LoRAOptions",
     "TrainingStopped",
-    "parse_metric",
     "split_for_training",
     "train_lora",
 ]

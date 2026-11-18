@@ -2,9 +2,9 @@
 
 from .architecture import LSTM, MLP, Architecture, Bigram, architectures
 from .language_model import LanguageModel
-from .pairs import Pairs, make_pairs
+from .pairs import make_pairs
 from .tokenizer import Tokenizer, tokenizer_from_text, tokenizers
-from .training import TrainingOptions, TrainingResults
+from .training import TrainingOptions
 
 __all__ = [
     "LSTM",
@@ -12,10 +12,8 @@ __all__ = [
     "Architecture",
     "Bigram",
     "LanguageModel",
-    "Pairs",
     "Tokenizer",
     "TrainingOptions",
-    "TrainingResults",
     "architectures",
     "make_pairs",
     "tokenizer_from_text",
