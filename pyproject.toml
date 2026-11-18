@@ -40,6 +40,9 @@ dependencies = [
 lora = [
     # Apple-silicon-only: mlx is not portable.
     'mlx-lm[train]==0.32.2; platform_machine == "arm64" and sys_platform == "darwin"',
+    # The downloader and cache use the Hub; mlx-lm pulls it in, but the
+    # downloader names it directly.
+    "huggingface-hub>=0.29",
 ]
 
 # Development-only tooling (PEP 735 group, installed by `uv sync` by default).
@@ -47,6 +50,7 @@ lora = [
 dev = [
     "pytest>=8",
     "opencv-python-headless>=4.12,<5",
+    "huggingface-hub>=0.29",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -56,6 +60,9 @@ packages = ["orangecontrib"]
 
 [project.entry-points."orange.widgets"]
 "Language Models" = "orangecontrib.ai_suite.widgets"
+
+[project.scripts]
+orange-ai-assets = "orangecontrib.ai_suite.kernel.assets:main"
 
 [project.entry-points."Orange.widgets"]
 "Language Models" = "orangecontrib.ai_suite.widgets"
