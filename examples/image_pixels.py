@@ -30,7 +30,7 @@ HERE = Path(__file__).parent
 RAMP = " .:-=+*#%@"  # ten steps from dark to bright
 
 
-def pixel_values(image: np.ndarray, size: int) -> tuple[np.ndarray, tuple[str, ...]]:
+def pixel_row(image: np.ndarray, size: int) -> tuple[np.ndarray, tuple[str, ...]]:
     """The widget's pipeline, in the open: decode, resize, flatten."""
     grid = resize_square(to_unit_scale(to_luminance(image)), size)
     return flatten(grid)
@@ -69,11 +69,15 @@ def main(argv: list[str]) -> None:
         f"image        {path.name}  {width} x {height} pixels, RGB, aspect {width / height:.2f} : 1"
     )
     print(f"grid         {size} x {size}, aspect 1.00 : 1 (the frame is stretched, not cropped)")
-    resampling = "INTER_AREA (shrinking)" if size < min(height, width) else "INTER_LINEAR"
+    width_smaller, height_smaller = size < width, size < height
+    if width_smaller == height_smaller:
+        resampling = "INTER_AREA (shrinking)" if height_smaller else "INTER_LINEAR (growing)"
+    else:
+        resampling = "mixed: INTER_AREA on the shrinking axis, INTER_LINEAR on the growing one"
     print(f"resampling   {resampling}")
 
-    values, names = pixel_values(image, size)
-    print(f"\n  pixel_values(image, {size})")
+    values, names = pixel_row(image, size)
+    print(f"\n  pixel_row(image, {size})")
     print(f"    shape {values.shape}, dtype {values.dtype}")
     print(f"    values {values.min():.3f} .. {values.max():.3f}, mean {values.mean():.3f}")
     print(f"    names  {len(names)}, first {names[0]!r}, last {names[-1]!r}")
@@ -94,12 +98,12 @@ def main(argv: list[str]) -> None:
 
     print("\n  the same photograph at three resolutions:")
     for other in (4, 10, 20):
-        coarse, other_names = pixel_values(image, other)
+        coarse, other_names = pixel_row(image, other)
         print(
             f"    {other:2d} x {other:<2d} -> {len(other_names):3d} columns, mean {coarse.mean():.3f}"
         )
     print("\n    at 4 x 4 the same frame is that coarse:")
-    show_grid(pixel_values(image, 4)[0], 4)
+    show_grid(pixel_row(image, 4)[0], 4)
     print("    fewer cells keep the overall brightness and lose the detail; the count")
     print("    grows as the square of the side, which is why the widget defaults to 10.")
 
