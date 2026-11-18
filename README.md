@@ -21,6 +21,8 @@ and generations come back as corpora that Orange's text widgets can analyse.
   are thin shells: options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
   workflows.
+- **`GLOSSARY.md`** - the words the text and model code uses, one definition
+  each: tokenizer, token, context, pair, model, sampler.
 
 One wheel, one install, three toolbox categories.
 
@@ -458,6 +460,13 @@ QT_QPA_PLATFORM=offscreen \
 The kernel suite must pass in a plain Python environment; the widget suite must
 pass in the Orange interpreter. One slow test is skipped in the default widget
 run unless the converted MLX model is present.
+
+## Reviewing a change
+
+Structural changes - new modules, moved code, renames, splits - have a checklist
+in [REVIEW.md](REVIEW.md): words, steps and boundaries, layout, evidence, and how
+to finish. It is worth reading before choosing a shape as well as before merging
+one.
 
 ## Layout
 
