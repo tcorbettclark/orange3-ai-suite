@@ -19,7 +19,16 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
+from orangecontrib.ai_suite.kernel.lora import (
+    LoRAOptions,
+    LoRAModel,
+    TrainingStopped,
+    is_4bit,
+    train_lora,
+)
+
 DEFAULT_BASE_MODEL = "britllm/britllm-3b-v0.1"
+_OPTION_DEFAULTS = LoRAOptions()
 
 
 class LoraWorker(QThread):
@@ -27,6 +36,7 @@ class LoraWorker(QThread):
 
     metric_signal = pyqtSignal(dict)
     finished_ok = pyqtSignal(object)
+    stopped = pyqtSignal(str)
     failed = pyqtSignal(str)
 
     def __init__(self, request, parent=None):
@@ -36,14 +46,14 @@ class LoraWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.lora import train_lora  # guarded import inside
-
             adapter = train_lora(
                 on_metric=self.metric_signal.emit,
                 stop_requested=lambda: self.request_stop_flag,
                 **self.request,
             )
             self.finished_ok.emit(adapter)
+        except TrainingStopped as exc:
+            self.stopped.emit(str(exc))
         except Exception:
             self.failed.emit(traceback.format_exc())
 
@@ -76,6 +86,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
             "The base model is not 4-bit quantised. Convert it first: "
             "uv run python demo/fetch_britllm.py"
         )
+        bad_settings = Msg("Invalid training settings: {}")
 
     class Error(OWWidget.Error):
         mlx_missing = Msg(
@@ -86,15 +97,16 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
     class Information(OWWidget.Information):
         training = Msg("Training in progress; press Stop to end early.")
+        stopped = Msg("Training stopped before mlx-lm wrote an adapter; no model was produced.")
 
     # settings
     base_model = Setting(DEFAULT_BASE_MODEL)
-    iters = Setting(300)
-    learning_rate = Setting(1e-4)
-    num_layers = Setting(16)
-    batch_size = Setting(4)
-    max_seq_length = Setting(512)
-    seed = Setting(42)
+    iters = Setting(_OPTION_DEFAULTS.iters)
+    learning_rate = Setting(_OPTION_DEFAULTS.learning_rate)
+    num_layers = Setting(_OPTION_DEFAULTS.num_layers)
+    batch_size = Setting(_OPTION_DEFAULTS.batch_size)
+    max_seq_length = Setting(_OPTION_DEFAULTS.max_seq_length)
+    seed = Setting(_OPTION_DEFAULTS.seed)
 
     def __init__(self):
         super().__init__()
@@ -155,14 +167,11 @@ class LoRATrainerBase(OWWidget, openclass=True):
     # ---- lifecycle ---------------------------------------------------------
 
     def _make_lora_data(self):
-        """Build the kernel's ``LoraData`` from the connected Table."""
+        """Build the kernel's ``LoRAData`` from the connected Table."""
         raise NotImplementedError
 
-    def _collect_request(self, tmp_dir) -> dict:
-        from orangecontrib.ai_suite.kernel.lora import LoraOptions
-
-        data_obj = self._make_lora_data()
-        options = LoraOptions(
+    def _collect_request(self, tmp_dir, data_obj) -> dict:
+        options = LoRAOptions(
             iters=self.iters,
             learning_rate=self.learning_rate,
             num_layers=self.num_layers,
@@ -192,8 +201,10 @@ class LoRATrainerBase(OWWidget, openclass=True):
         self.Warning.nothing_to_train.clear()
         self.Warning.no_text.clear()
         self.Warning.fp16_model.clear()
+        self.Warning.bad_settings.clear()
         self.Error.mlx_missing.clear()
         self.Error.training_failed.clear()
+        self.Information.stopped.clear()
         if self.data is None:
             self.Warning.nothing_to_train()
             return None
@@ -201,7 +212,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
             self.Error.mlx_missing()
             return None
         base_model = self.base_model or DEFAULT_BASE_MODEL
-        if not self._model_is_quantised(base_model):
+        if not is_4bit(base_model):
             self.Warning.fp16_model()
             return None  # only 4-bit QLoRA is offered
 
@@ -210,9 +221,14 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
         tmp_dir = Path(tempfile.mkdtemp(prefix="lora_"))
         try:
-            return self._collect_request(tmp_dir)
+            data_obj = self._make_lora_data()
         except ValueError as exc:
             self.Warning.no_text(str(exc))
+            return None
+        try:
+            return self._collect_request(tmp_dir, data_obj)
+        except ValueError as exc:
+            self.Warning.bad_settings(str(exc))
             return None
 
     def _run(self, blocking: bool):
@@ -229,6 +245,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         worker = LoraWorker(request)
         worker.metric_signal.connect(self._on_metric)
         worker.finished_ok.connect(self._on_done)
+        worker.stopped.connect(self._on_stopped)
         worker.failed.connect(self._on_failed)
         self.worker = worker
         if blocking:
@@ -249,26 +266,6 @@ class LoRATrainerBase(OWWidget, openclass=True):
     def stop_training(self):
         if self.worker is not None:
             self.worker.request_stop_flag = True
-
-    @staticmethod
-    def _model_is_quantised(base_model: str) -> bool:
-        """Local directories: inspect config.json's quantization settings.
-
-        A Hugging Face id may be quantised on the Hub, but that cannot be known
-        without downloading the model card, so it is treated as unquantised.
-        The 4-bit-only rule then points the classroom at the locally converted
-        model.
-        """
-        import json
-        from pathlib import Path
-
-        candidate = Path(base_model)
-        if not candidate.is_dir():
-            return False  # HF id or missing path - not verifiably quantised
-        config = candidate / "config.json"
-        if not config.exists():
-            return False
-        return bool(json.loads(config.read_text()).get("quantization"))
 
     # ---- live feedback -------------------------------------------------------
 
@@ -292,8 +289,6 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
     def _on_done(self, adapter):
         self.Information.training.clear()
-        from orangecontrib.ai_suite.kernel.lora import LoRAModel
-
         self.model = LoRAModel(
             adapter.base_model,
             adapter.adapter_path,
@@ -307,6 +302,11 @@ class LoRATrainerBase(OWWidget, openclass=True):
             "connect the Model output to LM Generator for the before/after "
             "comparison."
         )
+
+    def _on_stopped(self, message: str):
+        self.Information.training.clear()
+        self.Information.stopped()
+        self.status_label.setText("Stopped; no adapter was written.")
 
     def _on_failed(self, tb: str):
         self.Information.training.clear()

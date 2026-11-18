@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
+from orangecontrib.ai_suite.kernel.lora import is_4bit
 from orangecontrib.ai_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
 
 MLX_OK = importlib.util.find_spec("mlx") is not None
@@ -20,8 +21,8 @@ def test_pretrainer_builds_text_rows(qapp, text_table):
     w = OWLoRAPretrainer()
     w.set_data(text_table)
     data = w._make_lora_data()
-    assert data.kind == "text"
-    assert len(data.train) + len(data.valid) == 2
+    assert data.format == "text"
+    assert len(data.rows) == 2
 
 
 def test_mlx_missing_routes_to_install_hint(qapp):
@@ -70,6 +71,14 @@ def test_real_training_path(qapp, capture):
     assert isinstance(out, str) and out.startswith("the quick brown")
 
 
+def test_stop_before_adapter_routes_to_information(qapp):
+    w = OWLoRAPretrainer()
+    w.show()
+    w._on_stopped("training was stopped before mlx-lm wrote the final adapter")
+    assert w.Information.stopped.is_shown()
+    assert not w.Information.training.is_shown()
+
+
 def test_trainable_parameter_note_is_reported(qapp):
     w = OWLoRAPretrainer()
     w.show()
@@ -100,5 +109,5 @@ def test_lora_fp16_guard_accepts_quantised_dir(qapp, text_table):
     quantised_dir = Path(__file__).resolve().parents[2] / "data" / "models" / "britllm-4bit"
     if not (quantised_dir / "config.json").exists():
         pytest.skip("converted model absent")
-    assert w._model_is_quantised(str(quantised_dir))
-    assert not w._model_is_quantised("britllm/britllm-3b-v0.1")
+    assert is_4bit(str(quantised_dir))
+    assert not is_4bit("britllm/britllm-3b-v0.1")

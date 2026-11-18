@@ -393,22 +393,25 @@ callables; the kernel never imports Qt.
 ### LoRA
 
 ```python
-from orangecontrib.ai_suite.kernel.lora import LoraData, LoraOptions, LoRAModel, train_lora
+from orangecontrib.ai_suite.kernel.lora import LoRAData, LoRAOptions, LoRAModel, train_lora
 
-data = LoraData.from_texts(corpus)  # or LoraData.from_pairs(pairs)
+data = LoRAData.from_texts(corpus)  # or LoRAData.from_pairs(pairs)
 adapter = train_lora(
     "data/models/britllm-4bit",
     data,
     "my-adapter",
-    options=LoraOptions(iters=300, num_layers=16),
+    options=LoRAOptions(iters=300, num_layers=16),
 )
 model = LoRAModel(adapter.base_model, adapter.adapter_path)
 model.generate("In the second century", temperature=0)
+model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}
 model.adapter_enabled = False  # the same base model, before adaptation
 ```
 
 `train_lora` runs the documented `python -m mlx_lm lora` command in a
-subprocess, streams parsed metrics, and supports clean cancellation.
+subprocess and streams parsed metrics. Stopping terminates the whole child
+process tree; because mlx-lm writes the adapter after the last iteration, a stop
+before that leaves no artifact.
 
 ## Demo data and workflows
 

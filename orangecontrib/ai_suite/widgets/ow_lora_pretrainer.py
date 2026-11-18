@@ -43,9 +43,9 @@ class OWLoRAPretrainer(LoRATrainerBase):
     )
 
     def _make_lora_data(self):
-        from orangecontrib.ai_suite.kernel.lora import LoraData
+        from orangecontrib.ai_suite.kernel.lora import LoRAData
 
-        return LoraData.from_texts(table_texts(self.data))
+        return LoRAData.from_texts(table_texts(self.data))
 
 
 if __name__ == "__main__":  # pragma: no cover - dev preview

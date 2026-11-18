@@ -48,9 +48,9 @@ class OWLoRASFT(LoRATrainerBase):
     )
 
     def _make_lora_data(self):
-        from orangecontrib.ai_suite.kernel.lora import LoraData
+        from orangecontrib.ai_suite.kernel.lora import LoRAData
 
-        return LoraData.from_pairs(table_pairs(self.data))
+        return LoRAData.from_pairs(table_pairs(self.data))
 
 
 if __name__ == "__main__":  # pragma: no cover - dev preview

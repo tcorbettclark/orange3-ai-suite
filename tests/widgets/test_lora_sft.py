@@ -48,6 +48,6 @@ def test_sft_builds_prompt_completion_pairs(qapp):
     table = _pair_table([(f"question {i}", f"answer {i}") for i in range(5)])
     w.set_data(table)
     data = w._make_lora_data()
-    assert data.kind == "pairs"
-    assert data.train[0] == ("question 0", "answer 0")
-    assert len(data.train) + len(data.valid) == 5
+    assert data.format == "pairs"
+    assert ("question 0", "answer 0") in data.rows
+    assert len(data.rows) == 5

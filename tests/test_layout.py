@@ -81,9 +81,8 @@ def test_the_text_package_is_a_facade_over_private_steps():
 
 
 def test_the_text_facade_exports_every_public_name_and_nothing_private():
-    from orangecontrib.ai_suite import kernel
+    from orangecontrib.ai_suite.kernel import text as facade
 
-    facade = kernel.text
     assert facade.__all__ == list(dict.fromkeys(facade.__all__))  # no duplicates
     for name in facade.__all__:
         assert hasattr(facade, name), name
