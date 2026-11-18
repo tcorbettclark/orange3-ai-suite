@@ -1,4 +1,4 @@
-"""The slowest feature in the suite; the first target if extraction needs speed."""
+"""One feature: median crossings, counted per line, upward only."""
 
 import numpy as np
 
@@ -16,7 +16,7 @@ class ProfileMedianCrossingCount(Feature):
     name = "profile_median_crossing_count"
     description = Description(
         title="Median crossings",
-        summary="Median number of times a row or column crosses its own median brightness.",
+        summary="Median number of upward crossings of its own median brightness per line.",
         intuition=(
             "Imagine scanning along each row and each column and counting how often you move "
             "from the darker half to the brighter half. Vertical stripes crossed left to "

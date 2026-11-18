@@ -22,8 +22,9 @@ class StrokeCrossingCount(Feature):
             "transitions between below and above is counted; the mean over rows is reported. "
             "Real-valued because it averages. Below-or-equal counts as below, which keeps the "
             "count stable when the median coincides with the background of a minority bright "
-            "object. Rows only, and one global level: `profile_median_crossing_count` "
-            "uses each line's own median and both axes."
+            "object. Rows only, and one global level: `profile_median_crossing_count` uses "
+            "each line's own median, both axes, and counts upward crossings only, where this "
+            "counts transitions in both directions."
         ),
     )
 
