@@ -4,9 +4,10 @@ from .architecture import LSTM, MLP, Architecture, Bigram, architectures
 from .language_model import LanguageModel
 from .pairs import make_pairs
 from .tokenizer import Tokenizer, tokenizer_from_text, tokenizers
-from .training import TrainingOptions
+from .training import EPOCH_STATS_KEYS, TrainingOptions
 
 __all__ = [
+    "EPOCH_STATS_KEYS",
     "LSTM",
     "MLP",
     "Architecture",

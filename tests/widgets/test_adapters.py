@@ -64,13 +64,11 @@ def test_checkpoint_table_columns_and_sample():
         },
     ]
     table = checkpoint_table(rows)
-    assert [v.name for v in table.domain.attributes] == [
-        "epoch",
-        "loss",
-        "val_loss",
-        "perplexity",
-        "val_perplexity",
-    ]
+    # Structural tie: the columns are the kernel's own epoch-stats key order,
+    # imported from the producing module - not a copy spelled here.
+    from orangecontrib.ai_suite.kernel.lm import EPOCH_STATS_KEYS
+
+    assert [v.name for v in table.domain.attributes] == list(EPOCH_STATS_KEYS)
     assert table.domain.metas[0].name == "sample"
     assert table.metas[1, 0] == "less gibberish"
     assert table[0, "loss"] == 3.0

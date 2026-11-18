@@ -17,7 +17,18 @@ from dataclasses import dataclass
 
 import keras
 
-EpochStats = dict  # {epoch, loss, val_loss, perplexity, val_perplexity}, plus what a hook adds
+EpochStats = dict  # keys: EPOCH_STATS_KEYS, plus what a hook adds
+
+#: The ordered keys of an epoch-stats record, produced here and read by the
+#: widget-side checkpoint table. One spelling: the callback builds the dict
+#: from this tuple, so the producer and the columns cannot drift apart.
+EPOCH_STATS_KEYS = (
+    "epoch",
+    "loss",
+    "val_loss",
+    "perplexity",
+    "val_perplexity",
+)
 
 
 @dataclass(frozen=True)
@@ -97,13 +108,14 @@ def epoch_callback(
     def emit(epoch: int, logs: dict) -> None:
         loss = logs.get("loss")
         val_loss = logs.get("val_loss")
-        stats: EpochStats = {
-            "epoch": epoch + 1,
-            "loss": float(loss) if loss is not None else float("nan"),
-            "val_loss": float(val_loss) if val_loss is not None else float("nan"),
-            "perplexity": math.exp(loss) if loss is not None else float("nan"),
-            "val_perplexity": (math.exp(val_loss) if val_loss is not None else float("nan")),
-        }
+        values = (
+            epoch + 1,
+            float(loss) if loss is not None else float("nan"),
+            float(val_loss) if val_loss is not None else float("nan"),
+            math.exp(loss) if loss is not None else float("nan"),
+            math.exp(val_loss) if val_loss is not None else float("nan"),
+        )
+        stats: EpochStats = dict(zip(EPOCH_STATS_KEYS, values))
         on_epoch(stats)
 
     class _EpochCallback(keras.callbacks.Callback):

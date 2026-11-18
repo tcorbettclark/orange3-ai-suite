@@ -2,6 +2,9 @@
 
 All Orange-type conversion (Table, Corpus, meta columns) lives here, in the
 widget layer. The kernel never imports Orange; this module never imports Qt.
+It imports Orange types and one kernel constant: the epoch-stats key order the
+kernel's training runs produce (:class:`~.lm.training.EPOCH_STATS_KEYS`), so
+the checkpoint columns cannot drift from the producer.
 
 Inputs are read duck-typed where cheap: an Orange3-Text ``Corpus`` *is* a
 ``Table`` subclass (so a plain ``Table`` input accepts it automatically);
@@ -19,7 +22,9 @@ from Orange.data import (
     Table,
 )
 
-CHECKPOINT_COLUMNS = ("epoch", "loss", "val_loss", "perplexity", "val_perplexity")
+from orangecontrib.ai_suite.kernel.lm import EPOCH_STATS_KEYS
+
+CHECKPOINT_COLUMNS = EPOCH_STATS_KEYS
 
 
 def image_paths(table: Table):

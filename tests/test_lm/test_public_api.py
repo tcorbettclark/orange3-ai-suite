@@ -10,6 +10,7 @@ EXPECTED = frozenset(
     {
         "Architecture",
         "Bigram",
+        "EPOCH_STATS_KEYS",
         "LSTM",
         "LanguageModel",
         "MLP",
@@ -21,6 +22,15 @@ EXPECTED = frozenset(
         "tokenizers",
     }
 )
+
+
+def test_the_epoch_stats_keys_match_the_stats_the_producer_builds():
+    # The correspondence is structural: emit builds its dict by zipping the tuple.
+    from orangecontrib.ai_suite.kernel.lm.training import EPOCH_STATS_KEYS, epoch_callback
+
+    seen = []
+    epoch_callback(on_epoch=seen.append).on_epoch_end(0, {"loss": 0.5, "val_loss": 0.6})
+    assert list(seen[0]) == list(EPOCH_STATS_KEYS)
 
 
 def test_package_exports_only_the_use_case():
