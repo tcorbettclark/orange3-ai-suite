@@ -63,7 +63,7 @@ canvas:
 2. **Browse...** to `data/text/yellow-wallpaper.txt`.
 3. Press **Reload**.
 4. Leave **Table type** as **Text documents** and **Split into** as
-   **Paragraphs**.
+   **Paragraph**.
 5. Enable **Strip Project Gutenberg header/footer** and **Reflow wrapped
    lines** in the cleaning section.
 6. Connect **Data** to **LM Pre-trainer**, **LoRA Pre-trainer**, **LoRA SFT** or

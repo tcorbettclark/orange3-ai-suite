@@ -2,7 +2,8 @@
 
 A source widget for the language-model teaching suite. It reads UTF-8 ``.txt``
 files, applies opt-in cleaning, and emits a plain Orange Table. In document
-mode each row is a whole file, paragraph, line or sentence. In Q/A mode each
+mode each row is a whole file, one paragraph or one sentence - which changes what
+the table holds, not the sentences the model trains on. In Q/A mode each
 row is one prompt/completion pair from fixed ``Q:``/``A:`` blocks.
 """
 
@@ -32,14 +33,16 @@ from Orange.widgets.widget import Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.kernel.text import (
     CleanOptions,
+    RowGranularity,
     clean_text,
     parse_qa,
     reflow_qa_pair,
     split_text,
 )
 
-MODES = ("Whole file", "Paragraphs", "Lines", "Sentences")
-SPLIT_KEYS = ("whole", "paragraphs", "lines", "sentences")
+# The menu order is the enum's declaration order; there is no second list to keep
+# in step with it.
+GRANULARITIES = tuple(RowGranularity)
 PREVIEW_ROWS = 200
 
 
@@ -47,7 +50,7 @@ class OWLMTextLoader(OWWidget):
     """Read plain-text files into a Table for the language-model widgets.
 
     Source is a single ``.txt`` file or a recursively scanned folder. Document
-    mode emits one row per file, paragraph, line or sentence, with a ``text``
+    mode emits one row per file, per paragraph or per sentence, with a ``text``
     meta. Q/A mode emits ``prompt`` and ``completion`` metas from fixed blocks:
     a new pair starts at ``Q:``, the prompt includes the following ``A:`` line,
     and the completion runs to the next ``Q:``. The source file is shown in the
@@ -74,7 +77,9 @@ class OWLMTextLoader(OWWidget):
     source_type = Setting(0)  # 0 = file, 1 = folder
     source_path = Setting("")
     table_mode = Setting(0)  # 0 = documents, 1 = Q/A pairs
-    split_mode = Setting(1)  # default: paragraphs
+    # Stored by label, not by index: dropping a granularity cannot silently
+    # re-point an existing setting at a different one.
+    row_granularity = Setting(RowGranularity.PARAGRAPH.value)
     strip_gutenberg = Setting(False)
     reflow = Setting(False)
     remove_repeated_lines = Setting(False)
@@ -120,8 +125,8 @@ class OWLMTextLoader(OWWidget):
         gui.comboBox(
             self._doc_box,
             self,
-            "split_mode",
-            items=MODES,
+            "row_granularity",
+            items=[granularity.value for granularity in GRANULARITIES],
             label="Split into",
             callback=self._rebuild,
         )
@@ -290,12 +295,12 @@ class OWLMTextLoader(OWWidget):
 
         removed_lines = 0
         if self.table_mode == 0:
-            mode = SPLIT_KEYS[self.split_mode]
+            granularity = RowGranularity(self.row_granularity)
             rows = []
             for source, raw in self._raw_files:
                 cleaned = clean_text(raw, self._clean_options(reflow=self.reflow))
                 removed_lines += cleaned.removed_lines
-                rows.extend((source, text) for text in split_text(cleaned.text, mode))
+                rows.extend((source, text) for text in split_text(cleaned.text, granularity))
             self._rows = rows
             self._send_documents(rows)
             total_chars = sum(len(text) for _, text in rows)

@@ -1,4 +1,4 @@
-"""Where image code lives, and which modules are support code.
+"""Where kernel code lives, and which modules are support code.
 
 The kernel is organised by domain; ``images`` is the image domain, and inside it
 the two consumers (``features`` and ``pixels``) share only decoding. A leading
@@ -11,6 +11,8 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 KERNEL = ROOT / "orangecontrib" / "ai_suite" / "kernel"
 IMAGES = KERNEL / "images"
+
+TEXT = KERNEL / "text"
 
 PUBLIC = {"catalogue", "description", "extraction", "feature", "groups", "guide", "options"}
 SUPPORT = {"_conventions", "_measurements", "_preprocessing"}
@@ -66,3 +68,23 @@ def test_production_code_outside_images_uses_only_the_public_modules():
                 if SUPPORT & set(parts):
                     offenders.append(f"{path.relative_to(ROOT)}: {node.module}")
     assert offenders == []
+
+
+def test_the_text_package_is_a_facade_over_private_steps():
+    assert {p.name for p in TEXT.glob("*.py")} == {
+        "__init__.py",
+        "_clean.py",
+        "_qa.py",
+        "_split.py",
+    }
+    assert not (KERNEL / "text.py").exists()
+
+
+def test_the_text_facade_exports_every_public_name_and_nothing_private():
+    from orangecontrib.ai_suite import kernel
+
+    facade = kernel.text
+    assert facade.__all__ == list(dict.fromkeys(facade.__all__))  # no duplicates
+    for name in facade.__all__:
+        assert hasattr(facade, name), name
+    assert not [name for name in facade.__all__ if name.startswith("_")]

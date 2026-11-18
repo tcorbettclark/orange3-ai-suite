@@ -1,8 +1,11 @@
 """Plain-text cleaning, splitting and Q/A parsing."""
 
+import pytest
+
 from orangecontrib.ai_suite.kernel.text import (
     CleanOptions,
     QAPair,
+    RowGranularity,
     clean_text,
     parse_qa,
     reflow_qa_pair,
@@ -45,15 +48,15 @@ def test_reflow_joins_lines_and_repairs_hyphens():
     assert result.text == "A wrapped paragraph continues here.\n\nAnother paragraph."
 
 
-def test_split_modes():
+def test_row_granularities():
     text = "First sentence. Second sentence.\n\nA new paragraph."
-    assert split_text(text, "whole") == (text,)
-    assert split_text(text, "paragraphs") == (
+    assert split_text(text, RowGranularity.WHOLE_FILE) == (text,)
+    assert split_text(text, RowGranularity.PARAGRAPH) == (
         "First sentence. Second sentence.",
         "A new paragraph.",
     )
-    assert split_text("one\ntwo\n", "lines") == ("one", "two")
-    assert split_text(text, "sentences") == (
+    assert split_text("one\ntwo\n", RowGranularity.PARAGRAPH) == ("one\ntwo",)
+    assert split_text(text, RowGranularity.SENTENCE) == (
         "First sentence.",
         "Second sentence.",
         "A new paragraph.",
@@ -129,3 +132,40 @@ def test_newline_keeps_joined_documents_apart():
     assert split_sentences(" ".join(documents))[0] == (
         "Chapter one ends here and chapter two begins."
     )
+
+
+@pytest.mark.parametrize("granularity", list(RowGranularity))
+def test_every_declared_granularity_is_accepted(granularity):
+    assert split_text("one.\n\ntwo.", granularity)
+
+
+def test_granularity_values_are_the_menu_labels():
+    assert [granularity.value for granularity in RowGranularity] == [
+        "Whole file",
+        "Paragraph",
+        "Sentence",
+    ]
+
+
+def test_every_granularity_value_is_distinct():
+    values = [granularity.value for granularity in RowGranularity]
+    assert len(set(values)) == len(values)
+
+
+def test_a_string_is_not_a_granularity():
+    with pytest.raises(ValueError, match="expected a RowGranularity"):
+        split_text("one", "chapters")  # type: ignore[arg-type]
+
+
+def test_rows_do_not_change_the_sentences_the_model_sees():
+    # The table shape is not the model's unit: joining the rows and splitting
+    # sentences again must give the same sentences whatever the granularity.
+    from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text
+
+    text = "The cat sat. A dog barked.\n\nNothing else happened that day."
+    tokenizer = tokenizer_from_text(text, "word")
+    streams = {
+        granularity: tokenizer.encode("\n".join(split_text(text, granularity)))
+        for granularity in RowGranularity
+    }
+    assert len(set(map(tuple, streams.values()))) == 1

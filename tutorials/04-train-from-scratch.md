@@ -6,13 +6,14 @@ can remember. This is the "from scratch" end of the language-model arc.
 ## 1. Load the training Table
 
 Add **LM Text Loader** and load `data/text/yellow-wallpaper.txt` as described in
-[00 - Setup](00-setup.md#3-load-text-with-lm-text-loader). Use **Paragraphs**, and
+[00 - Setup](00-setup.md#3-load-text-with-lm-text-loader). Use **Paragraph**, and
 enable the Gutenberg and reflow cleaning rules.
 
 Connect its **Data** output to **LM Pre-trainer** **Data**.
 
-If you want a faster first pass, choose a shorter `.txt` file or **Lines**
-instead. The steps are identical; only the corpus size changes.
+If you want a faster first pass, choose a shorter `.txt` file. The row
+granularity does not make training faster: the loader joins the rows back into one
+corpus, and the model's units are sentences either way.
 
 ## 2. Bigram: the floor
 

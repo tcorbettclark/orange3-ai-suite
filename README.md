@@ -121,8 +121,9 @@ groups or a convolutional model.
 ### LM Text Loader
 
 Reads UTF-8 `.txt` files from one file or a recursively scanned folder into a
-plain Table. **Text documents** mode emits one row per whole file, paragraph,
-line or sentence, with a `text` meta. **Q/A pairs** mode parses fixed blocks: a
+plain Table. **Text documents** mode emits one row per whole file, per
+paragraph or per sentence, with a `text` meta; the rows are storage, not the
+model's units, which are always sentences. **Q/A pairs** mode parses fixed blocks: a
 new pair starts at `Q:`, the prompt includes the following `A:` line, and the
 completion runs to the next `Q:`. The output uses `prompt` and `completion`
 metas. The source file is shown in the preview but is not added to the Data
@@ -494,7 +495,10 @@ orangecontrib/
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects
-      text.py     text loading and corpus helpers
+      text/       plain text into training rows, behind one facade
+        _clean.py    raw text -> clean text (Gutenberg, page numbers, reflow)
+        _split.py    clean text -> table rows (whole file, paragraph, sentence)
+        _qa.py       clean text -> Q/A prompt/completion pairs
     widgets/      the nine Orange widgets and their icons
 demo/             corpora, fetchers, generated .ows workflows
 examples/         runnable kernel examples

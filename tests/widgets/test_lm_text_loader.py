@@ -110,7 +110,7 @@ def test_preview_is_capped_with_explanation(qapp, capture, tmp_path):
     w.show()
     sent = capture(w.Outputs.data)
     w.source_type = 0
-    w.split_mode = 2  # lines
+    w.row_granularity = "Sentence"
     w._path_edit.setText(str(path))
     w._reload()
 
@@ -134,3 +134,13 @@ def test_gutenberg_cleaning_is_applied(qapp, capture, tmp_path):
     w._path_edit.setText(str(path))
     w._reload()
     assert table_texts(sent[-1]) == ["Body text."]
+
+
+def test_split_menu_is_the_kernel_vocabulary(qapp):
+    from orangecontrib.ai_suite.kernel.text import RowGranularity
+
+    w = OWLMTextLoader()
+    combo = w.controls.row_granularity
+    shown = [combo.itemText(index) for index in range(combo.count())]
+    assert shown == [granularity.value for granularity in RowGranularity]
+    assert w.row_granularity == RowGranularity.PARAGRAPH.value  # the default
