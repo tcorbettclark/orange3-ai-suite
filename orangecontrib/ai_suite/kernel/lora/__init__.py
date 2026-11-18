@@ -1,6 +1,7 @@
 """LoRA fine-tuning of an MLX base model, with the adapter stored beside it.
 
-- 4-bit QLoRA: a quantised base model plus a low-rank adapter;
+- QLoRA: a quantised base model plus a low-rank adapter (the course uses
+  the 4-bit BritLLM model);
 - an adapter is serialised with its base-model reference as one artifact, so
   the two travel together;
 - ``LoRAModel`` exposes the kernel's ``generate`` and ``evaluate`` conventions,
@@ -15,7 +16,7 @@ and parses its output, so the kernel depends on the CLI rather than on the
 tuner's internals.
 """
 
-from .model import LoRAAdapter, LoRAModel, is_4bit
+from .model import LoRAAdapter, LoRAModel
 from .training import LoRAData, LoRAOptions, TrainingStopped, parse_metric, train_lora
 
 __all__ = [
@@ -24,7 +25,6 @@ __all__ = [
     "LoRAData",
     "LoRAOptions",
     "TrainingStopped",
-    "is_4bit",
     "parse_metric",
     "train_lora",
 ]

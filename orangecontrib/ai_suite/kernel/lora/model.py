@@ -34,19 +34,6 @@ def _require_mlx() -> None:
         raise ImportError(_MLX_IMPORT_ERROR) from exc
 
 
-def is_4bit(base_model: str | Path) -> bool:
-    """Whether a local model directory declares 4-bit quantisation.
-
-    Reads ``quantization.bits`` from the model's ``config.json``. A Hugging Face
-    id is not downloaded to check, so it counts as not 4-bit.
-    """
-    config = Path(base_model) / "config.json"
-    if not config.is_file():
-        return False
-    quantization = json.loads(config.read_text()).get("quantization") or {}
-    return quantization.get("bits") == 4
-
-
 def _segments(ids: list[int], max_tokens: int, window: int) -> list[list[int]]:
     """Windows of at most ``window`` inputs, plus the target that follows each.
 

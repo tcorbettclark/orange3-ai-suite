@@ -1,5 +1,6 @@
 """Widgets for the neural-network and language-model add-on."""
 
+from .ow_britllm_models import OWBritLLMModels
 from .ow_image_features import OWImageFeatures
 from .ow_image_pixels import OWImagePixels
 from .ow_lm_generator import OWLMGenerator
@@ -11,6 +12,7 @@ from .ow_lora_sft import OWLoRASFT
 from .ow_neural_network_viewer import OWNeuralNetworkViewer
 
 __all__ = [
+    "OWBritLLMModels",
     "OWImageFeatures",
     "OWImagePixels",
     "OWLMGenerator",

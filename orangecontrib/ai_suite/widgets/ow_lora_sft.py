@@ -26,7 +26,7 @@ class OWLoRASFT(LoRATrainerBase):
     name = "LoRA SFT"
     description = (
         "Supervised fine-tuning on prompt/response pairs: Q&A, tool use, "
-        "instruction following (4-bit QLoRA, Apple Silicon)."
+        "instruction following (LoRA/QLoRA, Apple Silicon)."
     )
     icon = "icons/lora_sft.svg"
     priority = 16

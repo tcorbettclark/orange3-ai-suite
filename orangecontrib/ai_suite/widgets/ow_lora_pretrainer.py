@@ -24,7 +24,7 @@ class OWLoRAPretrainer(LoRATrainerBase):
 
     name = "LoRA Pre-trainer"
     description = (
-        "Continue pre-training a base LLM on a raw text corpus (4-bit QLoRA, Apple Silicon)."
+        "Continue pre-training a base LLM on a raw text corpus (LoRA/QLoRA, Apple Silicon)."
     )
     icon = "icons/lora_pretrainer.svg"
     priority = 15

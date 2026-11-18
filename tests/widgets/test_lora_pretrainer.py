@@ -5,13 +5,12 @@ extra) AND the converted model on disk; deg + routing tests run anywhere.
 """
 
 import importlib.util
-import json
 
 import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
-from orangecontrib.ai_suite.kernel.lora import is_4bit
+from orangecontrib.ai_suite.kernel.assets import BRITLLM_4BIT, cached_path
 from orangecontrib.ai_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
 
 MLX_OK = importlib.util.find_spec("mlx") is not None
@@ -39,21 +38,16 @@ def test_mlx_missing_routes_to_install_hint(qapp):
 @pytest.mark.slow
 def test_real_training_path(qapp, capture):
     """2-iteration QLoRA via the widget's blocking path end-to-end."""
-    from pathlib import Path
-
-    model_file = (
-        Path(__file__).resolve().parents[2]
-        / "data"
-        / "models"
-        / "britllm-4bit"
-        / "model.safetensors"
-    )
-    if not model_file.exists():
-        pytest.skip("converted model absent — run demo/fetch_britllm.py")
+    model_dir = cached_path(BRITLLM_4BIT)
+    if model_dir is None:
+        pytest.skip(
+            "pinned 4-bit model not cached — use the BritLLM Models widget "
+            "or examples/fetch_britllm.py"
+        )
 
     w = OWLoRAPretrainer()
     w.show()
-    w.base_model = str(model_file.parent)
+    w.base_model = str(model_dir)
     domain = Domain([], metas=[StringVariable("text")])
     texts = [f"the quick brown fox jumped over fence {i}" for i in range(8)]
     table = Table.from_numpy(
@@ -82,32 +76,32 @@ def test_stop_before_adapter_routes_to_information(qapp):
 def test_trainable_parameter_note_is_reported(qapp):
     w = OWLoRAPretrainer()
     w.show()
-    w._on_metric({"kind": "params", "pct": 0.233, "detail": "6.21M / 2.67B"})
+    w._on_metric({"kind": "params", "pct": 0.233, "detail": "6.210M/2667.000M"})
     assert "0.233%" in w.status_label.text()
-    assert "6.21M / 2.67B" in w.status_label.text()
+    assert "6.210M/2667.000M" in w.status_label.text()
 
 
-def test_lora_fp16_guard_blocks_unconverted_model(qapp, text_table, tmp_path, monkeypatch):
-    """4-bit QLoRA only: an unquantised base model must not train."""
+def test_lora_without_a_base_model_warns(qapp, text_table, monkeypatch):
     w = OWLoRAPretrainer()
     w.show()
     w.set_data(text_table)
     monkeypatch.setattr(w, "_mlx_available", lambda: True)
-    unquantised = tmp_path / "fp16-model"
-    unquantised.mkdir()
-    (unquantised / "config.json").write_text(json.dumps({"model_type": "llama"}))
-    w.base_model = str(unquantised)
+    w.base_model = ""
     w.run_training_blocking()
-    assert w.Warning.fp16_model.is_shown()
+    assert w.Warning.no_model.is_shown()
     assert w.worker is None
 
 
-def test_lora_fp16_guard_accepts_quantised_dir(qapp, text_table):
-    from pathlib import Path
-
+def test_base_model_input_sets_the_line_edit_and_the_request(
+    qapp, text_table, tmp_path, monkeypatch
+):
     w = OWLoRAPretrainer()
-    quantised_dir = Path(__file__).resolve().parents[2] / "data" / "models" / "britllm-4bit"
-    if not (quantised_dir / "config.json").exists():
-        pytest.skip("converted model absent")
-    assert is_4bit(str(quantised_dir))
-    assert not is_4bit("britllm/britllm-3b-v0.1")
+    w.show()
+    w.set_data(text_table)
+    monkeypatch.setattr(w, "_mlx_available", lambda: True)
+    model = str(tmp_path / "model")
+    w.set_base_model(model)
+    assert w.base_model == model
+    assert w.base_model_edit.text() == model
+    request = w._build_request()
+    assert request["base_model"] == model

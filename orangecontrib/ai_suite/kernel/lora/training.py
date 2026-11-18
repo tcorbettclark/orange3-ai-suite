@@ -54,7 +54,7 @@ class TrainingStopped(RuntimeError):
 
 @dataclass(frozen=True)
 class LoRAOptions:
-    """Hyperparameters for one 4-bit QLoRA run."""
+    """Hyperparameters for one LoRA run on an MLX base model."""
 
     iters: int = 300
     learning_rate: float = 1e-4
@@ -261,7 +261,7 @@ def train_lora(
     stop_requested: Callable[[], bool] | None = None,
     data_dir: str | Path | None = None,
 ) -> LoRAAdapter:
-    """Run QLoRA training; stream metrics; return the adapter artifact.
+    """Run LoRA training (QLoRA on a quantised base); stream metrics; return the artifact.
 
     The split is ``options.validation_fraction`` of the rows, ordered with
     ``options.seed``. The subprocess runs in its own process group, so stopping

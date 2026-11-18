@@ -14,6 +14,7 @@ def test_widget_category_layout():
     }
 
     assert descriptions == {
+        "BritLLM Models": "Language Models",
         "Image Features": "Image Analytics",
         "Image Pixels": "Image Analytics",
         "LM Text Loader": "Language Models",

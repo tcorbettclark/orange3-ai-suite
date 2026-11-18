@@ -11,22 +11,21 @@ from pathlib import Path
 
 import pytest
 
+from orangecontrib.ai_suite.kernel.assets import BRITLLM_4BIT, cached_path
 from orangecontrib.ai_suite.kernel.lora import (
     LoRAAdapter,
     LoRAData,
     LoRAModel,
     LoRAOptions,
-    is_4bit,
     parse_metric,
     train_lora,
 )
 from orangecontrib.ai_suite.kernel.lora.model import _segments
 from orangecontrib.ai_suite.kernel.lora.training import _adapter_weights, _lora_command, _stage
 
-MODEL_DIR = Path(__file__).resolve().parents[2] / "data" / "models" / "britllm-4bit"
-needs_britllm = pytest.mark.skipif(
-    not (MODEL_DIR / "model.safetensors").exists(),
-    reason="converted model absent — run demo/fetch_britllm.py",
+_NO_MODEL = (
+    "pinned 4-bit model not cached — use the BritLLM Models widget "
+    "or examples/fetch_britllm.py"
 )
 slow = pytest.mark.slow  # end-to-end runs (model load + iterations); excluded
 # from the default suite via addopts -m "not slow"; run with `-m slow` when
@@ -254,20 +253,6 @@ def test_saving_an_adapter_without_weights_raises(tmp_path):
         adapter.save(tmp_path / "artifact")
 
 
-def test_is_4bit(tmp_path):
-    for bits in (4, 8):
-        model = tmp_path / f"model-{bits}bit"
-        model.mkdir()
-        (model / "config.json").write_text(json.dumps({"quantization": {"bits": bits}}))
-        assert is_4bit(model) is (bits == 4)
-    plain = tmp_path / "plain"
-    plain.mkdir()
-    (plain / "config.json").write_text("{}")
-    assert not is_4bit(plain)
-    assert not is_4bit(tmp_path / "missing")
-    assert not is_4bit("britllm/britllm-3b-v0.1")  # an id is not downloaded to check
-
-
 def test_model_import_requires_apple(monkeypatch):
     """Non-Apple machine: clear message, never a stack trace."""
     import builtins
@@ -287,15 +272,17 @@ def test_model_import_requires_apple(monkeypatch):
 # ---- end-to-end (converted model required) ---------------------------------
 
 
-@needs_britllm
 @slow
 def test_train_lora_tiny_run(tmp_path):
     """2 iterations on the converted 4-bit model: adapter produced, model
     generates and evaluates, save/load round trip reproduces identical greedy
     output."""
+    model_dir = cached_path(BRITLLM_4BIT)
+    if model_dir is None:
+        pytest.skip(_NO_MODEL)
     data = LoRAData.from_texts([f"the quick brown fox jumped over fence {i}" for i in range(8)])
     adapter = train_lora(
-        MODEL_DIR,
+        model_dir,
         data,
         tmp_path / "adapter",
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=128, num_layers=4),
@@ -324,12 +311,14 @@ def test_train_lora_tiny_run(tmp_path):
     assert reloaded.generate(prompt, temperature=0, max_new_tokens=8, seed=0) == out_on
 
 
-@needs_britllm
 @slow
 def test_train_lora_greedy_determinism(tmp_path):
+    model_dir = cached_path(BRITLLM_4BIT)
+    if model_dir is None:
+        pytest.skip(_NO_MODEL)
     data = LoRAData.from_texts(["alpha beta gamma delta." for _ in range(6)])
     a = train_lora(
-        MODEL_DIR,
+        model_dir,
         data,
         tmp_path / "a1",
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=64, num_layers=2, seed=7),

@@ -23,11 +23,9 @@ from orangecontrib.ai_suite.kernel.lora import (
     LoRAOptions,
     LoRAModel,
     TrainingStopped,
-    is_4bit,
     train_lora,
 )
 
-DEFAULT_BASE_MODEL = "britllm/britllm-3b-v0.1"
 _OPTION_DEFAULTS = LoRAOptions()
 
 
@@ -59,13 +57,13 @@ class LoraWorker(QThread):
 
 
 class LoRATrainerBase(OWWidget, openclass=True):
-    """Shared 4-bit QLoRA training UI for the two LoRA widgets.
+    """Shared LoRA training UI for the two LoRA widgets.
 
     Subclasses supply ``data_box_title``, ``data_help`` and ``_make_lora_data``.
-    The output is a ``LoRAModel``: the base model plus the trained adapter,
-    ready for the LM Generator. The live curve shows loss per iteration; the
-    adapter's trainable-parameter share is a small fraction of the base
-    model's parameters.
+    The base model arrives on the Base model input, so a connected BritLLM Models
+    widget passes its local path explicitly; the line edit also accepts a path or
+    an HF id. The output is a ``LoRAModel``: the base model plus the trained
+    adapter, ready for the LM Generator. The live curve shows loss per iteration.
     """
 
     name = None  # not a registered widget; subclasses provide the UI
@@ -75,6 +73,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
     class Inputs:
         data = Input("Data", Table)
+        base_model = Input("Base model", object, auto_summary=False)
 
     class Outputs:
         model = Output("Model", object, auto_summary=False)
@@ -82,9 +81,9 @@ class LoRATrainerBase(OWWidget, openclass=True):
     class Warning(OWWidget.Warning):
         no_text = Msg("No usable training data: {}")
         nothing_to_train = Msg("Press Train once data is connected.")
-        fp16_model = Msg(
-            "The base model is not 4-bit quantised. Convert it first: "
-            "uv run python demo/fetch_britllm.py"
+        no_model = Msg(
+            "No base model: connect BritLLM Models or paste an MLX model "
+            "directory or Hugging Face id."
         )
         bad_settings = Msg("Invalid training settings: {}")
 
@@ -100,7 +99,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         stopped = Msg("Training stopped before mlx-lm wrote an adapter; no model was produced.")
 
     # settings
-    base_model = Setting(DEFAULT_BASE_MODEL)
+    base_model = Setting("")
     iters = Setting(_OPTION_DEFAULTS.iters)
     learning_rate = Setting(_OPTION_DEFAULTS.learning_rate)
     num_layers = Setting(_OPTION_DEFAULTS.num_layers)
@@ -117,15 +116,22 @@ class LoRATrainerBase(OWWidget, openclass=True):
         self._trainable_note = ""
 
         model_box = gui.widgetBox(self.controlArea, "Model")
-        gui.lineEdit(
+        self.base_model_edit = gui.lineEdit(
             model_box,
             self,
             "base_model",
             label="Base model (path or HF id)",
-            tooltip="Path to a local MLX model directory or a Hugging "
-            "Face repo id. QLoRA requires a 4-bit quantised "
-            "model; demo/fetch_britllm.py produces one.",
+            tooltip="Path to a local MLX model directory or a Hugging Face "
+            "repo id. Start with the 4-bit BritLLM model from BritLLM Models; "
+            "other MLX models (8-bit or unquantised) work if the machine has "
+            "the memory.",
         )
+        model_help = QLabel(
+            "Start with the 4-bit BritLLM model from BritLLM Models. "
+            "Other MLX models work if the machine has the memory."
+        )
+        model_help.setWordWrap(True)
+        model_box.layout().addWidget(model_help)
 
         data_box = gui.widgetBox(self.controlArea, self.data_box_title)
         if self.data_help:
@@ -164,6 +170,14 @@ class LoRATrainerBase(OWWidget, openclass=True):
         self.Warning.no_text.clear()
         self.Warning.nothing_to_train(shown=table is None)
 
+    @Inputs.base_model
+    def set_base_model(self, value):
+        path = "" if value is None else str(value)
+        self.base_model = path
+        if getattr(self, "base_model_edit", None) is not None:
+            self.base_model_edit.setText(path)
+        self.Warning.no_model.clear()
+
     # ---- lifecycle ---------------------------------------------------------
 
     def _make_lora_data(self):
@@ -180,7 +194,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
             seed=self.seed,
         )
         return dict(
-            base_model=self.base_model or DEFAULT_BASE_MODEL,
+            base_model=self.base_model.strip(),
             data=data_obj,
             adapter_dir=tmp_dir / "adapter",
             data_dir=tmp_dir / "staged-data",
@@ -200,7 +214,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         """Validate state and stage data; None (with a message) when unusable."""
         self.Warning.nothing_to_train.clear()
         self.Warning.no_text.clear()
-        self.Warning.fp16_model.clear()
+        self.Warning.no_model.clear()
         self.Warning.bad_settings.clear()
         self.Error.mlx_missing.clear()
         self.Error.training_failed.clear()
@@ -211,10 +225,9 @@ class LoRATrainerBase(OWWidget, openclass=True):
         if not self._mlx_available():
             self.Error.mlx_missing()
             return None
-        base_model = self.base_model or DEFAULT_BASE_MODEL
-        if not is_4bit(base_model):
-            self.Warning.fp16_model()
-            return None  # only 4-bit QLoRA is offered
+        if not self.base_model.strip():
+            self.Warning.no_model()
+            return None
 
         import tempfile
         from pathlib import Path
