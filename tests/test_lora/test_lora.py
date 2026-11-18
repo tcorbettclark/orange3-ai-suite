@@ -21,7 +21,7 @@ from orangecontrib.ai_suite.kernel.lora import (
     train_lora,
 )
 from orangecontrib.ai_suite.kernel.lora.model import _segments
-from orangecontrib.ai_suite.kernel.lora.training import _lora_command, _stage
+from orangecontrib.ai_suite.kernel.lora.training import _adapter_weights, _lora_command, _stage
 
 MODEL_DIR = Path(__file__).resolve().parents[2] / "data" / "models" / "britllm-4bit"
 needs_britllm = pytest.mark.skipif(
@@ -124,7 +124,12 @@ def test_no_validation_split_omits_valid_file(tmp_path):
 
 
 def test_options_validate_and_are_frozen():
-    for name, value in (("iters", 0), ("batch_size", 0), ("num_layers", 0)):
+    for name, value in (
+        ("iters", 0),
+        ("batch_size", 0),
+        ("num_layers", 0),
+        ("save_every", 0),
+    ):
         with pytest.raises(ValueError, match=name):
             LoRAOptions(**{name: value})
     with pytest.raises(ValueError, match="learning_rate"):
@@ -166,6 +171,7 @@ def test_lora_command_passes_the_options(tmp_path):
         max_seq_length=64,
         steps_per_report=1,
         steps_per_eval=2,
+        save_every=3,
         seed=11,
     )
     cmd = _lora_command("base", tmp_path / "data", tmp_path / "adapter", options, "pairs")
@@ -178,6 +184,7 @@ def test_lora_command_passes_the_options(tmp_path):
     assert value("--max-seq-length") == "64"
     assert value("--steps-per-report") == "1"
     assert value("--steps-per-eval") == "2"
+    assert value("--save-every") == "3"
     assert value("--seed") == "11"
     assert value("--fine-tune-type") == "lora"
     # SFT trains on the completion only; a corpus must not ask for prompt masking
@@ -185,6 +192,16 @@ def test_lora_command_passes_the_options(tmp_path):
     assert "--mask-prompt" not in _lora_command(
         "base", tmp_path / "data", tmp_path / "adapter", options, "text"
     )
+
+
+def test_adapter_weights_prefers_the_final_file_and_takes_the_newest(tmp_path):
+    assert _adapter_weights(tmp_path) is None
+    (tmp_path / "0000010_adapters.safetensors").write_bytes(b"x")
+    (tmp_path / "0000002_adapters.safetensors").write_bytes(b"x")
+    (tmp_path / "junk_adapters.safetensors").write_bytes(b"x")  # not a checkpoint
+    assert _adapter_weights(tmp_path) == tmp_path / "0000010_adapters.safetensors"
+    (tmp_path / "adapters.safetensors").write_bytes(b"x")
+    assert _adapter_weights(tmp_path) == tmp_path / "adapters.safetensors"
 
 
 # ---- perplexity windows (pure, no MLX needed) ------------------------------

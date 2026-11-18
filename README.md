@@ -410,8 +410,9 @@ model.adapter_enabled = False  # the same base model, before adaptation
 
 `train_lora` runs the documented `python -m mlx_lm lora` command in a
 subprocess and streams parsed metrics. Stopping terminates the whole child
-process tree; because mlx-lm writes the adapter after the last iteration, a stop
-before that leaves no artifact.
+process tree. mlx-lm writes a checkpoint every `save_every` iterations; a stop
+adopts the newest checkpoint and records `iters_completed`, while a stop before
+the first one raises `TrainingStopped` and produces no model.
 
 ## Demo data and workflows
 

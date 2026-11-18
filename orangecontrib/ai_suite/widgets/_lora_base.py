@@ -297,9 +297,15 @@ class LoRATrainerBase(OWWidget, openclass=True):
         )
         self.Outputs.model.send(self.model)
         detail = f" ({self._trainable_note})" if self._trainable_note else ""
+        hp = adapter.hyperparameters
+        stopped = (
+            f" Stopped at iteration {hp['iters_completed']} of {hp['iters']}."
+            if hp.get("stopped")
+            else ""
+        )
         self.status_label.setText(
-            f"Done: adapter trained ({adapter.name or 'adapter'}){detail}; "
-            "connect the Model output to LM Generator for the before/after "
+            f"Done: adapter trained ({adapter.name or 'adapter'}){detail}.{stopped} "
+            "Connect the Model output to LM Generator for the before/after "
             "comparison."
         )
 

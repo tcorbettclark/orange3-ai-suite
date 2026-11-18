@@ -11,8 +11,9 @@ Two data formats:
 
 The run is ``python -m mlx_lm lora`` in a subprocess. Its stdout is parsed into
 per-iteration metric dicts. ``stop_requested`` terminates the child process
-tree; mlx-lm writes the adapter after the last iteration, so a stop before that
-writes no adapter.
+tree; mlx-lm writes a checkpoint every ``save_every`` iterations and the final
+adapter after the last iteration, so a stop adopts the last checkpoint and
+records how far the run got.
 
 The train/validation split is a run setting, not a property of the rows: it
 comes from :class:`LoRAOptions`, with the run's seed, so the two cannot
@@ -25,6 +26,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -62,10 +64,18 @@ class LoRAOptions:
     validation_fraction: float = 0.1
     steps_per_report: int = 20
     steps_per_eval: int = 50
+    save_every: int = 50
     seed: int = 42
 
     def __post_init__(self) -> None:
-        for name in ("iters", "num_layers", "batch_size", "steps_per_report", "steps_per_eval"):
+        for name in (
+            "iters",
+            "num_layers",
+            "batch_size",
+            "steps_per_report",
+            "steps_per_eval",
+            "save_every",
+        ):
             if getattr(self, name) < 1:
                 raise ValueError(f"{name} must be >= 1")
         if self.learning_rate <= 0:
@@ -215,6 +225,8 @@ def _lora_command(
         str(options.steps_per_report),
         "--steps-per-eval",
         str(options.steps_per_eval),
+        "--save-every",
+        str(options.save_every),
         "--seed",
         str(options.seed),
         "--fine-tune-type",
@@ -223,6 +235,20 @@ def _lora_command(
     if format == "pairs":
         cmd.append("--mask-prompt")
     return cmd
+
+
+def _adapter_weights(adapter_dir: Path) -> Path | None:
+    """The final adapter if mlx-lm wrote it, else its newest numbered checkpoint."""
+    canonical = adapter_dir / _ADAPTER_WEIGHTS
+    if canonical.exists():
+        return canonical
+    checkpoints: list[tuple[int, Path]] = []
+    for path in adapter_dir.glob(f"*_{_ADAPTER_WEIGHTS}"):
+        try:
+            checkpoints.append((int(path.name.split("_", 1)[0]), path))
+        except ValueError:
+            continue
+    return max(checkpoints, key=lambda item: item[0])[1] if checkpoints else None
 
 
 def train_lora(
@@ -239,8 +265,10 @@ def train_lora(
 
     The split is ``options.validation_fraction`` of the rows, ordered with
     ``options.seed``. The subprocess runs in its own process group, so stopping
-    terminates the whole child tree; the adapter is written after the last
-    iteration, so a stop before that raises :class:`TrainingStopped`.
+    terminates the whole child tree. mlx-lm writes a checkpoint every
+    ``options.save_every`` iterations; if the run is stopped, the newest
+    checkpoint becomes the adapter and ``iters_completed`` records the iteration
+    it reached. A stop before the first checkpoint raises :class:`TrainingStopped`.
     """
     opts = options or LoRAOptions()
     train, valid = data.split(opts.validation_fraction, opts.seed)
@@ -292,13 +320,19 @@ def train_lora(
             except ProcessLookupError:
                 pass
 
-    if not (adapter_dir / _ADAPTER_WEIGHTS).exists():
+    weights = _adapter_weights(adapter_dir)
+    if weights is None:
         if stopped:
             raise TrainingStopped(
-                "training was stopped before mlx-lm wrote the final adapter "
-                "(it saves at the end of the run)"
+                "training was stopped before mlx-lm wrote a checkpoint "
+                "(save_every iterations must elapse first)"
             )
         raise RuntimeError("training ended without adapter files")
+    canonical = adapter_dir / _ADAPTER_WEIGHTS
+    completed = opts.iters
+    if weights != canonical:
+        completed = int(weights.name.split("_", 1)[0])
+        shutil.copy2(weights, canonical)
     adapter_config = {}
     config_path = adapter_dir / _ADAPTER_CONFIG
     if config_path.exists():
@@ -306,7 +340,12 @@ def train_lora(
     return LoRAAdapter(
         base_model=str(base_model),
         adapter_path=str(adapter_dir),
-        hyperparameters={**asdict(opts), "adapter_config": adapter_config},
+        hyperparameters={
+            **asdict(opts),
+            "adapter_config": adapter_config,
+            "iters_completed": completed,
+            "stopped": completed < opts.iters,
+        },
         name=adapter_dir.name,
     )
 
