@@ -18,8 +18,8 @@ class Elongation(Feature):
         "Streak (>1) vs. blob (~1): eigenvalue ratio of the intensity second-moment matrix."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        moments = mass_moments(img)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        moments = mass_moments(image)
         matrix = np.array([[moments.var_x, moments.cov_xy], [moments.cov_xy, moments.var_y]])
         eigenvalues = np.linalg.eigvalsh(matrix)
         smallest = float(eigenvalues[0])

@@ -18,5 +18,5 @@ class RowProfileRoughness(Feature):
         "profile divided by its mean level; 0 = perfectly smooth."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return roughness(img.mean(axis=1))
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return roughness(image.mean(axis=1))

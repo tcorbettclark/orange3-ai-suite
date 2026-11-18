@@ -46,6 +46,8 @@ GROUP_LABELS = tuple(
 )
 GROUP_HELP = {group.letter: group.description for group in features.all_groups()}
 _ALL_GROUPS = "".join(features.GROUP_ORDER)
+_MIN_WORKING_SIZE = 32
+_MAX_WORKING_SIZE = 512
 _THUMBNAIL_SIZE = 48
 _GRID_ITEM_SIZE = QSize(66, 76)
 
@@ -67,7 +69,7 @@ class _FeatureCache:
 
     names: tuple[str, ...]
     values: np.ndarray
-    preprocess_key: tuple
+    options: features.FeatureOptions
 
 
 @dataclass
@@ -94,7 +96,6 @@ class ImageExtractionWorker(QThread):
         skipped_no_path: int,
         image_cache: _ImageCache | None,
         options,
-        preprocess_key: tuple,
     ):
         super().__init__()
         self._generation = generation
@@ -103,7 +104,6 @@ class ImageExtractionWorker(QThread):
         self._skipped_no_path = skipped_no_path
         self._image_cache = image_cache
         self._options = options
-        self._preprocess_key = preprocess_key
         self._stop = False
         self.result: _WorkerResult | None = None
         self.error: tuple[str, int] | None = None
@@ -155,7 +155,7 @@ class ImageExtractionWorker(QThread):
             if not image_cache.images:
                 self.progress.emit(100)
 
-            feature_cache = _FeatureCache(tuple(names), values, self._preprocess_key)
+            feature_cache = _FeatureCache(tuple(names), values, self._options)
             self.result = _WorkerResult(
                 self._generation,
                 self._data_version,
@@ -168,17 +168,17 @@ class ImageExtractionWorker(QThread):
             self.failed.emit(*self.error)
 
 
-def _format_feature_value(value) -> str:
+def _format_feature_value(value, is_count: bool = False) -> str:
     if value is None or not np.isfinite(value):
         return "—"
     value = float(value)
-    if abs(value - round(value)) < 1e-9:
+    if is_count and abs(value - round(value)) < 1e-9:
         return str(round(value))
     return f"{value:.4g}"
 
 
 def _read_thumbnail(path: str, size: int) -> QImage:
-    """Decode one image and center-crop it to a square thumbnail."""
+    """Decode one image and centre-crop it to a square thumbnail."""
     reader = QImageReader(path)
     reader.setAutoTransform(True)
     source_size = reader.size()
@@ -253,7 +253,7 @@ class OWImageFeatures(OWWidget):
     """
 
     name = "Image Features"
-    description = "Extract interpretable image features (groups A-F) for classifiers."
+    description = "Extract interpretable image features (groups A-G, colour opt-in)."
     icon = "icons/image_features.svg"
     category = "Image Analytics"
     priority = 30
@@ -308,7 +308,9 @@ class OWImageFeatures(OWWidget):
         prep_box.layout().addLayout(size_row)
         size_row.addWidget(QLabel("Working size (square)"))
         self._working_size_edit = QLineEdit()
-        self._working_size_edit.setValidator(QIntValidator(32, 512, self))
+        self._working_size_edit.setValidator(
+            QIntValidator(_MIN_WORKING_SIZE, _MAX_WORKING_SIZE, self)
+        )
         self._working_size_edit.setText(str(self.working_size))
         self._working_size_edit.setFixedWidth(70)
         self._working_size_edit.textEdited.connect(self._working_size_edited)
@@ -370,7 +372,7 @@ class OWImageFeatures(OWWidget):
         except ValueError:
             self._working_size_edit.setText(str(self.working_size))
             return
-        value = max(32, min(512, value))
+        value = max(_MIN_WORKING_SIZE, min(_MAX_WORKING_SIZE, value))
         self._working_size_edit.setText(str(value))
         if value != self.working_size:
             self.working_size = value
@@ -486,7 +488,7 @@ class OWImageFeatures(OWWidget):
 
     def _current_feature_cache(self):
         cache = self._feature_cache
-        if cache is None or cache.preprocess_key != self._preprocess_key():
+        if cache is None or cache.options != self._feature_options():
             return None
         return cache
 
@@ -539,7 +541,9 @@ class OWImageFeatures(OWWidget):
                 name: value for name, value in zip(cache.names, cache.values[row], strict=True)
             }
         for name, item in self._feature_items.items():
-            item.setText(1, _format_feature_value(values.get(name)))
+            item.setText(
+                1, _format_feature_value(values.get(name), features.get_feature(name).is_count)
+            )
 
     def _style_feature_groups(self):
         enabled = set(self.groups_enabled)
@@ -644,7 +648,7 @@ class OWImageFeatures(OWWidget):
         vmin, vmax = float(values.min()), float(values.max())
         if vmin == vmax:
             edges = np.array([vmin - 0.5, vmax + 0.5])
-        elif np.allclose(values, np.round(values)) and vmax - vmin <= 60:
+        elif features.get_feature(feature_name).is_count and vmax - vmin <= 60:
             lo, hi = int(np.floor(vmin)), int(np.ceil(vmax))
             edges = np.arange(lo - 0.5, hi + 1.5, 1.0)
         else:
@@ -685,10 +689,11 @@ class OWImageFeatures(OWWidget):
                     pen=pg.mkPen("#d62728", width=2),
                 )
             )
-        caption = f"current: {_format_feature_value(current)}"
+        flag = features.get_feature(feature_name).is_count
+        caption = f"current: {_format_feature_value(current, flag)}"
         if labels is not None:
             caption += " — bars by class"
-        if features.groups.group_of(feature_name) not in self.groups_enabled:
+        if features.group_of(feature_name) not in self.groups_enabled:
             caption += " — group off (not in output)"
         self._histogram_caption.setText(caption)
 
@@ -784,14 +789,6 @@ class OWImageFeatures(OWWidget):
             denoise=self.denoise,
         )
 
-    def _preprocess_key(self) -> tuple:
-        return (
-            self.working_size,
-            self.centre_crop,
-            self.contrast_normalise,
-            self.denoise,
-        )
-
     @Inputs.images
     def set_data(self, table):
         self.data = table
@@ -858,7 +855,7 @@ class OWImageFeatures(OWWidget):
             self._set_grid_paths(paths)
 
         kept = [(i, p) for i, p in enumerate(paths) if p]
-        preprocess_key = self._preprocess_key()
+        options = self._feature_options()
 
         self._generation += 1
         generation = self._generation
@@ -871,7 +868,7 @@ class OWImageFeatures(OWWidget):
         if (
             image_cache is not None
             and feature_cache is not None
-            and feature_cache.preprocess_key == preprocess_key
+            and feature_cache.options == options
         ):
             self._send_features()
             return
@@ -881,7 +878,7 @@ class OWImageFeatures(OWWidget):
             kept,
             len(paths) - len(kept),
             image_cache,
-            preprocess_key,
+            options,
         )
 
     def _start_worker(
@@ -890,7 +887,7 @@ class OWImageFeatures(OWWidget):
         kept,
         skipped_no_path,
         image_cache,
-        preprocess_key,
+        options,
     ):
         self._restart_pending = False
         worker = ImageExtractionWorker(
@@ -899,8 +896,7 @@ class OWImageFeatures(OWWidget):
             paths=tuple(kept),
             skipped_no_path=skipped_no_path,
             image_cache=image_cache,
-            options=self._feature_options(),
-            preprocess_key=preprocess_key,
+            options=options,
         )
         worker.progress.connect(self._set_progress)
         worker.finished_ok.connect(self._on_worker_done)
@@ -922,7 +918,7 @@ class OWImageFeatures(OWWidget):
             # Accept a result that is still valid for the current data, even
             # when a setting changed while the worker was running.
             self._image_cache = result.image_cache
-            if result.feature_cache.preprocess_key == self._preprocess_key():
+            if result.feature_cache.options == self._feature_options():
                 self._feature_cache = result.feature_cache
         if result.generation != self._generation:
             if self._restart_pending:
@@ -965,12 +961,7 @@ class OWImageFeatures(OWWidget):
         self._feature_row_by_source = {
             int(source): i for i, source in enumerate(image_cache.readable_source)
         }
-        ordered = [
-            name
-            for letter, _ in GROUP_LABELS
-            if letter in self.groups_enabled
-            for name in features.get_group(letter).members
-        ]
+        ordered = list(features.selection(self.groups_enabled))
         columns = {name: i for i, name in enumerate(feature_cache.names)}
         values = feature_cache.values[:, [columns[name] for name in ordered]]
         source = self.data.domain

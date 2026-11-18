@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 from orangecontrib.ai_suite.kernel.features import FeatureOptions
-from orangecontrib.ai_suite.kernel.features.preprocessing import preprocess, to_luminance
+from orangecontrib.ai_suite.kernel.features.channels import to_luminance, to_unit_scale
+from orangecontrib.ai_suite.kernel.features.preprocessing import preprocess, preprocess_colour
 from synth import uniform_image
 
 
@@ -29,8 +30,51 @@ def test_luminance_grayscale_passthrough():
 
 
 def test_luminance_rejects_bad_channels():
+    with pytest.raises(ValueError, match="3 \\(RGB\\) or 4 \\(RGBA\\)"):
+        to_luminance(np.zeros((4, 4, 1)))
+
+
+def test_unit_scale_accepts_unit_and_8bit_ranges():
+    assert np.allclose(to_unit_scale(np.full((2, 2), 0.5, np.float32)), 0.5)
+    assert np.allclose(to_unit_scale(np.full((2, 2), 255, np.uint8)), 1.0)
+    assert np.allclose(to_unit_scale(np.full((2, 2), 51, np.uint8)), 0.2)
+
+
+def test_unit_scale_rejects_16bit_values():
+    with pytest.raises(ValueError, match="must be in \\[0, 1\\] or \\[0, 255\\]"):
+        to_unit_scale(np.full((2, 2), 60000, np.uint16))
+
+
+def test_preprocess_colour_returns_unit_range_from_8bit_input():
+    rgb = np.full((8, 8, 3), 128, np.uint8)
+    out = preprocess_colour(rgb, FeatureOptions(working_size=None))
+    assert out.max() <= 1.0 and np.isclose(out.max(), 128 / 255)
+
+
+def test_preprocess_without_normalisation_keeps_the_input_scale():
+    rgb = np.full((8, 8, 3), 200, np.uint8)
+    opts = FeatureOptions(working_size=None, contrast_normalise=False)
+    assert np.isclose(preprocess(rgb, opts).max(), 200.0)  # grey 200 keeps its scale
+    assert preprocess(rgb, FeatureOptions(working_size=None)).max() <= 1.0
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"working_size": 0},
+        {"working_size": -8},
+        {"denoise_ksize": 4},
+        {"denoise_ksize": 1},
+        {"denoise_ksize": 7},
+        {"peak_prominence_frac": -0.1},
+        {"peak_prominence_frac": 1.5},
+        {"edge_density_frac": -1.0},
+        {"centre_crop": "yes"},
+    ],
+)
+def test_options_reject_invalid_values(kwargs):
     with pytest.raises(ValueError):
-        to_luminance(np.zeros((4, 4, 2)))
+        FeatureOptions(**kwargs)
 
 
 def test_preprocess_squares_and_resizes():

@@ -1,5 +1,6 @@
 """The feature catalogue, the feature groups and the extraction API."""
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ from orangecontrib.ai_suite.kernel.features import (
     features_of_group,
     get_feature,
     get_group,
+    selection,
 )
 from synth import cloud_image
 
@@ -75,12 +77,17 @@ def test_group_metadata_covers_group_order():
         assert get_group(letter).members  # every group contributes features
 
 
-def test_count_features_are_flagged():
+def test_count_features_are_flagged_and_integral():
     counts = all_count_feature_names()
     assert "hole_count" in counts
-    assert "profile_median_crossing_count" in counts
+    assert "row_profile_peaks" in counts
     assert "mean_intensity" not in counts
+    assert "profile_median_crossing_count" not in counts  # an average, not a count
     assert counts == tuple(f.name for f in all_features() if f.is_count)
+    # the flag is a promise about the value, so check it on a real image
+    vec = extract_features(cloud_image(seed=1), groups="ABCDEFG")
+    for name in counts:
+        assert float(vec[name]).is_integer(), (name, vec[name])
 
 
 def test_get_feature_errors():
@@ -132,6 +139,8 @@ def test_feature_level_exclusion():
 
 def test_feature_vector_dict_protocol():
     vec = extract_features(cloud_image(seed=1), groups="E")
+    assert isinstance(vec, Mapping)
+    assert vec == dict(vec)
     assert set(vec.keys()) == set(get_group("E").members)
     assert len(list(vec)) == len(vec) == len(list(vec.items()))
     assert vec.get("hole_count") == vec["hole_count"]
@@ -148,6 +157,19 @@ def test_by_group_view():
     assert set(by["F"]) == set(get_group("F").members)
 
 
+def test_exclude_accepts_one_name():
+    vec = extract_features(cloud_image(seed=1), exclude="hole_count")
+    assert "hole_count" not in vec
+    assert len(vec) == 33
+
+
+def test_selection_is_deduplicated_and_in_column_order():
+    forward = selection("AD")
+    assert forward == tuple(name for name in all_feature_names() if name in set(forward))
+    assert set(forward) == set(get_group("A").members) | set(get_group("D").members)
+    assert forward == selection("DA")  # order of the letters does not matter
+
+
 def test_error_paths():
     img = cloud_image(seed=1)
     with pytest.raises(ValueError, match="unknown feature groups"):
@@ -159,9 +181,11 @@ def test_error_paths():
 
 
 def test_extraction_uses_fixed_working_size():
-    big = np.kron(cloud_image(seed=4), np.ones((2, 2), dtype=np.float32))  # 256x256
-    vec = extract_features(big)  # centre-cropped + resized to 128
-    assert len(vec) == 34 and np.isfinite(vec.to_array()).all()
+    small = cloud_image(seed=4)  # 128x128
+    big = np.kron(small, np.ones((2, 2), dtype=np.float32))  # 256x256
+    # A 2x2 block-upcast image, downsampled back to 128 with INTER_AREA, is the
+    # original again - so the features must match. This fails if no resize runs.
+    assert np.allclose(extract_features(big).to_array(), extract_features(small).to_array())
 
 
 def test_one_pixel_image_yields_finite_features():

@@ -11,5 +11,5 @@ class ForegroundAreaFraction(Feature):
     name = "foreground_area_fraction"
     definition = "Ink / cloud coverage: fraction of pixels above the Otsu threshold."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return float(otsu_foreground(img).mean())
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return float(otsu_foreground(image).mean())

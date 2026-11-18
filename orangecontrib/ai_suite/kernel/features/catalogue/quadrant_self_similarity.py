@@ -1,12 +1,11 @@
 """Do the four quadrants look like each other?
 
 The mean of the six pairwise inter-quadrant correlations: high for uniform
-structure spread everywhere, low for one localised object. Quadrants are
-resized to the smallest one first, because odd sizes make them differ by a
-pixel and correlation needs matching shapes.
+structure spread everywhere, low for one localised object. An odd size means
+the four quadrants would differ by a pixel, so the last row or column is
+dropped - the same rule :func:`._imaging.mirror_corr` uses for half symmetry.
 """
 
-import cv2
 import numpy as np
 
 from .._conventions import safe_corr
@@ -20,15 +19,13 @@ class QuadrantSelfSimilarity(Feature):
         "Uniform vs. localised structure: mean of the six pairwise inter-quadrant correlations."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        h, w = img.shape
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        h, w = image.shape
         if h < 2 or w < 2:
             return 0.0
         h2, w2 = h // 2, w // 2
-        quadrants = [
-            cv2.resize(quadrant, (w2, h2), interpolation=cv2.INTER_AREA)
-            for quadrant in (img[:h2, :w2], img[:h2, w2:], img[h2:, :w2], img[h2:, w2:])
-        ]
+        core = image[: 2 * h2, : 2 * w2]
+        quadrants = [core[:h2, :w2], core[:h2, w2:], core[h2:, :w2], core[h2:, w2:]]
         pairs = [(i, j) for i in range(4) for j in range(i + 1, 4)]
         correlations = [
             safe_corr(quadrants[i], quadrants[j], flat_policy="equal_is_one") for i, j in pairs

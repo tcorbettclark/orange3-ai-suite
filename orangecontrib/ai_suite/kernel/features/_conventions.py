@@ -10,11 +10,22 @@ from __future__ import annotations
 
 import numpy as np
 
-EPS = 1e-12  # "numerically zero" for every feature group
+EPS = 1e-12  # "numerically zero": division, range and empty-mass guards
 
-_FLAT_AMPLITUDE = 1e-6  # centred amplitude below this counts as a flat input
+FLAT_AMPLITUDE = 1e-6  # centred amplitude below this counts as a flat input
 
 _FLAT_POLICIES = ("zero", "equal_is_one")
+
+
+def is_flat(array: np.ndarray) -> bool:
+    """Whether an array carries no structure, by centred amplitude.
+
+    The guard is on amplitude rather than std: float32 summation noise can leave
+    a structurally constant profile with std ~1e-8, which would poison a
+    correlation with 0/0. One tolerance for every feature that has to decide.
+    """
+    values = np.asarray(array, dtype=np.float64).ravel()
+    return float(np.abs(values - values.mean()).max()) < FLAT_AMPLITUDE
 
 
 def safe_corr(a: np.ndarray, b: np.ndarray, *, flat_policy: str) -> float:
@@ -39,11 +50,11 @@ def safe_corr(a: np.ndarray, b: np.ndarray, *, flat_policy: str) -> float:
     b = np.asarray(b, dtype=np.float64).ravel()
     am = a - a.mean()
     bm = b - b.mean()
-    flat_a = float(np.abs(am).max()) < _FLAT_AMPLITUDE
-    flat_b = float(np.abs(bm).max()) < _FLAT_AMPLITUDE
+    flat_a = float(np.abs(am).max()) < FLAT_AMPLITUDE
+    flat_b = float(np.abs(bm).max()) < FLAT_AMPLITUDE
     if flat_a or flat_b:
         if flat_policy == "equal_is_one" and flat_a and flat_b:
-            return 1.0 if abs(float(a.mean()) - float(b.mean())) < _FLAT_AMPLITUDE else 0.0
+            return 1.0 if abs(float(a.mean()) - float(b.mean())) < FLAT_AMPLITUDE else 0.0
         return 0.0
     den = float(np.sqrt((am * am).sum() * (bm * bm).sum()))
     if den == 0.0 or not np.isfinite(den):

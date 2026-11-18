@@ -15,5 +15,5 @@ class MeanIntensity(Feature):
     name = "mean_intensity"
     definition = "Overall brightness: mean pixel intensity."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return float(img.mean())
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return float(image.mean())

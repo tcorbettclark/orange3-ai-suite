@@ -9,8 +9,8 @@ OPTS = FeatureOptions()
 _GROUP = features_of_group("A")
 
 
-def _compute(img):
-    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
+def _compute(image):
+    return {feature.name: feature.compute(image, OPTS) for feature in _GROUP}
 
 
 def test_symmetric_distribution_has_zero_skew():

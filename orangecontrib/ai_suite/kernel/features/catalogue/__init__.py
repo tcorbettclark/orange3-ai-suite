@@ -1,18 +1,22 @@
 """The feature catalogue: one module, one class, one feature - and its index.
 
 This package is the primary interface to the features. Each feature is a class
-in its own module. The roster below lists them in column order, and the
-accessors are how the rest of the kernel and the widgets read that collection.
+in its own module. The catalogue is the list below, in column order, and the
+accessors are how the rest of the kernel and the widgets read it.
 
 Importing this package imports every feature, which is deliberate: each class
 validates itself when it is created (see :mod:`..feature`), so a malformed
 feature fails here rather than during extraction.
 
-``_CATALOGUE`` is the roster *and* the column order - the only place either is
-defined - and it is private because :func:`all_features` already returns it. It
-is written out rather than discovered by scanning the directory: a module that
-nothing imports would otherwise be silently invisible, which is a worse failure
-than a stale list. The tests assert that the roster and the directory agree.
+``_CATALOGUE`` *is* the column order - the only place it is defined - and it is
+private because :func:`all_features` already returns it. It is written out
+rather than discovered by scanning the directory: a module that nothing imports
+would otherwise be silently invisible, which is a worse failure than a stale
+list. The tests assert that the catalogue and the directory agree.
+
+``POSITION`` and ``is_known`` are the seam :mod:`..extraction` uses; they are
+public names but not advertised, because a caller reading features should go
+through the accessors.
 
 Order here is column order and nothing else. Which features belong together is
 a grouping concern (:mod:`..groups`), so neither this file nor the classes it
@@ -60,7 +64,7 @@ from .row_profile_peaks import RowProfilePeaks
 from .row_profile_roughness import RowProfileRoughness
 from .row_profile_trend import RowProfileTrend
 from .skewness import Skewness
-from .stroke_crossings_median_level import StrokeCrossingsMedianLevel
+from .stroke_crossing_count import StrokeCrossingCount
 from .top_bottom_symmetry import TopBottomSymmetry
 from .vertical_spread import VerticalSpread
 
@@ -95,7 +99,7 @@ _CATALOGUE: tuple[Feature, ...] = (
     AutocorrelationHalfWidth(),
     HoleCount(),
     ForegroundAreaFraction(),
-    StrokeCrossingsMedianLevel(),
+    StrokeCrossingCount(),
     LeftRightSymmetry(),
     TopBottomSymmetry(),
     QuadrantSelfSimilarity(),

@@ -13,5 +13,5 @@ class VerticalSpread(Feature):
         "Tall vs. squat bright mass: intensity-weighted std along y, divided by image height."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return float(np.sqrt(max(mass_moments(img).var_y, 0.0)))
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return float(np.sqrt(max(mass_moments(image).var_y, 0.0)))

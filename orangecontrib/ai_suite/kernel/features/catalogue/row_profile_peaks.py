@@ -22,5 +22,5 @@ class RowProfilePeaks(Feature):
     )
     is_count = True
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return peak_count(img.mean(axis=1), opts)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return peak_count(image.mean(axis=1), options)

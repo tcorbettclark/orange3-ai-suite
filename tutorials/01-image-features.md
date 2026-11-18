@@ -50,7 +50,7 @@ Open **Data Table**. You should see:
 - one row per image;
 - a class column (`0`-`9`) inherited from the folder names;
 - a `image` meta column with the source path;
-- 36 numeric feature columns from groups A-F.
+- 34 numeric feature columns from groups A-F.
 
 Sort by `hole_count`. Digits with enclosed regions (`0`, `6`, `8`, `9`) score
 higher than `1`, `2`, `3`, `5`, `7`. Look at
@@ -135,7 +135,7 @@ only that each pixel has its own input weight.
 
 ## Checkpoint
 
-- The feature output has 36 columns plus the inherited class and image path.
+- The feature output has 34 columns plus the inherited class and image path.
 - Turning groups off changes both the table and the evaluation.
 - You can point to a confused digit pair and name the feature that explains it.
 

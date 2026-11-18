@@ -18,6 +18,6 @@ class RowProfileTrend(Feature):
         "row-mean profile scaled by its length); positive = brighter at the bottom."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        rows = img.mean(axis=1)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        rows = image.mean(axis=1)
         return scaled_slope(np.arange(len(rows), dtype=np.float64), rows)

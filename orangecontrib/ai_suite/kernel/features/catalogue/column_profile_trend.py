@@ -14,6 +14,6 @@ class ColumnProfileTrend(Feature):
         "column-mean profile scaled by its length); positive = brighter on the right."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        columns = img.mean(axis=0)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        columns = image.mean(axis=0)
         return scaled_slope(np.arange(len(columns), dtype=np.float64), columns)

@@ -7,6 +7,7 @@ rather than broad tonal range.
 
 import numpy as np
 
+from .._imaging import percentile_span
 from ..feature import Feature
 from ..options import FeatureOptions
 
@@ -15,6 +16,5 @@ class RobustContrast(Feature):
     name = "robust_contrast"
     definition = "Contrast without outlier sensitivity: 90th minus 10th intensity percentile."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        p10, p90 = np.percentile(img, 10), np.percentile(img, 90)
-        return float(p90 - p10)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return percentile_span(image)

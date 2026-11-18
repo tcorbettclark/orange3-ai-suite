@@ -22,8 +22,8 @@ class HoleCount(Feature):
     )
     is_count = True
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        background = (~otsu_foreground(img)).astype(np.uint8)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        background = (~otsu_foreground(image)).astype(np.uint8)
         n_labels, labels = cv2.connectedComponents(background, connectivity=4)
         border = {
             int(label)

@@ -10,8 +10,8 @@ OPTS = FeatureOptions()
 _GROUP = features_of_group("F")
 
 
-def _compute(img):
-    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
+def _compute(image):
+    return {feature.name: feature.compute(image, OPTS) for feature in _GROUP}
 
 
 def test_mirror_symmetric_images():

@@ -26,9 +26,8 @@ class ProfileMedianCrossingCount(Feature):
         "How often pixel lines cross their own median level — parameter-free "
         "cousin of peak counting (median over rows and columns, averaged)."
     )
-    is_count = True
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        rows = [_upcrossings(img[i, :]) for i in range(img.shape[0])]
-        columns = [_upcrossings(img[:, j]) for j in range(img.shape[1])]
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        rows = [_upcrossings(image[i, :]) for i in range(image.shape[0])]
+        columns = [_upcrossings(image[:, j]) for j in range(image.shape[1])]
         return float((float(np.median(rows)) + float(np.median(columns))) / 2.0)

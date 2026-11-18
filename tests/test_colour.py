@@ -13,8 +13,8 @@ OPTS = FeatureOptions()
 _GROUP = features_of_group("G")
 
 
-def _compute(img):
-    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
+def _compute(image):
+    return {feature.name: feature.compute(image, OPTS) for feature in _GROUP}
 
 
 def sky_photo(size=64):

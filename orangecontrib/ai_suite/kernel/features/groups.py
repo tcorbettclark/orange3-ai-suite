@@ -1,4 +1,4 @@
-"""Feature groups: membership lists over the flat feature table.
+"""Feature groups: membership lists over the catalogue.
 
 A group owns no feature and computes nothing. It is a membership list plus the
 words to describe it, so the same feature may appear in several groups - that
@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from .catalogue import all_feature_names, get_feature
+from .catalogue import POSITION, all_feature_names, get_feature
 from .feature import Feature
 
 
@@ -102,7 +102,7 @@ _GROUPS: tuple[Group, ...] = (
         "topology",
         "Topology: Otsu foreground, enclosed-background hole count and stroke "
         "crossings. The classic digit features.",
-        ("hole_count", "foreground_area_fraction", "stroke_crossings_median_level"),
+        ("hole_count", "foreground_area_fraction", "stroke_crossing_count"),
     ),
     Group(
         "F",
@@ -121,6 +121,7 @@ _GROUPS: tuple[Group, ...] = (
 )
 
 GROUP_ORDER: tuple[str, ...] = tuple(group.letter for group in _GROUPS)
+_BY_LETTER: dict[str, Group] = {group.letter: group for group in _GROUPS}
 DEFAULT_GROUPS = "ABCDEF"  # the colour shortcut group is opt-in
 
 
@@ -135,6 +136,8 @@ def _validate() -> dict[str, tuple[str, ...]]:
             problems.append(f"group {group.letter}: missing title or description")
         if len(set(group.members)) != len(group.members):
             problems.append(f"group {group.letter}: duplicate members")
+        if list(group.members) != sorted(group.members, key=POSITION.__getitem__):
+            problems.append(f"group {group.letter}: members are not in column order")
         for name in group.members:
             get_feature(name)  # raises with a friendly message
             memberships.setdefault(name, []).append(group.letter)
@@ -168,19 +171,16 @@ def all_groups() -> tuple[Group, ...]:
 def get_group(letter: str) -> Group:
     """Look up one group by letter."""
     check_groups((letter,))
-    for group in _GROUPS:
-        if group.letter == letter:
-            return group
-    raise AssertionError(f"group {letter!r} is in GROUP_ORDER but missing from GROUPS")
+    return _BY_LETTER[letter]
 
 
 def check_groups(letters: Iterable[str]) -> tuple[str, ...]:
     """Validate a group selection and return it as a tuple of letters."""
-    selection = tuple(letters)
-    unknown = sorted(set(selection) - set(GROUP_ORDER))
+    chosen = tuple(letters)
+    unknown = sorted(set(chosen) - set(GROUP_ORDER))
     if unknown:
         raise ValueError(f"unknown feature groups {unknown}; valid: {GROUP_ORDER}")
-    return selection
+    return chosen
 
 
 def memberships_of(name: str) -> tuple[str, ...]:
@@ -194,14 +194,9 @@ def group_of(name: str) -> str:
     return memberships_of(name)[0]
 
 
-def group_names(letter: str) -> tuple[str, ...]:
-    """Feature names contributed by one group, in column order."""
-    return get_group(letter).members
-
-
 def features_of_group(letter: str) -> tuple[Feature, ...]:
     """Features of one group letter, in column order."""
-    return tuple(get_feature(name) for name in group_names(letter))
+    return tuple(get_feature(name) for name in get_group(letter).members)
 
 
 def selection(groups: str | None = None) -> tuple[str, ...]:
@@ -211,7 +206,7 @@ def selection(groups: str | None = None) -> tuple[str, ...]:
     groups; members are de-duplicated, so overlapping groups are harmless.
     """
     letters = check_groups(DEFAULT_GROUPS if groups is None else groups)
-    wanted = {name for letter in letters for name in group_names(letter)}
+    wanted = {name for letter in letters for name in get_group(letter).members}
     return tuple(name for name in all_feature_names() if name in wanted)
 
 

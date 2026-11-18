@@ -38,9 +38,10 @@ class Feature(ABC):
         feature's documentation. Longer reasoning belongs in the module
         docstring.
     is_count:
-        True for integer-valued counts (peaks, holes, crossings). Such values
-        must be stable under small shifts and jitter; the stability tests
-        assert exact equality for them.
+        True when the value is a whole number: peaks and holes. Level counts
+        that are averaged over lines are not whole numbers and do not carry it,
+        which makes the flag something a caller can act on - a table column to
+        treat as a count, a histogram to bin at integer edges.
     needs_colour:
         True if the feature reads absolute colour instead of the preprocessed
         luminance image. The pipeline is a property of the feature: it must
@@ -77,10 +78,10 @@ class Feature(ABC):
                 raise TypeError(f"{cls.__name__}.{flag} must be a bool")
 
     @abstractmethod
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
         """The feature value for one preprocessed image.
 
-        ``img`` is the luminance image for ``needs_colour = False`` features and
+        ``image`` is the luminance image for ``needs_colour = False`` features and
         the absolute colour image for ``needs_colour = True`` ones.
         """
 

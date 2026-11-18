@@ -24,15 +24,15 @@ class RadialGradient(Feature):
         "over 8 rings."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        moments = mass_moments(img)
-        h, w = img.shape
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        moments = mass_moments(image)
+        h, w = image.shape
         yy, xx = np.meshgrid(np.linspace(0.0, 1.0, h), np.linspace(0.0, 1.0, w), indexing="ij")
         radius = np.hypot(xx - moments.com_x, yy - moments.com_y)
         if radius.max() < EPS:
             return 0.0
         bins = np.clip((radius / radius.max() * RADIAL_BINS).astype(int), 0, RADIAL_BINS - 1)
-        sums = np.bincount(bins.ravel(), weights=img.ravel(), minlength=RADIAL_BINS)
+        sums = np.bincount(bins.ravel(), weights=image.ravel(), minlength=RADIAL_BINS)
         counts = np.bincount(bins.ravel(), minlength=RADIAL_BINS)
         occupied = counts > 0
         if occupied.sum() < 2:

@@ -22,9 +22,9 @@ class EdgeDensity(Feature):
         "(default half) of the image's own p99 gradient (adaptive)."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        magnitude = gradient_magnitude(img)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        magnitude = gradient_magnitude(image)
         p99 = float(np.percentile(magnitude, 99))
         if p99 < EPS:
             return 0.0
-        return float((magnitude >= opts.edge_density_frac * p99).mean())
+        return float((magnitude >= options.edge_density_frac * p99).mean())

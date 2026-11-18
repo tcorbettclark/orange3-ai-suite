@@ -16,16 +16,15 @@ from ..feature import Feature
 from ..options import FeatureOptions
 
 
-class StrokeCrossingsMedianLevel(Feature):
-    name = "stroke_crossings_median_level"
+class StrokeCrossingCount(Feature):
+    name = "stroke_crossing_count"
     definition = (
         "Dense version of the classic OCR stroke-crossing count: crossings of "
         "the global median level per row, averaged; open strokes ('1', '7') "
         "score low, dense strokes ('8') high."
     )
-    is_count = True
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        below = img <= np.median(img)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        below = image <= np.median(image)
         transitions = (below[:, 1:] != below[:, :-1]).sum(axis=1)
         return float(transitions.mean())

@@ -13,5 +13,5 @@ class TopBottomSymmetry(Feature):
         "Vertical mirror symmetry: correlation of the top half with the mirrored bottom half."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return mirror_corr(img, axis=0)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return mirror_corr(image, axis=0)

@@ -11,5 +11,5 @@ class FineTexture(Feature):
     name = "fine_texture"
     definition = "Small-scale lumpiness: mean local standard deviation over 5x5 windows."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return local_std_mean(img)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return local_std_mean(image)

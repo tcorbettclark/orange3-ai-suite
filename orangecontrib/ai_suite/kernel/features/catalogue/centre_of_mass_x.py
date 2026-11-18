@@ -15,5 +15,5 @@ class CentreOfMassX(Feature):
     name = "centre_of_mass_x"
     definition = "Left/right placement of the bright mass in [0, 1]; 0.5 = centred."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return mass_moments(img).com_x
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return mass_moments(image).com_x

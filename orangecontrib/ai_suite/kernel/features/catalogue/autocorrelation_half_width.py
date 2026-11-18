@@ -9,7 +9,7 @@ structure and returns 0.0.
 
 import numpy as np
 
-from .._conventions import EPS
+from .._conventions import is_flat
 from ..feature import Feature
 from ..options import FeatureOptions
 
@@ -21,11 +21,11 @@ class AutocorrelationHalfWidth(Feature):
         "autocorrelation drops below 0.5."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        h, w = img.shape
-        centred = img.astype(np.float64) - img.mean()
-        if centred.std() < EPS:
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        h, w = image.shape
+        if is_flat(image):
             return 0.0
+        centred = image.astype(np.float64) - image.mean()
         power = np.abs(np.fft.fft2(centred)) ** 2
         autocorrelation = np.fft.fftshift(np.fft.ifft2(power).real)
         autocorrelation /= autocorrelation[h // 2, w // 2]  # normalise by lag 0

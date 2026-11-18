@@ -22,7 +22,7 @@ class CoarseToFineTextureRatio(Feature):
         "cumulus scores high, wispy cirrus low."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        coarse = block_mean_variance(img)
-        fine = local_std_mean(img)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        coarse = block_mean_variance(image)
+        fine = local_std_mean(image)
         return coarse / (coarse + fine + EPS)

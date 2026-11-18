@@ -9,8 +9,8 @@ OPTS = FeatureOptions()
 _GROUP = features_of_group("E")
 
 
-def _compute(img):
-    return {feature.name: feature.compute(img, OPTS) for feature in _GROUP}
+def _compute(image):
+    return {feature.name: feature.compute(image, OPTS) for feature in _GROUP}
 
 
 def test_hole_counts_digit_like():
@@ -46,7 +46,7 @@ def test_foreground_area_fraction_ring():
 def test_stroke_crossings_vertical_bar():
     # Each row enters and leaves the (bright, minority) bar: 2 crossings.
     f = _compute(vertical_bar_image())
-    assert abs(f["stroke_crossings_median_level"] - 2.0) < 1e-6
+    assert abs(f["stroke_crossing_count"] - 2.0) < 1e-6
 
 
 def test_flat_image_guards():
@@ -54,4 +54,4 @@ def test_flat_image_guards():
     f = _compute(img)
     assert f["hole_count"] == 0.0
     assert f["foreground_area_fraction"] == 0.0
-    assert f["stroke_crossings_median_level"] == 0.0
+    assert f["stroke_crossing_count"] == 0.0

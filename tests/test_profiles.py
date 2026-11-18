@@ -9,8 +9,8 @@ OPTS = FeatureOptions()
 _GROUP = features_of_group("B")
 
 
-def _compute(img, opts=OPTS):
-    return {feature.name: feature.compute(img, opts) for feature in _GROUP}
+def _compute(image, options=OPTS):
+    return {feature.name: feature.compute(image, options) for feature in _GROUP}
 
 
 def test_two_bands_two_row_peaks():

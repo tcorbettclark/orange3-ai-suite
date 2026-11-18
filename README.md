@@ -95,7 +95,7 @@ automatically; type a working size and press Enter to reprocess. Toggling
 groups is the ablation experiment; group G (colour) is the opt-in shortcut
 demonstration. The main area shows every input image as a thumbnail, with the
 total count and the current selection in the header. Thumbnails are
-center-cropped to squares so wide and tall images fill the grid. The right-hand
+centre-cropped to squares so wide and tall images fill the grid. The right-hand
 panel shows
 the selected image's feature values, grouped A-G, and a class-split histogram
 for the selected feature. Disabled groups stay visible but greyed out. The
@@ -444,9 +444,16 @@ orangecontrib/
     __init__.py
     adapters.py Orange <-> kernel conversion
     kernel/
-      features/   preprocessing, extraction front door
+      features/   the feature package
         catalogue/   one module and one class per feature, plus the index
-        groups.py    feature groups as membership lists over the catalogue
+        feature.py   the feature contract, checked at import
+        groups.py    groups as membership lists over the catalogue
+        extraction.py  extract_features and FeatureVector
+        preprocessing.py  the pipeline (internal)
+        channels.py  RGB/luminance and [0,1] conventions
+        options.py   FeatureOptions
+        _conventions.py  numeric rules (zero, flat, net change)
+        _imaging.py  measurements shared by more than one feature
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects

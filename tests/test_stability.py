@@ -1,8 +1,8 @@
 """Feature stability under small shifts and noise.
 
-Category features (peak/hole/median-crossing counts) must be *identical*
-under 1-pixel shifts and small additive noise; continuous features must stay
-within tolerance. A feature whose category flips on a 5-pixel shift is noise.
+Count features - the ones flagged ``is_count``, whose values are whole numbers -
+must be *identical* under small shifts and noise; real-valued features must stay
+within tolerance. A count that flips on a 5-pixel shift is noise, not signal.
 """
 
 import numpy as np
@@ -60,6 +60,15 @@ def test_small_noise_jitter_texture(cloud_base):
         )
 
 
+def test_count_features_hold_exactly_under_shift():
+    digit = digit8_image()
+    base = extract_features(digit, groups="E").by_group()["E"]
+    assert COUNT_FEATURES & set(base)
+    for dy, dx in ((1, 1), (-1, 0), (0, 2), (5, 0), (0, -5)):
+        shifted = extract_features(shift_image(digit, dy, dx), groups="E").by_group()["E"]
+        _assert_stable(base, shifted)  # count features exact, the rest tolerant
+
+
 def test_hole_count_stable_under_shift():
     digit = digit8_image()
     assert extract_features(digit)["hole_count"] == 2.0
@@ -74,15 +83,14 @@ def test_ring_hole_count_stable_under_shift():
         assert extract_features(shift_image(ring, dy, dx))["hole_count"] == 1.0
 
 
-def test_denoising_strength_does_not_flip_categories():
-    img = cloud_image(seed=2)
-    base = extract_features(img).by_group()["D"]
+def test_denoising_strength_does_not_flip_counts():
+    img = digit8_image()
+    base = extract_features(img, groups="E").by_group()["E"]
+    assert COUNT_FEATURES & set(base)  # the loop below must not be empty
     for ksize in (3, 5):
         opts = FeatureOptions(denoise=True, denoise_ksize=ksize)
-        f = extract_features(img, options=opts, groups="D").by_group()["D"]
-        # denoising a smooth image is near-idempotent; counts must not flip
-        for name in COUNT_FEATURES & set(base):
-            assert f[name] == base[name], (name, base[name], f[name])
+        denoised = extract_features(img, options=opts, groups="E").by_group()["E"]
+        _assert_stable(base, denoised)
 
 
 def test_working_size_change_keeps_digit_categories():

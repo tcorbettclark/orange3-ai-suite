@@ -58,7 +58,7 @@ def test_group_ablation_via_settings(qapp, capture, images_table):
     assert [v.name for v in out.domain.attributes] == [
         "hole_count",
         "foreground_area_fraction",
-        "stroke_crossings_median_level",
+        "stroke_crossing_count",
     ]
     # topology: the disc has no enclosed background -> hole_count 0; area sane
     assert out[4, "foreground_area_fraction"] > 0.05
@@ -245,7 +245,7 @@ def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
     assert opts.edge_density_frac == 0.50
 
 
-def test_wide_thumbnail_is_center_cropped(tmp_path):
+def test_wide_thumbnail_is_centre_cropped(tmp_path):
     from PIL import Image
 
     from orangecontrib.ai_suite.widgets.ow_image_features import _read_thumbnail

@@ -18,5 +18,5 @@ class ProfileRowColumnCorrelation(Feature):
         "and column-mean profiles; 0.0 when either is flat (lumpy vs. streaky)."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return safe_corr(img.mean(axis=1), img.mean(axis=0), flat_policy="zero")
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return safe_corr(image.mean(axis=1), image.mean(axis=0), flat_policy="zero")

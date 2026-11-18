@@ -11,5 +11,5 @@ class MeanGradientMagnitude(Feature):
     name = "mean_gradient_magnitude"
     definition = "Overall roughness: mean magnitude of the image gradient."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return float(gradient_magnitude(img).mean())
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return float(gradient_magnitude(image).mean())

@@ -22,8 +22,8 @@ class BluishFraction(Feature):
     )
     needs_colour = True
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        channels = colour_channels(img)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        channels = colour_channels(image)
         if channels is None:
             return 0.0
         red, _, blue = channels

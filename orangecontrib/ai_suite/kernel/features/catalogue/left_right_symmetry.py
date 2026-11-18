@@ -17,5 +17,5 @@ class LeftRightSymmetry(Feature):
     name = "left_right_symmetry"
     definition = "Bilateral symmetry: correlation of the left half with the mirrored right half."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return mirror_corr(img, axis=1)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return mirror_corr(image, axis=1)

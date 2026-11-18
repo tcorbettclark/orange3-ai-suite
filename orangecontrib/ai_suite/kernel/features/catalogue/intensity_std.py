@@ -10,5 +10,5 @@ class IntensityStd(Feature):
     name = "intensity_std"
     definition = "Contrast: standard deviation of pixel intensity."
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return float(img.std())
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return float(image.std())

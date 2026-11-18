@@ -1,8 +1,8 @@
 """No two features may be the same number.
 
-Group modules are reviewed one family at a time, which is exactly the seam where
-duplicates hide: group B once recomputed group C's centre of mass from its own
-profiles and the two columns differed only by float32 summation noise.
+Features are reviewed one at a time, which is exactly the seam where duplicates
+hide: a group B feature once recomputed a group C feature's centre of mass from
+its own profiles, and the two columns differed only by float32 summation noise.
 
 The probes below are deliberately varied (clouds, a digit, a ring, a bar, bands,
 a gradient) so features that are honestly distinct must disagree somewhere. A

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator, Mapping
 
 import numpy as np
 
@@ -13,25 +13,31 @@ from .options import FeatureOptions
 from .preprocessing import preprocess, preprocess_colour
 
 
-class FeatureVector:
-    """Result of feature extraction: an ordered name -> value mapping.
+class FeatureVector(Mapping[str, float]):
+    """Result of feature extraction: a name -> value mapping in column order.
 
-    Behaves like a read-only dict (``vec["hole_count"]``, ``vec.keys()``,
-    ``vec.items()``) and can produce the plain float array used for one Table
-    row. Feature metadata (group, definition sentence) lives in the catalogue:
-    ``get_feature(name)``.
+    A read-only :class:`~collections.abc.Mapping`, so ``vec["hole_count"]``,
+    ``vec.keys()``, ``vec.items()``, ``vec.get`` and equality against a plain
+    dict all behave as expected. Values are held in catalogue column order
+    whatever order they were supplied in, so :meth:`names` and
+    :meth:`to_array` cannot disagree.
+
+    Feature metadata (definition sentence, count flag) lives in the catalogue:
+    ``get_feature(name)``. Group views are delegated to :mod:`groups`.
     """
 
-    def __init__(self, values: dict[str, float]):
-        self._values = dict(values)
+    def __init__(self, values: Mapping[str, float]):
+        unknown = sorted(name for name in values if not is_known(name))
+        if unknown:
+            raise ValueError(f"unknown feature names: {unknown}")
+        self._values = {
+            name: float(values[name]) for name in sorted(values, key=POSITION.__getitem__)
+        }
 
     def __getitem__(self, name: str) -> float:
         return self._values[name]
 
-    def __contains__(self, name: str) -> bool:
-        return name in self._values
-
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._values)
 
     def __len__(self) -> int:
@@ -40,25 +46,13 @@ class FeatureVector:
     def __repr__(self) -> str:  # pragma: no cover - cosmetic
         return f"FeatureVector({len(self._values)} features)"
 
-    def keys(self):
-        return self._values.keys()
-
-    def values(self):
-        return self._values.values()
-
-    def items(self):
-        return self._values.items()
-
-    def get(self, name: str, default: float | None = None) -> float | None:
-        return self._values.get(name, default)
-
     def names(self) -> tuple[str, ...]:
+        """Feature names in catalogue column order."""
         return tuple(self._values)
 
     def to_array(self) -> np.ndarray:
-        """Values in stable column order."""
-        ordered = sorted(self._values, key=POSITION.__getitem__)
-        return np.asarray([self._values[name] for name in ordered], dtype=np.float64)
+        """Values in catalogue column order, as one Table row."""
+        return np.asarray(list(self._values.values()), dtype=np.float64)
 
     def group_of(self, name: str) -> str:
         """Group letter the named feature is reported under."""
@@ -80,21 +74,21 @@ def extract_features(
     Parameters
     ----------
     image:
-        RGB(A) or grayscale array; channel order is RGB (convert OpenCV's BGR
-        before calling).
+        RGB(A) or grayscale array in [0, 1] or [0, 255]; channel order is RGB
+        (convert OpenCV's BGR before calling).
     options:
         :class:`FeatureOptions`; defaults applied when None.
     groups:
-        None (all default groups, ``"ABCDEF"``) or a subset string such as
-        ``"AD"``. The colour shortcut group G is opt-in only.
+        None (the default groups, see :mod:`groups`) or a subset string such
+        as ``"AD"``. The colour shortcut group is opt-in only.
     exclude:
-        None, or an iterable of feature names to drop - per-feature switching
-        on top of group selection.
+        None, a single feature name, or an iterable of names to drop -
+        per-feature switching on top of group selection.
     """
-    opts = options or FeatureOptions()
+    options = options or FeatureOptions()
     selected = selection(groups)
 
-    excluded = frozenset(exclude or ())
+    excluded = frozenset((exclude,) if isinstance(exclude, str) else exclude or ())
     unknown_features = sorted(name for name in excluded if not is_known(name))
     if unknown_features:
         raise ValueError(f"unknown feature names to exclude: {unknown_features}")
@@ -106,11 +100,11 @@ def extract_features(
     # The pipeline is a property of the feature, not of the group it sits in.
     needs_colour = any(feature.needs_colour for feature in features)
     needs_luminance = any(not feature.needs_colour for feature in features)
-    luminance = preprocess(image, opts) if needs_luminance else None
-    colour = preprocess_colour(image, opts) if needs_colour else None
+    luminance = preprocess(image, options) if needs_luminance else None
+    colour = preprocess_colour(image, options) if needs_colour else None
 
     values = {
-        feature.name: feature.compute(colour if feature.needs_colour else luminance, opts)
+        feature.name: feature.compute(colour if feature.needs_colour else luminance, options)
         for feature in features
     }
     return FeatureVector(values)

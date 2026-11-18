@@ -6,12 +6,13 @@ features read their input from is part of the feature (``needs_colour``), not
 of any grouping.
 
 Feature groups are membership lists, not a structure: :mod:`groups` holds them
-over the catalogue in the table below, so the same feature can belong to
-several groups and a group is only ever a selection for ablation or display.
+over the catalogue, so the same feature can belong to several groups and a
+group is only ever a selection for ablation or display.
 
 Use :func:`extract_features` for values, :func:`all_features` /
-:func:`get_feature` for the catalogue in column order, and :func:`all_groups` /
-:func:`get_group` for the group letters and their titles.
+:func:`get_feature` for the catalogue in column order, :func:`all_groups` /
+:func:`get_group` for the group letters and their titles, and
+:func:`selection` to resolve a group string to feature names.
 
 Preprocessing (:mod:`preprocessing`) is internal: a feature reads its image
 through :func:`extract_features`, which applies the one pipeline the whole
@@ -28,6 +29,8 @@ from .groups import (
     all_groups,
     features_of_group,
     get_group,
+    group_of,
+    selection,
 )
 from .options import FeatureOptions
 
@@ -46,4 +49,6 @@ __all__ = [
     "features_of_group",
     "get_feature",
     "get_group",
+    "group_of",
+    "selection",
 ]

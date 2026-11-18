@@ -7,6 +7,7 @@ absolute threshold would silently encode the dataset's lighting.
 
 import numpy as np
 
+from .._imaging import percentile_span
 from ..feature import Feature
 from ..options import FeatureOptions
 
@@ -18,7 +19,6 @@ class BrightFraction(Feature):
         "robust_contrast/2 — adaptive 'how much bright stuff'."
     )
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        p10, p90 = np.percentile(img, 10), np.percentile(img, 90)
-        threshold = float(np.median(img)) + float(p90 - p10) / 2.0
-        return float((img > threshold).mean())
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        threshold = float(np.median(image)) + percentile_span(image) / 2.0
+        return float((image > threshold).mean())

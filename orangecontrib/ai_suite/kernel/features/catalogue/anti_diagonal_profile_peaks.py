@@ -19,5 +19,5 @@ class AntiDiagonalProfilePeaks(Feature):
     )
     is_count = True
 
-    def compute(self, img: np.ndarray, opts: FeatureOptions) -> float:
-        return peak_count(diagonal_profile(img, anti=True), opts)
+    def compute(self, image: np.ndarray, options: FeatureOptions) -> float:
+        return peak_count(diagonal_profile(image, anti=True), options)
