@@ -10,10 +10,11 @@ from .catalogue import ASSETS
 from .hf import AssetError, cached_path, ensure
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument(
         "--cache",
+        metavar="DIR",
         help=(
             "cache root (default: the Hugging Face hub cache for models, "
             "the datasets cache for prepared datasets)"
@@ -22,20 +23,34 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="orange-ai-assets",
         description="Download and cache the suite's Hugging Face models and datasets.",
+        epilog="""examples:
+  orange-ai-assets list
+  orange-ai-assets fetch mnist-digits
+  orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx --cache ./hf-cache""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    commands = parser.add_subparsers(dest="command", required=True, metavar="{fetch,list}")
+    commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
     fetch = commands.add_parser(
         "fetch",
         parents=[common],
         help="download or reuse one asset and print its local path",
     )
-    fetch.add_argument("asset", choices=tuple(ASSETS), help="asset to fetch (run 'list' for names)")
+    fetch.add_argument(
+        "asset",
+        metavar="ASSET",
+        choices=tuple(ASSETS),
+        help=f"asset to fetch: {', '.join(ASSETS)}",
+    )
     commands.add_parser(
         "list",
         parents=[common],
         help="list assets with size and cache status",
     )
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
     cache = Path(args.cache) if args.cache else None
 
     if args.command == "list":
