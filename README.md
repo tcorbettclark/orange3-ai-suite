@@ -467,7 +467,11 @@ and the prepared tree are cached; repeated calls are offline.
   paths. The Import Images paths inside are machine-local; re-point the File
   widget if the cache moved.
 
+`orange-ai-assets list` shows each asset's type, size, cache status and repo;
+`fetch` is idempotent and prints the usable path.
+
 ```bash
+orange-ai-assets list
 orange-ai-assets fetch mnist-digits
 orange-ai-assets fetch ccsn-clouds
 orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx

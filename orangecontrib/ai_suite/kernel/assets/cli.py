@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .catalogue import ASSETS, BRITLLM_4BIT
-from .hf import AssetError, ensure
+from .hf import AssetError, cached_path, ensure
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,17 +22,19 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+    cache = Path(args.cache) if args.cache else None
 
     if args.command == "list":
+        print(f"{'name':32} {'type':8} {'size':>8}  {'cache':7}  repo")
         for asset in ASSETS.values():
             size = f"{asset.size_bytes / 1e9:.2f} GB" if asset.size_bytes else "?"
-            print(f"{asset.name}\t{asset.repo_type}\t{size}\t{asset.repo_id}")
+            status = "cached" if cached_path(asset, cache) is not None else "missing"
+            print(f"{asset.name:32} {asset.repo_type:8} {size:>8}  {status:7}  {asset.repo_id}")
         return 0
     asset = ASSETS.get(args.asset)
     if asset is None:
         parser.error(f"unknown asset {args.asset!r}; choose from {', '.join(ASSETS)}")
 
-    cache = Path(args.cache) if args.cache else None
     last = [-1]
 
     def report(done: int, total: int) -> None:

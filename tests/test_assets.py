@@ -256,3 +256,12 @@ def test_asset_getters_delegate_to_ensure(monkeypatch, tmp_path):
         mnist.MNIST_DIGITS.name,
         clouds.CCSN_CLOUDS.name,
     ]
+
+
+def test_cli_list_reports_cache_status(tmp_path, capsys):
+    from orangecontrib.ai_suite.kernel.assets.cli import main
+
+    assert main(["list", "--cache", str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert "cache" in output
+    assert output.count("missing") == 3
