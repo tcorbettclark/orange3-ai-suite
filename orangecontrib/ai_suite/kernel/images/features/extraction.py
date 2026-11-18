@@ -51,7 +51,7 @@ class FeatureVector(Mapping[str, float]):
         return tuple(self._values)
 
     def to_array(self) -> np.ndarray:
-        """Values in catalogue column order, as one Table row."""
+        """Values in catalogue column order, as one flat array."""
         return np.asarray(list(self._values.values()), dtype=np.float64)
 
     def group_of(self, name: str) -> str:

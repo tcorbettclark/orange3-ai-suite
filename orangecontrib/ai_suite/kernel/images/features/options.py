@@ -67,8 +67,7 @@ class FeatureOptions:
                 raise ValueError(f"{flag} must be a bool, got {getattr(self, flag)!r}")
         if self.denoise_ksize not in _MEDIAN_KERNELS:
             raise ValueError(
-                f"denoise_ksize must be one of {_MEDIAN_KERNELS} "
-                f"(odd median-filter kernels), got {self.denoise_ksize!r}"
+                f"denoise_ksize must be one of {_MEDIAN_KERNELS}, got {self.denoise_ksize!r}"
             )
         for name in ("peak_prominence_frac", "edge_density_frac"):
             value = getattr(self, name)

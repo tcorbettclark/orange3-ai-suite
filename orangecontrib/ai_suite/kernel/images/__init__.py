@@ -1,14 +1,18 @@
-"""Image data: how it is decoded, and what can be measured from it.
+"""Image data: what the caller handed us, and what can be measured from it.
 
-Three parts, each with a reason to change of its own:
+Four parts, each with a reason to change of its own:
 
 - :mod:`decode` - what the caller handed us: alpha, channel order, value
   range. Parameterless, and it refuses a range it cannot interpret.
-- :mod:`pixel_values` - the plain baseline: an image becomes a small grid of
-  luminance values. It is not a catalogue feature.
-- ``features`` - the described, catalogued measurements and the pipeline they
-  are defined against.
+- :mod:`resize` - resampling to a fixed square, one policy per axis: area
+  averaging when an axis shrinks, bilinear when it grows.
+- :mod:`flatten` - a 2-D grid as one row, with a coordinate name per cell:
+  the columns of a pixel-values table.
+- ``features`` - the described, catalogued measurements and the pipeline
+  they are defined against.
 
-The sharing is deliberate and only at this level: ``features`` and ``pixel_values``
-both decode through :mod:`decode`, and neither reaches into the other.
+The sharing is deliberate and only at this level: ``features`` decodes and
+resizes through :mod:`decode` and :mod:`resize`; the widget that composes the
+plain pixel-values pipeline does the calling, because the kernel builds no
+tables.
 """

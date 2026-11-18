@@ -116,7 +116,12 @@ def local_std_mean(image: np.ndarray) -> float:
 
 
 def block_mean_variance(image: np.ndarray) -> float:
-    """Variance of 16x16 block means (INTER_AREA downsampling)."""
+    """Variance of 16x16 block means (INTER_AREA downsampling).
+
+    This is coarse block averaging, its own decision for the coarse-texture
+    feature - not :mod:`images.resize`'s shrink/grow policy, which it sits
+    outside deliberately.
+    """
     h, w = image.shape
     out_h, out_w = max(h // COARSE_BLOCK, 1), max(w // COARSE_BLOCK, 1)
     blocks = cv2.resize(image, (out_w, out_h), interpolation=cv2.INTER_AREA)
@@ -163,8 +168,9 @@ def mirror_corr(image: np.ndarray, axis: int) -> float:
 def colour_channels(image: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """(r, g, b) float64 planes, or None for grayscale input.
 
-    Grayscale has no colour by definition, so colour features return 0.0 for
-    it; the rule is stated once here rather than four times.
+    Grayscale has no colour by definition, so the colour features return 0.0
+    for it; the code rule lives here, and each feature's document names its
+    own consequence.
     """
     if image.ndim == 2:
         return None

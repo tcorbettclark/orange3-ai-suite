@@ -1,8 +1,9 @@
 """Where kernel code lives, and which modules are support code.
 
-The kernel is organised by domain; ``images`` is the image domain, and inside it
-the two consumers (``features`` and ``pixels``) share only decoding. A leading
-underscore marks support code that nothing outside ``images`` may import.
+The kernel is organised by domain; ``images`` is the image domain, holding the
+image pipeline (``decode``, ``resize``, ``flatten``) and the ``features`` package
+built on it. A leading underscore marks support code that nothing outside
+``images`` may import.
 """
 
 import ast

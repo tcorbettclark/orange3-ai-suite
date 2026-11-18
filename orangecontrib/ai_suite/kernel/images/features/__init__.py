@@ -1,9 +1,9 @@
 """Interpretable image features, one class per feature.
 
 Every feature is a class in :mod:`catalogue` carrying its own name, description
-and computation, and every value is a human-auditable sentence. Where the
-features read their input from is part of the feature (``needs_colour``), not
-of any grouping.
+and computation, and every feature's meaning is a human-auditable description.
+Where the features read their input from is part of the feature
+(``needs_colour``), not of any grouping.
 
 Feature groups are membership lists, not a structure: :mod:`groups` holds them
 over the catalogue, so the same feature can belong to several groups and a
