@@ -98,9 +98,15 @@ Selecting an image does not change the extracted features.
 
 The **Feature values** panel on the right lists the selected image's features,
 grouped A-G. Groups that are switched off stay visible but greyed out. Click a
-feature to read its definition and see a histogram across the data, split by
+feature to read its description and see a histogram across the data, split by
 class, with a red line at the selected image's value. This is the quickest way
 to see whether a feature separates the labels before trusting it in a model.
+
+Each feature comes with a title, a one-sentence summary, a plain-language
+account of which photographs it responds to and which leave it cold, and a
+technical note with links for further reading. The selected feature's title,
+summary and plain-language account sit under the tree; **Technical details…**
+opens the mechanics, and **Feature guide…** opens all 38 features as one page.
 
 If you prefer a standard table, connect **Features** to a **Data Table**'s
 *Data* input and **Selected image** to its *Data Subset* input. The table then

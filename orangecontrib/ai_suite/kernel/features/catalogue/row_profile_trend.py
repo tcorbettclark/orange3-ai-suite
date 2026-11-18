@@ -1,21 +1,34 @@
-"""Net intensity change down the image, from the dense row-mean profile.
-
-The slope is scaled by the profile length, so the value is a change in
-intensity units rather than a per-row rate that shrinks as images grow.
-"""
-
 import numpy as np
 
 from .._conventions import scaled_slope
+from ..description import Description
 from ..feature import Feature
 from ..options import FeatureOptions
 
 
 class RowProfileTrend(Feature):
     name = "row_profile_trend"
-    definition = (
-        "Net intensity change from image top to bottom (linear fit of the "
-        "row-mean profile scaled by its length); positive = brighter at the bottom."
+    description = Description(
+        title="Top-to-bottom trend",
+        summary="Net change in brightness from the top of the image to the bottom.",
+        intuition=(
+            "Whether the picture gets brighter or darker as you look down. A sunset with a "
+            "bright horizon over dark ground scores positive; a bright ceiling above a dark "
+            "floor scores negative. A scene that looks much the same all the way down scores "
+            "near zero. It only sees the average of each row, so left-right detail does not "
+            "matter."
+        ),
+        technical=(
+            "The row-mean brightness profile is fitted with a least-squares line and the "
+            "slope is multiplied by the number of rows. The result is the net change in "
+            "intensity units across the frame (roughly [-1, 1] after normalisation), not a "
+            "per-row rate. Positive means brighter at the bottom. The transpose of "
+            "`column_profile_trend`."
+        ),
+        references=(
+            "[Simple linear regression](https://en.wikipedia.org/wiki/Simple_linear_regression)",
+            "[NumPy polyfit](https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html)",
+        ),
     )
 
     def compute(self, image: np.ndarray, options: FeatureOptions) -> float:

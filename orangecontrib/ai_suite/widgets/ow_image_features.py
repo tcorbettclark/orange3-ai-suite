@@ -21,6 +21,7 @@ from AnyQt.QtCore import QSignalBlocker, QSize, Qt, QThread, pyqtSignal
 from AnyQt.QtGui import QBrush, QColor, QIcon, QImage, QImageReader, QIntValidator, QPixmap
 from AnyQt.QtWidgets import (
     QCheckBox,
+    QDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -28,9 +29,12 @@ from AnyQt.QtWidgets import (
     QListView,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QSplitter,
+    QTextBrowser,
     QTreeWidget,
     QTreeWidgetItem,
+    QVBoxLayout,
 )
 from Orange.data import ContinuousVariable, Domain, Table
 from Orange.widgets import gui
@@ -349,6 +353,9 @@ class OWImageFeatures(OWWidget):
             check.toggled.connect(self._sync_group_settings)
             group_box.layout().addWidget(check)
             self._group_checks[letter] = check
+        self._guide_button = QPushButton("Feature guide…", group_box)
+        self._guide_button.clicked.connect(self._show_feature_guide)
+        group_box.layout().addWidget(self._guide_button)
 
         self.controlArea.layout().addStretch(1)
         self.commit.now = self._apply
@@ -460,18 +467,35 @@ class OWImageFeatures(OWWidget):
             self._feature_tree.addTopLevelItem(group_item)
             self._feature_groups[letter] = group_item
             for feature in features.features_of_group(letter):
-                item = QTreeWidgetItem([feature.name, "—"])
+                item = QTreeWidgetItem([feature.description.title, "—"])
                 item.setData(0, Qt.UserRole, feature.name)
-                item.setToolTip(0, feature.definition)
-                item.setToolTip(1, feature.definition)
+                tooltip = f"{feature.description.summary}\n\ncolumn: {feature.name}"
+                item.setToolTip(0, tooltip)
+                item.setToolTip(1, tooltip)
                 group_item.addChild(item)
                 self._feature_items[feature.name] = item
             group_item.setExpanded(True)
 
-        self._feature_definition = QLabel("")
-        self._feature_definition.setWordWrap(True)
-        self._feature_definition.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        panel.layout().addWidget(self._feature_definition)
+        self._feature_title = QLabel("")
+        title_font = self._feature_title.font()
+        title_font.setBold(True)
+        self._feature_title.setFont(title_font)
+        self._feature_title.setWordWrap(True)
+        panel.layout().addWidget(self._feature_title)
+
+        self._feature_summary = QLabel("")
+        self._feature_summary.setWordWrap(True)
+        self._feature_summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        panel.layout().addWidget(self._feature_summary)
+
+        self._feature_intuition = QLabel("")
+        self._feature_intuition.setWordWrap(True)
+        self._feature_intuition.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        panel.layout().addWidget(self._feature_intuition)
+
+        self._feature_details_button = QPushButton("Technical details…", panel)
+        self._feature_details_button.clicked.connect(self._show_feature_details)
+        panel.layout().addWidget(self._feature_details_button)
 
         self._histogram_caption = QLabel("")
         self._histogram_caption.setWordWrap(True)
@@ -599,12 +623,53 @@ class OWImageFeatures(OWWidget):
     def _update_feature_details(self):
         name = self._selected_feature
         if name is None:
-            self._feature_definition.setText("")
+            self._feature_title.setText("")
+            self._feature_summary.setText("")
+            self._feature_intuition.setText("")
+            self._feature_details_button.setEnabled(False)
             self._histogram_caption.setText("")
             self._clear_histogram()
             return
-        self._feature_definition.setText(features.get_feature(name).definition)
+        description = features.get_feature(name).description
+        self._feature_title.setText(description.title)
+        self._feature_summary.setText(description.summary)
+        self._feature_intuition.setText(description.intuition)
+        self._feature_details_button.setEnabled(True)
         self._update_histogram(name)
+
+    def _show_feature_details(self):
+        name = self._selected_feature
+        if name is None:
+            return
+        feature = features.get_feature(name)
+        description = feature.description
+        sections = [
+            f"## {description.title}",
+            "",
+            f"`{feature.name}`",
+            "",
+            description.summary,
+            "",
+            f"**How it is computed.** {description.technical}",
+        ]
+        if description.references:
+            sections += ["", "**Further reading**", ""]
+            sections += [f"- {reference}" for reference in description.references]
+        self._show_markdown(f"{description.title} — technical details", "\n".join(sections))
+
+    def _show_feature_guide(self):
+        self._show_markdown("Image features", features.feature_guide_markdown())
+
+    def _show_markdown(self, title: str, markdown: str):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(760, 640)
+        browser = QTextBrowser(dialog)
+        browser.setOpenExternalLinks(True)
+        browser.setMarkdown(markdown)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(browser)
+        dialog.exec()
 
     def _clear_histogram(self):
         plot = self._histogram.getPlotItem()

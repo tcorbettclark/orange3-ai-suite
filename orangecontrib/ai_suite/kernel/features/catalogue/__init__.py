@@ -52,9 +52,9 @@ from .intensity_std import IntensityStd
 from .kurtosis import Kurtosis
 from .left_right_symmetry import LeftRightSymmetry
 from .mean_blueness import MeanBlueness
+from .mean_chroma import MeanChroma
 from .mean_gradient_magnitude import MeanGradientMagnitude
 from .mean_intensity import MeanIntensity
-from .mean_saturation import MeanSaturation
 from .profile_median_crossing_count import ProfileMedianCrossingCount
 from .profile_row_column_correlation import ProfileRowColumnCorrelation
 from .quadrant_self_similarity import QuadrantSelfSimilarity
@@ -105,23 +105,30 @@ _CATALOGUE: tuple[Feature, ...] = (
     QuadrantSelfSimilarity(),
     BluishFraction(),
     MeanBlueness(),
-    MeanSaturation(),
+    MeanChroma(),
     GreeneryFraction(),
 )
 
 
 def _build(measures: Iterable[Feature]) -> dict[str, Feature]:
     table: dict[str, Feature] = {}
-    definitions: dict[str, str] = {}
+    summaries: dict[str, str] = {}
+    titles: dict[str, str] = {}
     problems: list[str] = []
     for feature in measures:
         if feature.name in table:
             problems.append(f"duplicate feature name {feature.name!r}")
-        if feature.definition in definitions:
+        if feature.description.summary in summaries:
             problems.append(
-                f"{feature.name!r} repeats the definition of {definitions[feature.definition]!r}"
+                f"{feature.name!r} repeats the summary of "
+                f"{summaries[feature.description.summary]!r}"
             )
-        definitions[feature.definition] = feature.name
+        if feature.description.title in titles:
+            problems.append(
+                f"{feature.name!r} repeats the title of {titles[feature.description.title]!r}"
+            )
+        summaries[feature.description.summary] = feature.name
+        titles[feature.description.title] = feature.name
         table[feature.name] = feature
     if problems:
         raise RuntimeError("; ".join(problems))

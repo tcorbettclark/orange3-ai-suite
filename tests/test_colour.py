@@ -44,8 +44,9 @@ def test_bluish_fraction_separates_sky_from_ground():
 
 
 def test_shortcuts_are_documented():
-    definition = get_feature("bluish_fraction").definition.lower()
-    assert "shortcut" in definition  # the lesson is part of the data
+    description = get_feature("bluish_fraction").description
+    text = " ".join((description.summary, description.intuition, description.technical)).lower()
+    assert "shortcut" in text  # the lesson is part of the data
 
 
 def test_grayscale_input_gives_zeros():

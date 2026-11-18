@@ -211,6 +211,34 @@ def test_cache_reuses_features_for_groups_and_preprocessing(
     assert calls[5:] == ["ABCDEFG"] * 5
 
 
+def test_description_is_surfaced_for_the_selected_feature(qapp, capture, images_table):
+    from orangecontrib.ai_suite.kernel import features
+
+    w = OWImageFeatures()
+    w.show()
+    capture(w.Outputs.features)
+    w.set_data(images_table)
+    w.commit.now()
+    w.wait_for_extraction()
+
+    item = w._feature_items["hole_count"]
+    description = features.get_feature("hole_count").description
+    assert item.text(0) == description.title  # the tree names the feature for a person
+    assert description.summary in item.toolTip(0)
+    w._feature_tree.setCurrentItem(item)
+    assert w._feature_title.text() == description.title
+    assert w._feature_summary.text() == description.summary
+    assert w._feature_intuition.text() == description.intuition
+
+    seen = {}
+    w._show_markdown = lambda title, markdown: seen.update(title=title, markdown=markdown)
+    w._show_feature_details()
+    assert "How it is computed" in seen["markdown"]
+    assert description.technical in seen["markdown"]
+    w._show_feature_guide()
+    assert seen["markdown"].startswith("# Image features")
+
+
 def test_working_size_line_edit_applies_on_enter(qapp, capture, images_table):
     from AnyQt.QtWidgets import QLineEdit
 

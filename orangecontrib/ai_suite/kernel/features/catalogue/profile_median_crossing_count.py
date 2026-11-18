@@ -1,16 +1,8 @@
-"""Level crossings, with the level taken from each line itself.
-
-The threshold is each row's and column's own median, so the count is
-parameter-free: no absolute level to calibrate, no sensitivity knob. Rows and
-columns are counted separately and averaged, because a vertical bar crosses
-every row once but leaves the columns flat.
-
-This is the slowest feature in the suite (it loops over 2 * size lines, each in
-numpy), and the obvious target if extraction ever needs to be faster.
-"""
+"""The slowest feature in the suite; the first target if extraction needs speed."""
 
 import numpy as np
 
+from ..description import Description
 from ..feature import Feature
 from ..options import FeatureOptions
 
@@ -22,9 +14,23 @@ def _upcrossings(line: np.ndarray) -> float:
 
 class ProfileMedianCrossingCount(Feature):
     name = "profile_median_crossing_count"
-    definition = (
-        "How often pixel lines cross their own median level — parameter-free "
-        "cousin of peak counting (median over rows and columns, averaged)."
+    description = Description(
+        title="Median crossings",
+        summary="Median number of times a row or column crosses its own median brightness.",
+        intuition=(
+            "Imagine scanning along each row and each column and counting how often you move "
+            "from the darker half to the brighter half. Vertical stripes crossed left to "
+            "right give several; a smooth sky gives none. Because the level is each line's "
+            "own middle value, dim and bright pictures are counted the same way, with nothing "
+            "to tune."
+        ),
+        technical=(
+            "For each row, then each column, the line's own median is found and the number of "
+            "upward crossings counted; the median over lines is taken, and rows and columns "
+            "are averaged. Real-valued because it averages over lines. The level is per line, "
+            "unlike `stroke_crossing_count`, which uses one global level and rows "
+            "only."
+        ),
     )
 
     def compute(self, image: np.ndarray, options: FeatureOptions) -> float:

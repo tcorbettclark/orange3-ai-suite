@@ -1,24 +1,34 @@
-"""Typical feature size: the lag at which the image stops resembling itself.
-
-The 2-D autocorrelation is FFT-based on the mean-subtracted image, normalised
-by its central value (the variance), then radially averaged. The returned lag
-is the first radius where that profile drops below 0.5, linearly interpolated;
-if it never drops, the maximum radius is returned. A flat image has no
-structure and returns 0.0.
-"""
-
 import numpy as np
 
 from .._conventions import is_flat
+from ..description import Description
 from ..feature import Feature
 from ..options import FeatureOptions
 
 
 class AutocorrelationHalfWidth(Feature):
     name = "autocorrelation_half_width"
-    definition = (
-        "Typical feature size in pixels: first lag where the normalised "
-        "autocorrelation drops below 0.5."
+    description = Description(
+        title="Feature size",
+        summary="The lag, in pixels, at which the image stops resembling itself.",
+        intuition=(
+            "Squint and slide the photo across itself: how far can you move it before it "
+            "stops matching? A broad cloud or a wide stripe stays matched for tens of pixels, "
+            "so this scores high; fine grass or gravel loses the match after two or three, so "
+            "it scores low. It is a typical size of the pattern, not the size of any "
+            "particular object."
+        ),
+        technical=(
+            "The 2-D autocorrelation is computed from the FFT of the mean-subtracted image, "
+            "normalised by its lag-zero value and averaged over rounded radii. The reported "
+            "lag is the first radius where that profile falls below 0.5, linearly "
+            "interpolated between samples; if it never falls, the maximum radius is returned. "
+            "A flat image returns 0.0. Pixels, so it scales with working size."
+        ),
+        references=(
+            "[Autocorrelation](https://en.wikipedia.org/wiki/Autocorrelation)",
+            "[NumPy FFT](https://numpy.org/doc/stable/reference/generated/numpy.fft.fft2.html)",
+        ),
     )
 
     def compute(self, image: np.ndarray, options: FeatureOptions) -> float:

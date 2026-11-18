@@ -116,7 +116,7 @@ _GROUPS: tuple[Group, ...] = (
         "Colour: bluish fraction, blueness, saturation and greenery. A "
         "deliberate shortcut, off by default: colour alone can answer 'is "
         "there sky?' without learning any spatial structure.",
-        ("bluish_fraction", "mean_blueness", "mean_saturation", "greenery_fraction"),
+        ("bluish_fraction", "mean_blueness", "mean_chroma", "greenery_fraction"),
     ),
 )
 

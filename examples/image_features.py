@@ -7,7 +7,7 @@ Run it from the repository root:
 The path, and the lines where the parts meet:
 
     image (RGB) ──extract_features──> FeatureVector     # one number per feature
-    catalogue ──────────────────────> 38 feature classes, each with a definition
+    catalogue ──────────────────────> 38 feature classes, each with a description
     groups ─────────────────────────> membership lists, for ablation and display
 
 The three photographs are real skies from the WMO International Cloud Atlas,
@@ -50,10 +50,10 @@ print(f"catalogue   {len(all_feature_names())} features in {len(all_groups())} g
 for group in all_groups():
     print(f"  {group.letter}  {len(group.members):2d}  {group.title}")
 
-print("\n  every feature is a class, and its definition is the documentation:")
+print("\n  every feature is a class, and its description is the documentation:")
 for name in ("hole_count", "edge_density", "bluish_fraction"):
     print(f"  {name}")
-    print(f"      {get_feature(name).definition}")
+    print(f"      {get_feature(name).description.summary}")
 print(f"\n  count features: {', '.join(all_count_feature_names())}")
 
 # 2. Extraction returns a FeatureVector: name -> value, plus by-group views.
@@ -116,4 +116,4 @@ sky = extract_features(CIRRUS, groups="G")
 ground = extract_features(OVER_GROUND, groups="G")
 for name in sky.names():
     print(f"  {name:18s} sky {sky[name]:6.3f}   ground {ground[name]:6.3f}")
-print(f"  -> {get_feature('bluish_fraction').definition}")
+print(f"  -> {get_feature('bluish_fraction').description.summary}")

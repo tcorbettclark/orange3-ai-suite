@@ -1,22 +1,32 @@
-"""Do the four quadrants look like each other?
-
-The mean of the six pairwise inter-quadrant correlations: high for uniform
-structure spread everywhere, low for one localised object. An odd size means
-the four quadrants would differ by a pixel, so the last row or column is
-dropped - the same rule :func:`._imaging.mirror_corr` uses for half symmetry.
-"""
-
 import numpy as np
 
 from .._conventions import safe_corr
+from ..description import Description
 from ..feature import Feature
 from ..options import FeatureOptions
 
 
 class QuadrantSelfSimilarity(Feature):
     name = "quadrant_self_similarity"
-    definition = (
-        "Uniform vs. localised structure: mean of the six pairwise inter-quadrant correlations."
+    description = Description(
+        title="Quadrant similarity",
+        summary="Mean correlation among the six pairs of image quadrants.",
+        intuition=(
+            "Do the four corners of the picture look like each other? Foliage, gravel or a "
+            "wall filling the frame scores high, because every corner is much like the next. "
+            "A portrait, where one corner holds the subject and the rest holds background, "
+            "scores low. A single object with an even surround lands somewhere in between."
+        ),
+        technical=(
+            "The image is split into four quadrants and the six pairwise Pearson coefficients "
+            "are averaged. An odd row or column is dropped rather than resampled, consistent "
+            "with `left_right_symmetry`. Constant quadrants follow the same flat rule "
+            "as the mirror features. High for texture that is uniform across the frame, low "
+            "for one localised object."
+        ),
+        references=(
+            "[Pearson correlation coefficient](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient)",
+        ),
     )
 
     def compute(self, image: np.ndarray, options: FeatureOptions) -> float:

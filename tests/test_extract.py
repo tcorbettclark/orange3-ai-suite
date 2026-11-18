@@ -34,17 +34,19 @@ def test_catalogue_structure():
         assert len(features_of_group(letter)) == size, letter
     names = all_feature_names()
     assert len(set(names)) == TOTAL  # unique names
-    assert len(set(definitions_defined(names))) == TOTAL
+    assert len(set(summaries_defined(names))) == TOTAL
 
 
-def definitions_defined(names):
-    return [get_feature(n).definition for n in names]
+def summaries_defined(names):
+    return [get_feature(n).description.summary for n in names]
 
 
-def test_definitions_are_non_empty_sentences():
+def test_descriptions_are_complete():
     for feature in all_features():
-        d = feature.definition
-        assert isinstance(d, str) and len(d) >= 20 and d[0].isupper(), feature.name
+        description = feature.description
+        assert description.title and description.summary
+        assert len(description.intuition) >= 60
+        assert len(description.technical) >= 40
 
 
 def test_group_members_match_features_of_group():

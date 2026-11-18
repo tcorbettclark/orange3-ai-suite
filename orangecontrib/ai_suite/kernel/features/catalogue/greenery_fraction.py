@@ -1,22 +1,29 @@
-"""Ground clutter: how much of the frame is greener than red or blue.
-
-Terrain, trees and grass in the lower half of a sky photo. The complement of
-``bluish_fraction`` in practice, which is why the pair separates "sky" from
-"not sky" so cheaply - and why both are excluded from the default selection.
-"""
-
 import numpy as np
 
 from .._imaging import colour_channels
+from ..description import Description
 from ..feature import Feature
 from ..options import FeatureOptions
 
 
 class GreeneryFraction(Feature):
     name = "greenery_fraction"
-    definition = (
-        "Ground-clutter detector: fraction of pixels greener than both red "
-        "and blue (grass, trees, terrain)."
+    description = Description(
+        title="Green share",
+        summary="Fraction of pixels where green exceeds both red and blue.",
+        intuition=(
+            "How much of the frame is vegetation. Grass, trees, lawns and fields score high; "
+            "sky, water, pavement and sand score low. It is the opposite of the bluish share "
+            "in practice, so the pair separates a green landscape from a blue sky almost for "
+            "free - and that is exactly the shortcut the colour features are there to "
+            "demonstrate."
+        ),
+        technical=(
+            "Fraction of pixels with G > R and G > B in the absolute colour image. A strict "
+            "two-way test with no margin, unlike the 0.04 offset in "
+            "`bluish_fraction`. Grayscale input returns 0.0. The fourth deliberately "
+            "naive colour feature, off by default with the rest of the group."
+        ),
     )
     needs_colour = True
 

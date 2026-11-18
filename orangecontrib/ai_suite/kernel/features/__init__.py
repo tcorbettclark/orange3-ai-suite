@@ -9,7 +9,8 @@ Feature groups are membership lists, not a structure: :mod:`groups` holds them
 over the catalogue, so the same feature can belong to several groups and a
 group is only ever a selection for ablation or display.
 
-Use :func:`extract_features` for values, :func:`all_features` /
+Use :func:`feature_guide_markdown` for the whole guide as one page,
+:func:`extract_features` for values, :func:`all_features` /
 :func:`get_feature` for the catalogue in column order, :func:`all_groups` /
 :func:`get_group` for the group letters and their titles, and
 :func:`selection` to resolve a group string to feature names.
@@ -20,6 +21,7 @@ catalogue is defined against.
 """
 
 from .catalogue import all_count_feature_names, all_feature_names, all_features, get_feature
+from .description import Description
 from .extraction import FeatureVector, extract_features
 from .feature import Feature
 from .groups import (
@@ -32,11 +34,13 @@ from .groups import (
     group_of,
     selection,
 )
+from .guide import feature_guide_markdown
 from .options import FeatureOptions
 
 __all__ = [
     "DEFAULT_GROUPS",
     "GROUP_ORDER",
+    "Description",
     "Feature",
     "FeatureOptions",
     "FeatureVector",
@@ -46,6 +50,7 @@ __all__ = [
     "all_features",
     "all_groups",
     "extract_features",
+    "feature_guide_markdown",
     "features_of_group",
     "get_feature",
     "get_group",

@@ -287,7 +287,7 @@ Experiments that the widgets make easy:
 ## Image feature groups
 
 Each feature is a class in `orangecontrib.ai_suite.kernel.features.catalogue`,
-carrying its own name, definition sentence and computation. Groups are a
+carrying its own name, description sentence and computation. Groups are a
 set of membership lists over that flat catalogue
 (`orangecontrib.ai_suite.kernel.features.groups`): membership lists used for
 ablation and display, so a feature can belong to more than one group and the
@@ -312,14 +312,32 @@ from orangecontrib.ai_suite.kernel.features import all_features, extract_feature
 vec = extract_features(rgb_image, groups="ABCDEF")
 vec["hole_count"]  # a feature value
 vec.to_array()  # one float per selected feature
-get_feature("hole_count").definition  # the human-readable sentence
+get_feature("hole_count").description  # title, sentence, intuition, mechanics
 all_features()  # the full catalogue, in stable column order
 ```
+
+### The feature guide
+
+Every feature carries four descriptions: a title, a one-sentence summary, a
+plain-language account of which pictures move it and which leave it cold, and a
+technical account of how it is computed with links for further reading. The
+whole guide is generated from the catalogue when it is asked for, so it cannot
+drift from the code:
+
+```python
+from orangecontrib.ai_suite.kernel.features import feature_guide_markdown
+
+print(feature_guide_markdown())
+```
+
+In the widget, **Feature guide…** opens the same page, the selected feature's
+title, sentence and intuition are shown beside its values, and **Technical
+details…** opens the mechanics for that one feature.
 
 A runnable script lives in `examples/image_features.py`
 (`uv run python examples/image_features.py`). It reads three real cloud
 photographs from `examples/` (credits in `examples/CREDITS.md`) and shows the
-catalogue and its definitions, the extraction and ablation selections, fine
+catalogue and its descriptions, the extraction and ablation selections, fine
 texture on wispy cirrus against coarse texture on a roll cloud, and the colour
 shortcut separating a blue sky from ground vegetation.
 
@@ -446,7 +464,9 @@ orangecontrib/
     kernel/
       features/   the feature package
         catalogue/   one module and one class per feature, plus the index
+        description.py  the four descriptions, checked when a feature is created
         feature.py   the feature contract, checked at import
+        guide.py     the whole catalogue as one generated Markdown page
         groups.py    groups as membership lists over the catalogue
         extraction.py  extract_features and FeatureVector
         preprocessing.py  the pipeline (internal)
