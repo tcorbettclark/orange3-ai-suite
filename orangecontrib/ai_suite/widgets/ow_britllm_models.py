@@ -26,7 +26,7 @@ from Orange.widgets import gui
 from Orange.widgets.widget import Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.kernel.assets import (
-    ASSETS,
+    MODEL_ASSETS,
     Asset,
     Progress,
     cached_path,
@@ -35,7 +35,7 @@ from orangecontrib.ai_suite.kernel.assets import (
     verify,
 )
 
-_NAMES = tuple(ASSETS)
+_NAMES = tuple(MODEL_ASSETS)
 
 
 class _Worker(QThread):
@@ -102,7 +102,7 @@ class OWBritLLMModels(OWWidget):
         box = gui.widgetBox(self.controlArea, "Model")
         self.model_combo = QComboBox()
         for name in _NAMES:
-            asset = ASSETS[name]
+            asset = MODEL_ASSETS[name]
             self.model_combo.addItem(
                 f"BritLLM 3B v0.1 - 4-bit MLX ({asset.size_bytes / 1e9:.1f} GB)", name
             )
@@ -158,7 +158,7 @@ class OWBritLLMModels(OWWidget):
     # ---- state -------------------------------------------------------------
 
     def _asset(self) -> Asset:
-        return ASSETS[self.model_combo.currentData()]
+        return MODEL_ASSETS[self.model_combo.currentData()]
 
     def _refresh(self) -> None:
         asset = self._asset()

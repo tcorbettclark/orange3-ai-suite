@@ -201,9 +201,7 @@ def build(source_repo: str, target: Path, rebuild: bool) -> dict:
         "built_at": time.strftime("%Y-%m-%d"),
     }
     write_model_card(target, manifest)
-    manifest["size_bytes"] = sum(
-        p.stat().st_size for p in target.rglob("*") if p.is_file()
-    )
+    manifest["size_bytes"] = sum(p.stat().st_size for p in target.rglob("*") if p.is_file())
     (target / "manifest.json").write_text(json.dumps(manifest, indent=1))
     return manifest
 
@@ -212,11 +210,14 @@ def asset_block(repo_id: str, revision: str | None, manifest: dict) -> str:
     revision_text = "None" if revision is None else repr(revision)
     note = "  # pin the upload's commit SHA" if revision is None else ""
     return f"""BRITLLM_4BIT = Asset(
-    name="{repo_id.split('/')[-1]}",
+    name="{repo_id.split("/")[-1]}",
     repo_id="{repo_id}",
+    repo_type="model",
     revision={revision_text},{note}
-    sha256="{manifest['weights_sha256']}",
-    size_bytes={manifest['size_bytes']},
+    patterns=("*.json", "*.safetensors", "*.model"),
+    sha256="{manifest["weights_sha256"]}",
+    size_bytes={manifest["size_bytes"]},
+    weights="model.safetensors",
 )"""
 
 

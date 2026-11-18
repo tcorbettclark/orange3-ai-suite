@@ -29,6 +29,8 @@ dependencies = [
     # OpenCV, the language models need Keras on a TensorFlow backend, and the
     # architectures are scikit-learn estimators.
     "opencv-python-headless>=4.12,<5",
+    "datasets>=5.1",
+    "pillow>=10",
     "keras>=3.10.0",
     "tensorflow>=2.19.0",  # keras' backend, declared rather than implied
     "scikit-learn>=1.4",

@@ -1,4 +1,4 @@
-"""Asset download/cache tests. No network, no Hugging Face install required."""
+"""Asset download/cache/prepare tests. No network."""
 
 import hashlib
 import json
@@ -9,6 +9,8 @@ import pytest
 
 from orangecontrib.ai_suite.kernel import assets
 from orangecontrib.ai_suite.kernel.assets import Asset, AssetError, cached_path, ensure, verify
+from orangecontrib.ai_suite.kernel.assets.hf import _repo_folder
+from orangecontrib.ai_suite.kernel.assets.prepare import prepare_ccsn, prepare_mnist
 
 WEIGHTS = b"weights"
 
@@ -17,7 +19,10 @@ def _asset(**kwargs):
     values = dict(
         name="tiny-model",
         repo_id="org/tiny-model",
+        repo_type="model",
         revision="rev1",
+        patterns=("*.safetensors",),
+        weights="model.safetensors",
         sha256=hashlib.sha256(WEIGHTS).hexdigest(),
         size_bytes=len(WEIGHTS),
     )
@@ -26,7 +31,7 @@ def _asset(**kwargs):
 
 
 def _cache(root, asset):
-    return root / f"models--{asset.repo_id.replace('/', '--')}"
+    return root / _repo_folder(asset.repo_id, asset.repo_type)
 
 
 def _snapshot(root, asset):
@@ -39,7 +44,7 @@ def fake_download(monkeypatch):
     calls = []
     state = {"bytes": WEIGHTS, "delay": 0.0}
 
-    def fake(asset, cache_dir, local_files_only):
+    def fake(asset, cache_dir, local_files_only, tqdm_class=None):
         calls.append((asset, cache_dir, local_files_only))
         snapshot = _snapshot(cache_dir, asset)
         if local_files_only:
@@ -48,17 +53,23 @@ def fake_download(monkeypatch):
             return snapshot
         blobs = _cache(cache_dir, asset) / "blobs"
         blobs.mkdir(parents=True, exist_ok=True)
+        bar = tqdm_class(total=len(state["bytes"]), unit="B") if tqdm_class else None
         with (blobs / "blob").open("wb") as f:
             f.write(state["bytes"][:3])
             f.flush()
+            if bar:
+                bar.update(3)
             if state["delay"]:
                 time.sleep(state["delay"])
             f.write(state["bytes"][3:])
+            if bar:
+                bar.update(len(state["bytes"]) - 3)
+                bar.close()
         snapshot.mkdir(parents=True, exist_ok=True)
         (snapshot / asset.weights).write_bytes(state["bytes"])
         return snapshot
 
-    monkeypatch.setattr(assets, "_snapshot_download", fake)
+    monkeypatch.setattr(assets.hf, "_snapshot_download", fake)
     return calls, state
 
 
@@ -67,7 +78,7 @@ def test_ensure_downloads_verifies_and_writes_a_marker(tmp_path, fake_download):
     path = ensure(asset, cache_dir=tmp_path)
     assert path == _snapshot(tmp_path, asset)
     assert (path / asset.weights).read_bytes() == WEIGHTS
-    assert json.loads((path / assets._VERIFIED).read_text())["sha256"] == asset.sha256
+    assert json.loads((path / assets.hf._VERIFIED).read_text())["sha256"] == asset.sha256
     calls, _ = fake_download
     assert [c[2] for c in calls] == [True, False]  # cached check, then download
 
@@ -103,18 +114,16 @@ def test_a_checksum_mismatch_is_an_error(tmp_path, fake_download):
 
 
 def test_a_missing_hub_install_is_reported(tmp_path, monkeypatch):
-    def missing(asset, cache_dir, local_files_only):
+    def missing(asset, cache_dir, local_files_only, tqdm_class=None):
         raise ImportError("No module named 'huggingface_hub'")
 
-    monkeypatch.setattr(assets, "_snapshot_download", missing)
+    monkeypatch.setattr(assets.hf, "_snapshot_download", missing)
     with pytest.raises(AssetError, match="huggingface_hub"):
         ensure(_asset(), cache_dir=tmp_path)
 
 
 def test_insufficient_disk_is_reported_before_downloading(tmp_path, monkeypatch, fake_download):
-    monkeypatch.setattr(
-        shutil, "disk_usage", lambda path: type("Usage", (), {"free": 1})()
-    )
+    monkeypatch.setattr(shutil, "disk_usage", lambda path: type("Usage", (), {"free": 1})())
     with pytest.raises(AssetError, match="free space"):
         ensure(_asset(), cache_dir=tmp_path)
 
@@ -128,3 +137,81 @@ def test_cached_path_is_offline_and_verified_by_verify(tmp_path, fake_download):
     assert cached_path(asset, tmp_path) == snapshot
     verify(asset, snapshot)
     assert verify(asset, snapshot) == snapshot
+
+
+def test_repo_folder_uses_the_dataset_prefix():
+    assert _repo_folder("org/data", "dataset") == "datasets--org--data"
+    assert _repo_folder("org/model", "model") == "models--org--model"
+
+
+def test_prepared_dataset_uses_datasets_and_a_marker(tmp_path, monkeypatch):
+    calls = []
+
+    def prepare(data, dest):
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "train").mkdir()
+        (dest / "train" / "0").write_text("image")
+        (dest / "README.md").write_text("readme")
+
+    def fake_load(repo_id, revision, cache_dir):
+        calls.append((repo_id, revision, cache_dir))
+        return {"train": []}
+
+    monkeypatch.setattr("datasets.load_dataset", fake_load)
+    asset = Asset(
+        name="tiny-data",
+        repo_id="org/tiny-data",
+        repo_type="dataset",
+        revision="rev1",
+        required=("train", "README.md"),
+        prepare=prepare,
+    )
+    seen = []
+    path = ensure(
+        asset, cache_dir=tmp_path, on_progress=lambda done, total: seen.append((done, total))
+    )
+    assert path == tmp_path / "prepared" / asset.name / asset.revision
+    assert (path / "train" / "0").is_file()
+    assert (path / assets.hf._PREPARED).is_file()
+    assert cached_path(asset, tmp_path) == path
+    assert ensure(asset, cache_dir=tmp_path) == path
+    assert len(calls) == 1
+    assert seen[-1] == (0, 0)
+
+
+def _dataset_dict(names, images, labels):
+    from datasets import ClassLabel, Dataset, DatasetDict, Image
+
+    dataset = Dataset.from_dict({"image": images, "label": labels})
+    dataset = dataset.cast_column("image", Image())
+    dataset = dataset.cast_column("label", ClassLabel(names=names))
+    return DatasetDict({"train": dataset, "test": dataset})
+
+
+def test_prepare_mnist_writes_the_500_100_layout(tmp_path):
+    from PIL import Image
+
+    names = [str(i) for i in range(10)]
+    images = [Image.new("L", (28, 28), color=i) for i in range(10) for _ in range(2)]
+    labels = [i for i in range(10) for _ in range(2)]
+    prepare_mnist(_dataset_dict(names, images, labels), tmp_path)
+    assert (tmp_path / "train" / "0").is_dir()
+    assert (tmp_path / "val" / "9").is_dir()
+    assert len(list((tmp_path / "train").rglob("*.png"))) == 20
+    assert len(list((tmp_path / "val").rglob("*.png"))) == 20
+    image = Image.open(next((tmp_path / "train").rglob("*.png")))
+    assert image.size == (28, 28)
+    assert (tmp_path / "README.md").is_file()
+
+
+def test_prepare_ccsn_keeps_the_five_genera_and_credits(tmp_path):
+    from PIL import Image
+
+    names = ["Ac", "As", "Cb", "Cc", "Ci", "Cs", "Ct", "Cu", "Ns", "Sc", "St"]
+    images = [Image.new("RGB", (256, 256), color=(i, i, i)) for i in range(len(names))]
+    labels = list(range(len(names)))
+    prepare_ccsn(_dataset_dict(names, images, labels), tmp_path)
+    for genus in ("ac", "sc", "cu", "cb", "ci"):
+        assert (tmp_path / genus).is_dir()
+    assert len(list(tmp_path.glob("*/*.jpg"))) == 5
+    assert (tmp_path / "CREDITS.md").is_file()
