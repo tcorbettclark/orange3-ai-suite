@@ -20,7 +20,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import (
+from orangecontrib.ai_suite.kernel.images.features import (
     FeatureOptions,
     all_count_feature_names,
     all_feature_names,

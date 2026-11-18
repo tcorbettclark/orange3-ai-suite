@@ -286,10 +286,10 @@ Experiments that the widgets make easy:
 
 ## Image feature groups
 
-Each feature is a class in `orangecontrib.ai_suite.kernel.features.catalogue`,
+Each feature is a class in `orangecontrib.ai_suite.kernel.images.features.catalogue`,
 carrying its own name, description sentence and computation. Groups are a
 set of membership lists over that flat catalogue
-(`orangecontrib.ai_suite.kernel.features.groups`): membership lists used for
+(`orangecontrib.ai_suite.kernel.images.features.groups`): membership lists used for
 ablation and display, so a feature can belong to more than one group and the
 grouping never touches the feature itself.
 
@@ -307,7 +307,7 @@ Groups A-F run on a preprocessed luminance image. Group G reads colour
 directly and is off by default.
 
 ```python
-from orangecontrib.ai_suite.kernel.features import all_features, extract_features, get_feature
+from orangecontrib.ai_suite.kernel.images.features import all_features, extract_features, get_feature
 
 vec = extract_features(rgb_image, groups="ABCDEF")
 vec["hole_count"]  # a feature value
@@ -325,7 +325,7 @@ whole guide is generated from the catalogue when it is asked for, so it cannot
 drift from the code:
 
 ```python
-from orangecontrib.ai_suite.kernel.features import feature_guide_markdown
+from orangecontrib.ai_suite.kernel.images.features import feature_guide_markdown
 
 print(feature_guide_markdown())
 ```
@@ -333,6 +333,11 @@ print(feature_guide_markdown())
 In the widget, **Feature guide…** opens the same page, the selected feature's
 title, sentence and intuition are shown beside its values, and **Technical
 details…** opens the mechanics for that one feature.
+
+What that plain baseline produces, cell by cell, is shown by
+`examples/image_pixel_values.py` (`uv run python examples/image_pixel_values.py`);
+it prints one photograph as a grid of numbers and as characters, with the
+column name of every value.
 
 A runnable script lives in `examples/image_features.py`
 (`uv run python examples/image_features.py`). It reads three real cloud
@@ -462,22 +467,23 @@ orangecontrib/
     __init__.py
     adapters.py Orange <-> kernel conversion
     kernel/
-      features/   the feature package
-        catalogue/   one module and one class per feature, plus the index
-        description.py  the four descriptions, checked when a feature is created
-        feature.py   the feature contract, checked at import
-        guide.py     the whole catalogue as one generated Markdown page
-        groups.py    groups as membership lists over the catalogue
-        extraction.py  extract_features and FeatureVector
-        preprocessing.py  the pipeline (internal)
-        channels.py  RGB/luminance and [0,1] conventions
-        options.py   FeatureOptions
-        _conventions.py  numeric rules (zero, flat, net change)
-        _imaging.py  measurements shared by more than one feature
+      images/     image data, decoded once and measured two ways
+        decode.py    RGB/luminance, alpha and [0,1] conventions (shared)
+        pixel_values.py  the raw luminance grid baseline (not catalogue features)
+        features/    the feature package
+          catalogue/   one module and one class per feature, plus the index
+          description.py  the four descriptions, checked when a feature is created
+          feature.py   the feature contract, checked at import
+          guide.py     the whole catalogue as one generated Markdown page
+          groups.py    groups as membership lists over the catalogue
+          extraction.py  extract_features and FeatureVector
+          options.py   FeatureOptions
+          _preprocessing.py  the pipeline (support code)
+          _conventions.py  numeric rules (zero, flat, net change)
+          _measurements.py  measurements shared by more than one feature
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects
-      pixels.py   luminance grid features
       text.py     text loading and corpus helpers
     widgets/      the nine Orange widgets and their icons
 demo/             corpora, fetchers, generated .ows workflows

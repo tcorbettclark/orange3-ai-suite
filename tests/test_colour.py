@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import (
+from orangecontrib.ai_suite.kernel.images.features import (
     FeatureOptions,
     extract_features,
     features_of_group,
@@ -71,6 +71,6 @@ def test_extraction_includes_colour_only_when_asked():
 
 
 def test_colour_group_off_by_default():
-    from orangecontrib.ai_suite.kernel.features import DEFAULT_GROUPS
+    from orangecontrib.ai_suite.kernel.images.features import DEFAULT_GROUPS
 
     assert "G" not in DEFAULT_GROUPS

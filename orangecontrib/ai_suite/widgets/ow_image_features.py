@@ -1,6 +1,6 @@
 """Image Features: interpretable features for image classification.
 
-A thin shell over :mod:`orangecontrib.ai_suite.kernel.features`. The widget adds preprocessing and
+A thin shell over :mod:`orangecontrib.ai_suite.kernel.images.features`. The widget adds preprocessing and
 group options, a thumbnail grid with a feature-values panel, and the Orange
 signal adapters.
 
@@ -42,7 +42,7 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import image_paths
-from orangecontrib.ai_suite.kernel import features
+from orangecontrib.ai_suite.kernel.images import features
 
 # Group letters, titles and help text come from the kernel's group table.
 GROUP_LABELS = tuple(

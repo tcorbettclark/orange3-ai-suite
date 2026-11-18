@@ -1,4 +1,4 @@
-"""Image Pixels: flatten downsampled images into raw pixel columns.
+"""Image Pixels: flatten downsampled images into raw pixel values.
 
 A deliberately vanilla baseline: convert each image to luminance, resize it to
 a square grid and flatten it row-major. There is no convolution, no spatial
@@ -22,6 +22,11 @@ from Orange.widgets.widget import Input, Msg, Output, OWWidget
 from orangecontrib.ai_suite.adapters import image_paths
 
 
+def _pixel_column_names(size: int) -> list[str]:
+    """Column names of the grid, row-major: the table's coordinate system."""
+    return [f"pixel_r{row}_c{column}" for row in range(size) for column in range(size)]
+
+
 @dataclass
 class _PixelResult:
     generation: int
@@ -33,7 +38,7 @@ class _PixelResult:
     size: int
 
 
-class PixelFeatureWorker(QThread):
+class PixelValuesWorker(QThread):
     """Load and flatten images without blocking the GUI thread."""
 
     progress = pyqtSignal(int)
@@ -64,7 +69,7 @@ class PixelFeatureWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.pixels import pixel_features
+            from orangecontrib.ai_suite.kernel.images.pixel_values import pixel_values
 
             rows = []
             readable = []
@@ -78,7 +83,7 @@ class PixelFeatureWorker(QThread):
                     n_unreadable += 1
                 else:
                     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                    rows.append(pixel_features(rgb, self._size))
+                    rows.append(pixel_values(rgb, self._size))
                     readable.append(source)
                 self.progress.emit(int(100 * (n + 1) / total))
 
@@ -103,12 +108,12 @@ class PixelFeatureWorker(QThread):
 
 
 class OWImagePixels(OWWidget):
-    """Flatten each input image into raw pixel features.
+    """Flatten each input image into raw pixel values.
 
     Input is an Import Images table. Every image is converted to luminance,
     resized to a square grid and flattened row-major into values in [0, 1].
     The only control is the grid dimension; the default 10 produces 100
-    features per image.
+    values per image.
 
     The output keeps the input's class variables and meta columns, including
     the image path, so rows remain traceable. This widget is intentionally
@@ -116,7 +121,7 @@ class OWImagePixels(OWWidget):
     """
 
     name = "Image Pixels"
-    description = "Flatten downsampled images into raw pixel features."
+    description = "Flatten downsampled images into raw pixel values."
     icon = "icons/image_pixels.svg"
     category = "Image Analytics"
     priority = 35
@@ -142,7 +147,7 @@ class OWImagePixels(OWWidget):
     def __init__(self):
         super().__init__()
         self.data = None
-        self._worker: PixelFeatureWorker | None = None
+        self._worker: PixelValuesWorker | None = None
         self._generation = 0
         self._data_version = 0
         self._restart_pending = False
@@ -182,7 +187,7 @@ class OWImagePixels(OWWidget):
 
     def _refresh_summary(self):
         self._summary.setText(
-            f"{self.dimensions} x {self.dimensions} = {self.dimensions * self.dimensions} features"
+            f"{self.dimensions} x {self.dimensions} = {self.dimensions * self.dimensions} values"
         )
 
     @Inputs.images
@@ -236,7 +241,7 @@ class OWImagePixels(OWWidget):
 
     def _start_worker(self, generation, kept, skipped_no_path):
         self._restart_pending = False
-        worker = PixelFeatureWorker(
+        worker = PixelValuesWorker(
             generation,
             self._data_version,
             paths=kept,
@@ -283,8 +288,6 @@ class OWImagePixels(OWWidget):
         self.Error.extraction_failed(last)
 
     def _send_result(self, result: _PixelResult):
-        from orangecontrib.ai_suite.kernel.pixels import pixel_feature_names
-
         self.Warning.rows_skipped(
             result.n_unreadable + result.skipped_no_path,
             result.n_unreadable,
@@ -296,7 +299,7 @@ class OWImagePixels(OWWidget):
             self.Outputs.features.send(None)
             return
 
-        names = pixel_feature_names(result.size)
+        names = _pixel_column_names(result.size)
         source = self.data.domain
         keep = np.asarray(result.readable_source, dtype=int)
         domain = Domain(

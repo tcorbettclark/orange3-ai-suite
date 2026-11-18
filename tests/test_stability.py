@@ -8,7 +8,7 @@ within tolerance. A count that flips on a 5-pixel shift is noise, not signal.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.features import (
+from orangecontrib.ai_suite.kernel.images.features import (
     FeatureOptions,
     all_count_feature_names,
     extract_features,

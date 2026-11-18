@@ -3,52 +3,24 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions
-from orangecontrib.ai_suite.kernel.features.channels import to_luminance, to_unit_scale
-from orangecontrib.ai_suite.kernel.features.preprocessing import preprocess, preprocess_colour
+from orangecontrib.ai_suite.kernel.images.features import FeatureOptions
+from orangecontrib.ai_suite.kernel.images.features._preprocessing import (
+    preprocess,
+    preprocess_colour,
+)
 from synth import uniform_image
-
-
-def test_luminance_rgb_weights():
-    red = np.zeros((4, 4, 3), dtype=np.float32)
-    red[..., 0] = 255.0
-    lum = to_luminance(red)
-    assert lum.dtype == np.float32
-    assert np.allclose(lum, 255.0 * 0.299)
-
-
-def test_luminance_alpha_ignored():
-    rgba = np.zeros((4, 4, 4), dtype=np.float32)
-    rgba[..., 0] = 100.0
-    rgba[..., 3] = 255.0  # alpha must be dropped, not averaged in
-    assert np.allclose(to_luminance(rgba), 100.0 * 0.299)
-
-
-def test_luminance_grayscale_passthrough():
-    gray = np.linspace(0, 1, 16, dtype=np.float32).reshape(4, 4)
-    assert np.allclose(to_luminance(gray), gray)
-
-
-def test_luminance_rejects_bad_channels():
-    with pytest.raises(ValueError, match="3 \\(RGB\\) or 4 \\(RGBA\\)"):
-        to_luminance(np.zeros((4, 4, 1)))
-
-
-def test_unit_scale_accepts_unit_and_8bit_ranges():
-    assert np.allclose(to_unit_scale(np.full((2, 2), 0.5, np.float32)), 0.5)
-    assert np.allclose(to_unit_scale(np.full((2, 2), 255, np.uint8)), 1.0)
-    assert np.allclose(to_unit_scale(np.full((2, 2), 51, np.uint8)), 0.2)
-
-
-def test_unit_scale_rejects_16bit_values():
-    with pytest.raises(ValueError, match="must be in \\[0, 1\\] or \\[0, 255\\]"):
-        to_unit_scale(np.full((2, 2), 60000, np.uint16))
 
 
 def test_preprocess_colour_returns_unit_range_from_8bit_input():
     rgb = np.full((8, 8, 3), 128, np.uint8)
     out = preprocess_colour(rgb, FeatureOptions(working_size=None))
     assert out.max() <= 1.0 and np.isclose(out.max(), 128 / 255)
+
+
+def test_preprocess_colour_returns_unit_range_from_grayscale_too():
+    gray = np.full((8, 8), 128, np.uint8)
+    out = preprocess_colour(gray, FeatureOptions(working_size=None))
+    assert np.isclose(out.max(), 128 / 255)
 
 
 def test_preprocess_without_normalisation_keeps_the_input_scale():

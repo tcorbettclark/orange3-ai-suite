@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.features import FeatureOptions, features_of_group
+from orangecontrib.ai_suite.kernel.images.features import FeatureOptions, features_of_group
 from synth import digit8_image, ring_image, vertical_bar_image
 
 OPTS = FeatureOptions()

@@ -8,9 +8,9 @@ required attributes and method are declared once and verified automatically.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.features import Feature
-from orangecontrib.ai_suite.kernel.features.catalogue import _build
-from orangecontrib.ai_suite.kernel.features.description import Description
+from orangecontrib.ai_suite.kernel.images.features import Feature
+from orangecontrib.ai_suite.kernel.images.features.catalogue import _build
+from orangecontrib.ai_suite.kernel.images.features.description import Description
 
 GOOD = Description(
     title="Probe",

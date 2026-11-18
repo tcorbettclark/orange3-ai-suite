@@ -1,6 +1,6 @@
 """The feature guide: one page generated from the catalogue, never a copy."""
 
-from orangecontrib.ai_suite.kernel.features import (
+from orangecontrib.ai_suite.kernel.images.features import (
     all_features,
     all_groups,
     feature_guide_markdown,
