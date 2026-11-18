@@ -11,9 +11,10 @@ card, and prints the ``Asset`` constant to paste into ``kernel/assets.py``.
 The converted directory goes to a new temporary directory unless ``--target``
 is given, so the repository is not written to. The second form needs
 ``hf auth login`` and publishes to ``tcorbettclark/britllm-3b-v0.1-4bit-mlx``
-(override with ``--repo-id``), then prints the commit SHA to pin. Students use
-``examples/fetch_britllm.py`` or the BritLLM Models widget; neither converts
-anything.
+(override with ``--repo-id``), then prints the commit SHA to pin. The classic
+LFS uploader is the default; ``--xet`` opts into the chunked uploader.
+Students use ``examples/fetch_britllm.py`` or the BritLLM Models widget;
+neither converts anything.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import os
 import shutil
 import struct
 import subprocess
@@ -29,8 +31,6 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-
-from huggingface_hub import HfApi, snapshot_download
 
 SOURCE_REPO = "britllm/britllm-3b-v0.1"
 DEFAULT_REPO = "tcorbettclark/britllm-3b-v0.1-4bit-mlx"
@@ -135,6 +135,8 @@ on {manifest["built_at"]}. The source snapshot was
 
 
 def build(source_repo: str, target: Path, rebuild: bool) -> dict:
+    from huggingface_hub import HfApi, snapshot_download
+
     api = HfApi()
     source_revision = api.model_info(source_repo).sha
     if target.exists() and rebuild:
@@ -152,10 +154,12 @@ def build(source_repo: str, target: Path, rebuild: bool) -> dict:
         print(f"reusing converted model at {target} (chat template {state})")
     else:
         t0 = time.perf_counter()
+        print("downloading the fp16 source (cached by Hugging Face) ...")
         source = Path(snapshot_download(source_repo))
         print(f"source snapshot ready ({time.perf_counter() - t0:.0f}s): {source}")
         target.parent.mkdir(parents=True, exist_ok=True)
         t0 = time.perf_counter()
+        print("converting to 4-bit MLX (this can take a few minutes) ...", flush=True)
         result = subprocess.run(
             [
                 sys.executable,
@@ -167,21 +171,21 @@ def build(source_repo: str, target: Path, rebuild: bool) -> dict:
                 "--mlx-path",
                 str(target),
                 "--quantize",
-            ],
-            capture_output=True,
-            text=True,
+            ]
         )
         if result.returncode != 0:
-            raise SystemExit(f"mlx_lm convert failed ({result.returncode}):\n{result.stderr}")
+            raise SystemExit(f"mlx_lm convert failed ({result.returncode})")
         print(f"converted in {time.perf_counter() - t0:.0f}s")
         templated = add_minimal_chat_template(target)
         n_params = parameter_count(source)
     n_params = previous.get("n_params_fp16_estimate_billions") or n_params
 
+    print("verifying the converted model loads ...", flush=True)
     from mlx_lm.utils import load
 
     load(str(target))  # the converted directory must load as an MLX model
 
+    print("hashing model.safetensors ...", flush=True)
     config = json.loads((target / "config.json").read_text())
     weights = target / "model.safetensors"
     manifest = {
@@ -231,7 +235,13 @@ def main() -> int:
     parser.add_argument(
         "--upload", action="store_true", help="create/upload the HF repo and print the pin"
     )
+    parser.add_argument(
+        "--xet",
+        action="store_true",
+        help="use the chunked Xet uploader (default: classic LFS)",
+    )
     args = parser.parse_args()
+    os.environ["HF_HUB_DISABLE_XET"] = "0" if args.xet else "1"
 
     # mkdtemp creates its directory; mlx_lm convert refuses an existing --mlx-path,
     # so the build target is a child that does not exist yet.
@@ -244,9 +254,11 @@ def main() -> int:
     print(f"\nAsset for kernel/assets.py (unpinned):\n{asset_block(args.repo_id, None, manifest)}")
 
     if args.upload:
+        from huggingface_hub import HfApi
+
         api = HfApi()
         api.create_repo(args.repo_id, repo_type="model", exist_ok=True)
-        print(f"\nuploading {target} -> {args.repo_id} ...")
+        print(f"\nuploading {target} -> {args.repo_id} ...", flush=True)
         api.upload_folder(
             repo_id=args.repo_id,
             repo_type="model",
