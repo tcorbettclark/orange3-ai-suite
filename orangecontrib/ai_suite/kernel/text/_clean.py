@@ -11,9 +11,13 @@ _PG_START = re.compile(
 _PG_END = re.compile(
     r"^\s*\*\*\* END OF .*PROJECT GUTENBERG EBOOK.*$", re.IGNORECASE | re.MULTILINE
 )
+# The roman branch uses the valid-numeral grammar and is case-insensitive -
+# best-effort on purpose: a stray one-word page number may cost a line of text
+# (e.g. "mix" is a valid roman numeral, 1009), but the grammar still keeps the
+# common words that merely look roman ("did", "mid", "civic" are not numerals).
 _PAGE_NUMBER = re.compile(
     r"^\s*[-–—]?\s*(?:(?:page|p\.)\s*)?"
-    r"(?:\d{1,4}|[ivxlcdm]{1,7})"
+    r"(?:\d{1,4}|(?:m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})))"
     r"(?:\s*(?:of|/)\s*\d{1,4})?\s*[-–—]?\s*$",
     re.IGNORECASE,
 )

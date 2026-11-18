@@ -169,3 +169,14 @@ def test_rows_do_not_change_the_sentences_the_model_sees():
         for granularity in RowGranularity
     }
     assert len(set(map(tuple, streams.values()))) == 1
+
+
+def test_page_number_rule_keeps_roman_spelled_words():
+    # Best-effort on purpose: the roman branch uses valid-numeral grammar and is
+    # case-insensitive, so "iv"/"XII"/"mix" (a valid numeral, 1009) are taken as
+    # page numbers, while "did", "mid" and "civic" - not valid numerals - stay.
+    result = clean_text(
+        "mix\ndid\nmind\ncivic\nim\nPage 13\niv\nXII\n",
+        CleanOptions(remove_page_numbers=True),
+    )
+    assert result.text == "did\nmind\ncivic\nim"
