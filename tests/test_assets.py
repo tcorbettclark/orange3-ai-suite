@@ -8,9 +8,15 @@ import time
 import pytest
 
 from orangecontrib.ai_suite.kernel import assets
-from orangecontrib.ai_suite.kernel.assets import Asset, AssetError, cached_path, ensure, verify
 from orangecontrib.ai_suite.kernel.assets.clouds import _prepare_clouds
-from orangecontrib.ai_suite.kernel.assets.hf import _repo_folder
+from orangecontrib.ai_suite.kernel.assets.hf import (
+    Asset,
+    AssetError,
+    _repo_folder,
+    cached_path,
+    ensure,
+    verify,
+)
 from orangecontrib.ai_suite.kernel.assets.mnist import _prepare_mnist
 
 WEIGHTS = b"weights"
@@ -219,7 +225,7 @@ def test_prepare_ccsn_keeps_the_five_genera_and_credits(tmp_path):
 
 
 def test_cli_lists_all_assets(capsys):
-    from orangecontrib.ai_suite.kernel.assets import main
+    from orangecontrib.ai_suite.kernel.assets.cli import main
 
     assert main(["list"]) == 0
     output = capsys.readouterr().out
@@ -229,7 +235,6 @@ def test_cli_lists_all_assets(capsys):
 
 
 def test_asset_getters_delegate_to_ensure(monkeypatch, tmp_path):
-    from orangecontrib.ai_suite.kernel import assets
     from orangecontrib.ai_suite.kernel.assets import britllm, clouds, mnist
 
     calls = []
@@ -247,7 +252,7 @@ def test_asset_getters_delegate_to_ensure(monkeypatch, tmp_path):
         )
         assert getter(tmp_path, None) == tmp_path
     assert [call[0] for call in calls] == [
-        assets.BRITLLM_4BIT.name,
-        assets.MNIST_DIGITS.name,
-        assets.CCSN_CLOUDS.name,
+        britllm.BRITLLM_4BIT.name,
+        mnist.MNIST_DIGITS.name,
+        clouds.CCSN_CLOUDS.name,
     ]

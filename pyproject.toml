@@ -64,7 +64,7 @@ packages = ["orangecontrib"]
 "Language Models" = "orangecontrib.ai_suite.widgets"
 
 [project.scripts]
-orange-ai-assets = "orangecontrib.ai_suite.kernel.assets:main"
+orange-ai-assets = "orangecontrib.ai_suite.kernel.assets.cli:main"
 
 [project.entry-points."Orange.widgets"]
 "Language Models" = "orangecontrib.ai_suite.widgets"

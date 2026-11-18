@@ -10,7 +10,8 @@ import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
-from orangecontrib.ai_suite.kernel.assets import BRITLLM_4BIT, cached_path
+from orangecontrib.ai_suite.kernel.assets.britllm import BRITLLM_4BIT
+from orangecontrib.ai_suite.kernel.assets.hf import cached_path
 from orangecontrib.ai_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
 
 MLX_OK = importlib.util.find_spec("mlx") is not None
@@ -92,9 +93,7 @@ def test_lora_without_a_base_model_warns(qapp, text_table, monkeypatch):
     assert w.worker is None
 
 
-def test_small_validation_split_warns_before_starting_a_worker(
-    qapp, text_table, monkeypatch
-):
+def test_small_validation_split_warns_before_starting_a_worker(qapp, text_table, monkeypatch):
     w = OWLoRAPretrainer()
     w.show()
     w.set_data(text_table)

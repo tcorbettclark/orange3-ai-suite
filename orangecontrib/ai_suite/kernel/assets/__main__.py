@@ -1,5 +1,5 @@
 """``python -m ...assets`` entry point."""
 
-from . import main
+from .cli import main
 
 raise SystemExit(main())

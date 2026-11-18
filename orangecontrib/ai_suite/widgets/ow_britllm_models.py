@@ -25,8 +25,8 @@ from AnyQt.QtWidgets import (
 from Orange.widgets import gui
 from Orange.widgets.widget import Msg, Output, OWWidget
 
-from orangecontrib.ai_suite.kernel.assets import (
-    MODEL_ASSETS,
+from orangecontrib.ai_suite.kernel.assets.catalogue import MODEL_ASSETS
+from orangecontrib.ai_suite.kernel.assets.hf import (
     Asset,
     Progress,
     cached_path,
@@ -90,9 +90,7 @@ class OWBritLLMModels(OWWidget):
 
     class Error(OWWidget.Error):
         download_failed = Msg("Download failed:\n{}")
-        hub_missing = Msg(
-            "Downloading needs huggingface_hub: install orange3-ai-suite[lora]."
-        )
+        hub_missing = Msg("Downloading needs huggingface_hub: install orange3-ai-suite[lora].")
 
     def __init__(self):
         super().__init__()
@@ -235,8 +233,7 @@ class OWBritLLMModels(OWWidget):
             self.progress.setRange(0, total)
             self.progress.setValue(min(done, total))
             self.status_label.setText(
-                f"Downloading {done / 1e9:.2f} of {total / 1e9:.2f} GB"
-                f" ({done * 100 // total}%)"
+                f"Downloading {done / 1e9:.2f} of {total / 1e9:.2f} GB ({done * 100 // total}%)"
             )
 
     def _on_done(self, result) -> None:

@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.assets import BRITLLM_4BIT, cached_path
+from orangecontrib.ai_suite.kernel.assets.britllm import BRITLLM_4BIT
+from orangecontrib.ai_suite.kernel.assets.hf import cached_path
 from orangecontrib.ai_suite.kernel.lora import (
     LoRAAdapter,
     LoRAData,
@@ -25,8 +26,7 @@ from orangecontrib.ai_suite.kernel.lora.model import _echo, _segments
 from orangecontrib.ai_suite.kernel.lora.training import _adapter_weights, _lora_command, _stage
 
 _NO_MODEL = (
-    "pinned 4-bit model not cached — use the BritLLM Models widget "
-    "or examples/fetch_britllm.py"
+    "pinned 4-bit model not cached — use the BritLLM Models widget or examples/fetch_britllm.py"
 )
 slow = pytest.mark.slow  # end-to-end runs (model load + iterations); excluded
 # from the default suite via addopts -m "not slow"; run with `-m slow` when
@@ -116,9 +116,7 @@ def test_split_for_training_refuses_a_small_validation_set():
     data = LoRAData.from_texts([f"document {i}" for i in range(20)])
     with pytest.raises(ValueError, match="valid split has 2 rows"):
         split_for_training(data, LoRAOptions(batch_size=4, validation_fraction=0.1))
-    train, valid = split_for_training(
-        data, LoRAOptions(batch_size=1, validation_fraction=0.1)
-    )
+    train, valid = split_for_training(data, LoRAOptions(batch_size=1, validation_fraction=0.1))
     assert len(train) == 18 and len(valid) == 2
     _, valid = split_for_training(data, LoRAOptions(validation_fraction=0.0))
     assert valid == []
@@ -259,10 +257,8 @@ def test_adapter_without_adapters_loads_fine(tmp_path):
 
 def test_saving_an_adapter_without_weights_raises(tmp_path):
     (tmp_path / "empty").mkdir()
-    adapter = LoRAAdapter(
-        base_model="b/x", adapter_path=str(tmp_path / "empty"), training={}
-    )
-    with pytest.raises(FileNotFoundError, match="adapters.safetensors"):
+    adapter = LoRAAdapter(base_model="b/x", adapter_path=str(tmp_path / "empty"), training={})
+    with pytest.raises(FileNotFoundError, match=r"adapters\.safetensors"):
         adapter.save(tmp_path / "artifact")
 
 

@@ -159,9 +159,7 @@ def _stage(format: Format, train: Rows, valid: Rows, directory: str | Path) -> P
         with (directory / f"{split}.jsonl").open("w", encoding="utf-8") as f:
             for row in rows:
                 record = (
-                    {"text": row}
-                    if format == "text"
-                    else {"prompt": row[0], "completion": row[1]}
+                    {"text": row} if format == "text" else {"prompt": row[0], "completion": row[1]}
                 )
                 f.write(json.dumps(record) + "\n")
     return directory
@@ -257,6 +255,14 @@ def _lora_command(
     return cmd
 
 
+def _terminate(process: subprocess.Popen) -> None:
+    """Stop the child's process group; it may already be gone."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
 def _adapter_weights(adapter_dir: Path) -> Path | None:
     """The final adapter if mlx-lm wrote it, else its newest numbered checkpoint."""
     canonical = adapter_dir / _ADAPTER_WEIGHTS
@@ -316,7 +322,7 @@ def train_lora(
         while process.poll() is None:
             if stop_requested is not None and stop_requested():
                 stopped = True
-                os.killpg(process.pid, signal.SIGTERM)
+                _terminate(process)
                 break
             try:
                 process.wait(timeout=0.2)
@@ -328,10 +334,7 @@ def train_lora(
             raise RuntimeError(f"mlx_lm lora failed ({process.returncode}):\n{tail_text}")
     finally:
         if process.poll() is None:
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
+            _terminate(process)
 
     weights = _adapter_weights(adapter_dir)
     if weights is None:

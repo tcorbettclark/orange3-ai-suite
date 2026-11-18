@@ -17,7 +17,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from orangecontrib.ai_suite.kernel.assets import AssetError, get_britllm, hub_cache
+from orangecontrib.ai_suite.kernel.assets import get_britllm
+from orangecontrib.ai_suite.kernel.assets.hf import AssetError, hub_cache
 
 
 def report(done: int, total: int) -> None:

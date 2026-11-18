@@ -3,7 +3,7 @@
 Maintainer script, not the student path. It downloads the fp16 source, converts
 it with ``mlx_lm convert --quantize`` (4-bit affine, group 64, the MLX defaults),
 adds the chat template the masked SFT path needs, writes a manifest and model
-card, and prints the ``Asset`` constant to paste into ``kernel/assets.py``.
+card, and prints the ``Asset`` constant to paste into ``kernel/assets/britllm.py``.
 
     uv run --extra lora python examples/build_britllm_4bit.py
     uv run --extra lora python examples/build_britllm_4bit.py --upload
@@ -252,7 +252,9 @@ def main() -> int:
     print(f"\nmanifest: {target / 'manifest.json'}")
     print(f"weights SHA-256: {manifest['weights_sha256']}")
     print(f"size: {manifest['size_bytes'] / 1e9:.2f} GB")
-    print(f"\nAsset for kernel/assets.py (unpinned):\n{asset_block(args.repo_id, None, manifest)}")
+    print(
+        f"\nAsset for kernel/assets/britllm.py (unpinned):\n{asset_block(args.repo_id, None, manifest)}"
+    )
 
     if args.upload:
         from huggingface_hub import HfApi
