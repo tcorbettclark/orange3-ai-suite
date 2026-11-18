@@ -9,14 +9,14 @@ from ..options import FeatureOptions
 class GreeneryFraction(Feature):
     name = "greenery_fraction"
     description = Description(
-        title="Green share",
+        title="Green fraction",
         summary="Fraction of pixels where green exceeds both red and blue.",
         intuition=(
             "How much of the frame is vegetation. Grass, trees, lawns and fields score high; "
-            "sky, water, pavement and sand score low. It is the opposite of the bluish share "
-            "in practice, so the pair separates a green landscape from a blue sky almost for "
-            "free - and that is exactly the shortcut the colour features are there to "
-            "demonstrate."
+            "sky, water, pavement and sand score low. It is the opposite of the bluish "
+            "fraction in practice, so the pair separates a green landscape from a blue sky "
+            "almost for free - and that is exactly the shortcut the colour features are there "
+            "to demonstrate."
         ),
         technical=(
             "Fraction of pixels with G > R and G > B in the absolute colour image. A strict "

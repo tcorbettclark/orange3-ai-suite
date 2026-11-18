@@ -51,7 +51,7 @@ from .horizontal_spread import HorizontalSpread
 from .intensity_std import IntensityStd
 from .kurtosis import Kurtosis
 from .left_right_symmetry import LeftRightSymmetry
-from .mean_blueness import MeanBlueness
+from .blue_minus_red_mean import BlueMinusRedMean
 from .mean_chroma import MeanChroma
 from .mean_gradient_magnitude import MeanGradientMagnitude
 from .mean_intensity import MeanIntensity
@@ -104,7 +104,7 @@ _CATALOGUE: tuple[Feature, ...] = (
     TopBottomSymmetry(),
     QuadrantSelfSimilarity(),
     BluishFraction(),
-    MeanBlueness(),
+    BlueMinusRedMean(),
     MeanChroma(),
     GreeneryFraction(),
 )

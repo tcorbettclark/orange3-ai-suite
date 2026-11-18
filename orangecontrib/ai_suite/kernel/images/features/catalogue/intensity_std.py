@@ -8,7 +8,7 @@ from ..options import FeatureOptions
 class IntensityStd(Feature):
     name = "intensity_std"
     description = Description(
-        title="Pixel spread",
+        title="Tone spread",
         summary="Standard deviation of brightness across the preprocessed image.",
         intuition=(
             "How far pixels sit from the average brightness. A chessboard, or black text on "

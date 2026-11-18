@@ -9,12 +9,12 @@ from ..options import FeatureOptions
 class ColumnProfileRoughness(Feature):
     name = "column_profile_roughness"
     description = Description(
-        title="Horizontal bandiness",
+        title="Vertical band strength",
         summary="Total variation of the column-mean brightness profile, divided by its mean.",
         intuition=(
             "How much the average brightness jumps up and down as you move across the "
             "picture. Vertical stripes, railings or a row of windows score high; a smooth "
-            "left-to-right fade scores low. As with the vertical version, random speckle also "
+            "left-to-right fade scores low. As with the row version, random speckle also "
             "scores high, so it is best read alongside the texture features."
         ),
         technical=(

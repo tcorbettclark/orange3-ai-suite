@@ -9,7 +9,7 @@ from ..options import FeatureOptions
 class RowProfileRoughness(Feature):
     name = "row_profile_roughness"
     description = Description(
-        title="Vertical bandiness",
+        title="Horizontal band strength",
         summary="Total variation of the row-mean brightness profile, divided by its mean.",
         intuition=(
             "How much the average brightness jumps up and down as you move down the picture. "

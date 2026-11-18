@@ -10,7 +10,7 @@ from ..options import FeatureOptions
 class EdgeDensity(Feature):
     name = "edge_density"
     description = Description(
-        title="Edgy-pixel share",
+        title="Edgy-pixel fraction",
         summary="Fraction of pixels whose gradient is at least a configured fraction of the image's own 99th percentile gradient.",
         intuition=(
             "How much of the picture is edge rather than flat area. A tree line against the "

@@ -9,13 +9,13 @@ from ..options import FeatureOptions
 class BrightFraction(Feature):
     name = "bright_fraction"
     description = Description(
-        title="Bright-area share",
+        title="Bright-area fraction (median)",
         summary="Fraction of pixels brighter than the image's own median plus half its percentile contrast.",
         intuition=(
             "How much of the picture stands out as noticeably brighter than the typical "
             "pixel. Two small clouds in a blue sky score low; a sky half covered in white "
             "cloud scores high. One small bright lamp also scores low, because a few pixels "
-            "are not a large share. The cut-off is taken from each picture, so dim and bright "
+            "are not a large area. The cut-off is taken from each picture, so dim and bright "
             "images are judged alike."
         ),
         technical=(

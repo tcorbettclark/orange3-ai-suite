@@ -6,8 +6,8 @@ from ..feature import Feature
 from ..options import FeatureOptions
 
 
-class MeanBlueness(Feature):
-    name = "mean_blueness"
+class BlueMinusRedMean(Feature):
+    name = "blue_minus_red_mean"
     description = Description(
         title="Blue-red balance",
         summary="Mean of blue minus red across all pixels.",

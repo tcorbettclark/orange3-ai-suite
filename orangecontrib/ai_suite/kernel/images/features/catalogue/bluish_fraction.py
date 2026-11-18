@@ -9,7 +9,7 @@ from ..options import FeatureOptions
 class BluishFraction(Feature):
     name = "bluish_fraction"
     description = Description(
-        title="Bluish share",
+        title="Bluish fraction",
         summary="Fraction of pixels where blue exceeds red by more than 0.04.",
         intuition=(
             "The deliberate shortcut: how much of the photo is blue. A blue sky or the sea "
