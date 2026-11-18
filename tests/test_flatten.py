@@ -33,3 +33,8 @@ def test_flatten_returns_float32_values():
 def test_flatten_rejects_non_2d_input(bad):
     with pytest.raises(ValueError, match="2-D"):
         flatten(bad)
+
+
+def test_flatten_rejects_an_empty_grid():
+    with pytest.raises(ValueError, match="empty grid"):
+        flatten(np.zeros((0, 3), np.float32))

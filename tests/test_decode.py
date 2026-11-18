@@ -60,3 +60,9 @@ def test_unit_scale_rejects_negative_values():
     with pytest.raises(ValueError, match="got min -3"):
         to_unit_scale(np.array([[-3.0, 0.5]]))
     assert np.allclose(to_unit_scale(np.zeros((2, 2), np.float32)), 0.0)  # zero is fine
+
+
+def test_unit_scale_passes_an_empty_image_through():
+    empty = np.zeros((0, 0), np.float32)
+    out = to_unit_scale(empty)
+    assert out.shape == (0, 0)  # no min or max to interpret; nothing to raise about
