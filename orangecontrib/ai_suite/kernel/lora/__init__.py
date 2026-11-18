@@ -17,7 +17,14 @@ tuner's internals.
 """
 
 from .model import LoRAAdapter, LoRAModel
-from .training import LoRAData, LoRAOptions, TrainingStopped, parse_metric, train_lora
+from .training import (
+    LoRAData,
+    LoRAOptions,
+    TrainingStopped,
+    parse_metric,
+    split_for_training,
+    train_lora,
+)
 
 __all__ = [
     "LoRAAdapter",
@@ -26,5 +33,6 @@ __all__ = [
     "LoRAOptions",
     "TrainingStopped",
     "parse_metric",
+    "split_for_training",
     "train_lora",
 ]

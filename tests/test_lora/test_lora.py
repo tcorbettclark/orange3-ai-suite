@@ -18,6 +18,7 @@ from orangecontrib.ai_suite.kernel.lora import (
     LoRAModel,
     LoRAOptions,
     parse_metric,
+    split_for_training,
     train_lora,
 )
 from orangecontrib.ai_suite.kernel.lora.model import _echo, _segments
@@ -109,6 +110,18 @@ def test_split_guards_and_edges():
     assert len(train) == 1 and len(valid) == 4
     # zero means no validation split
     assert data.split(valid_fraction=0.0, seed=0)[1] == []
+
+
+def test_split_for_training_refuses_a_small_validation_set():
+    data = LoRAData.from_texts([f"document {i}" for i in range(20)])
+    with pytest.raises(ValueError, match="valid split has 2 rows"):
+        split_for_training(data, LoRAOptions(batch_size=4, validation_fraction=0.1))
+    train, valid = split_for_training(
+        data, LoRAOptions(batch_size=1, validation_fraction=0.1)
+    )
+    assert len(train) == 18 and len(valid) == 2
+    _, valid = split_for_training(data, LoRAOptions(validation_fraction=0.0))
+    assert valid == []
 
 
 def test_no_validation_split_omits_valid_file(tmp_path):

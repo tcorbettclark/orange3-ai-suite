@@ -167,6 +167,26 @@ def _stage(format: Format, train: Rows, valid: Rows, directory: str | Path) -> P
     return directory
 
 
+def split_for_training(data: LoRAData, options: LoRAOptions) -> tuple[Rows, Rows]:
+    """The train and validation rows, refusing a validation batch mlx-lm cannot use.
+
+    A validation set smaller than one batch makes mlx-lm fail before training;
+    raising here lets a caller reject the setup before starting a worker. An
+    empty validation split (``validation_fraction=0``) is allowed: mlx-lm then
+    trains without validation.
+    """
+    train, valid = data.split(options.validation_fraction, options.seed)
+    if valid and len(valid) < options.batch_size:
+        rows = "row" if len(valid) == 1 else "rows"
+        raise ValueError(
+            f"valid split has {len(valid)} {rows} but batch_size is "
+            f"{options.batch_size} - mlx-lm requires the valid split to hold at "
+            "least one full batch; add data, reduce batch_size or raise "
+            "validation_fraction"
+        )
+    return train, valid
+
+
 def parse_metric(line: str) -> dict | None:
     """Parse one mlx-lm training-log line into a metric dict (or None)."""
     line = _ANSI.sub("", line.rstrip("\n"))
@@ -271,14 +291,7 @@ def train_lora(
     it reached. A stop before the first checkpoint raises :class:`TrainingStopped`.
     """
     opts = options or LoRAOptions()
-    train, valid = data.split(opts.validation_fraction, opts.seed)
-    if valid and len(valid) < opts.batch_size:
-        raise ValueError(
-            f"valid split has {len(valid)} rows but batch_size is "
-            f"{opts.batch_size} - mlx-lm requires the valid split to hold at "
-            "least one full batch; add data, reduce batch_size or raise "
-            "validation_fraction"
-        )
+    train, valid = split_for_training(data, opts)
     adapter_dir = Path(adapter_dir)
     staged = _stage(data.format, train, valid, data_dir or Path(f"{adapter_dir}.data"))
     adapter_dir.mkdir(parents=True, exist_ok=True)

@@ -23,6 +23,7 @@ from orangecontrib.ai_suite.kernel.lora import (
     LoRAOptions,
     LoRAModel,
     TrainingStopped,
+    split_for_training,
     train_lora,
 )
 
@@ -105,6 +106,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
     num_layers = Setting(_OPTION_DEFAULTS.num_layers)
     batch_size = Setting(_OPTION_DEFAULTS.batch_size)
     max_seq_length = Setting(_OPTION_DEFAULTS.max_seq_length)
+    validation_fraction = Setting(_OPTION_DEFAULTS.validation_fraction)
     seed = Setting(_OPTION_DEFAULTS.seed)
 
     def __init__(self):
@@ -145,6 +147,16 @@ class LoRATrainerBase(OWWidget, openclass=True):
         gui.spin(train_box, self, "num_layers", 2, 32, label="Fine-tuned layers")
         gui.spin(train_box, self, "batch_size", 1, 32, label="Batch size")
         gui.spin(train_box, self, "max_seq_length", 64, 4096, label="Max seq length")
+        gui.doubleSpin(
+            train_box,
+            self,
+            "validation_fraction",
+            0.0,
+            0.9,
+            0.05,
+            decimals=2,
+            label="Validation fraction",
+        )
         gui.spin(train_box, self, "seed", 0, 2**31 - 1, label="Seed")
 
         gui.button(self.controlArea, self, "Train", callback=self.start_training)
@@ -191,8 +203,10 @@ class LoRATrainerBase(OWWidget, openclass=True):
             num_layers=self.num_layers,
             batch_size=self.batch_size,
             max_seq_length=self.max_seq_length,
+            validation_fraction=self.validation_fraction,
             seed=self.seed,
         )
+        split_for_training(data_obj, options)  # reject before starting the worker
         return dict(
             base_model=self.base_model.strip(),
             data=data_obj,

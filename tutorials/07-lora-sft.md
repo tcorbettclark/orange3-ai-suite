@@ -66,6 +66,7 @@ Set:
 - **Fine-tuned layers**: 16
 - **Batch size**: 1
 - **Max seq length**: 128
+- **Validation fraction**: 0.1
 - **Seed**: 42
 
 The small batch is deliberate: the validation split must hold at least one full

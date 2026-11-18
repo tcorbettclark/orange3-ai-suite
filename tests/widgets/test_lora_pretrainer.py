@@ -92,6 +92,34 @@ def test_lora_without_a_base_model_warns(qapp, text_table, monkeypatch):
     assert w.worker is None
 
 
+def test_small_validation_split_warns_before_starting_a_worker(
+    qapp, text_table, monkeypatch
+):
+    w = OWLoRAPretrainer()
+    w.show()
+    w.set_data(text_table)
+    monkeypatch.setattr(w, "_mlx_available", lambda: True)
+    w.base_model = "/tmp/model"
+    w.batch_size = 4
+    w.validation_fraction = 0.1
+    w.run_training_blocking()
+    assert w.Warning.bad_settings.is_shown()
+    assert w.worker is None
+
+
+def test_a_valid_split_builds_the_request(qapp, text_table, monkeypatch):
+    w = OWLoRAPretrainer()
+    w.show()
+    w.set_data(text_table)
+    monkeypatch.setattr(w, "_mlx_available", lambda: True)
+    w.base_model = "/tmp/model"
+    w.batch_size = 1
+    w.validation_fraction = 0.1
+    request = w._build_request()
+    assert request is not None
+    assert request["options"].validation_fraction == 0.1
+
+
 def test_base_model_input_sets_the_line_edit_and_the_request(
     qapp, text_table, tmp_path, monkeypatch
 ):
@@ -103,5 +131,6 @@ def test_base_model_input_sets_the_line_edit_and_the_request(
     w.set_base_model(model)
     assert w.base_model == model
     assert w.base_model_edit.text() == model
+    w.batch_size = 1  # the two-row fixture cannot fill a larger validation batch
     request = w._build_request()
     assert request["base_model"] == model
