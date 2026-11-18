@@ -1,4 +1,8 @@
-"""Registry of the suite's assets, for the CLI and model-only widget."""
+"""Registry of the suite's assets, for the CLI and model-only widget.
+
+This is the asset registry (downloadable Hugging Face artifacts) - not the
+image feature catalogue under ``kernel/images/features``.
+"""
 
 from __future__ import annotations
 
