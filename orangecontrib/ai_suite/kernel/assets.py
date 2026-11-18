@@ -10,6 +10,11 @@ The cache is Hugging Face's own: ``HF_HUB_CACHE``, else ``$HF_HOME/hub``, else
 intended; resume, offline mode and the ``models--org--name`` layout come from
 ``huggingface_hub``.
 
+Transfers use the classic Hugging Face LFS path by default. It leaves a
+resumable ``.incomplete`` file under ``blobs``, which the progress poller reads,
+and it has been more reliable than Xet for the 1.4 GB artifact. Set
+``HF_HUB_DISABLE_XET=0`` before importing to opt into Xet.
+
 Progress is read from the cache's ``blobs`` directory rather than from a library
 progress bar: the downloader writes network bytes there, and the asset's pinned
 size is the denominator. ``on_progress`` is called from a poller thread while the
@@ -24,6 +29,7 @@ import json
 import os
 import shutil
 import sys
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -36,6 +42,20 @@ _WEIGHTS = "model.safetensors"
 _PATTERNS = ("*.json", "*.safetensors", "*.model")
 _VERIFIED = ".orange3-verified.json"
 _POLL_SECONDS = 0.25
+
+# Classic LFS by default: reliable progress and a resumable .incomplete file.
+# ``setdefault`` lets HF_HUB_DISABLE_XET=0 opt in; if HF imported first, its
+# constant is already fixed, so patch it (file_download reads it at call time).
+_DISABLE_XET = os.environ.setdefault("HF_HUB_DISABLE_XET", "1").lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+if _DISABLE_XET and "huggingface_hub.constants" in sys.modules:
+    import huggingface_hub.constants as _hf_constants
+
+    _hf_constants.HF_HUB_DISABLE_XET = True
 
 
 class AssetError(RuntimeError):
@@ -153,7 +173,12 @@ def _blob_bytes(root: Path, asset: Asset) -> int:
 
 
 class _Poller(threading.Thread):
-    """Report cache growth while a download runs."""
+    """Report cache growth while a classic LFS download runs.
+
+    The classic path writes both completed blobs and ``.incomplete`` files into
+    ``blobs``; summing that directory is the byte counter. Xet would stage
+    chunks elsewhere, which is why Xet is off by default.
+    """
 
     def __init__(self, root: Path, asset: Asset, on_progress: Progress | None):
         super().__init__(daemon=True)

@@ -184,6 +184,10 @@ Start with this 4-bit model. The Base model field also accepts other local MLX
 model directories or Hugging Face ids; 8-bit or unquantised bases work if the
 machine has the memory.
 
+Downloads use the classic Hugging Face LFS transfer by default: it gives a
+resumable file and a byte-accurate progress bar. Set `HF_HUB_DISABLE_XET=0`
+before launching Orange to opt into Xet if you want chunk-level dedup.
+
 ### LoRA Pre-trainer
 
 Continues pre-training a pretrained model with LoRA (QLoRA with the 4-bit
