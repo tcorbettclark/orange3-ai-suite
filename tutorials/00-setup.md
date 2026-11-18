@@ -48,9 +48,8 @@ checkout is needed:
 
 Both commands print the prepared root; use it for **Import Images**. The
 BritLLM model is downloaded by the **BritLLM Models** widget (or headlessly
-with `orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`). In a source checkout
-you can also run `uv run --extra lora python examples/fetch_britllm.py` and
-paste the printed path into **Base model**.
+with `orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`); the command prints
+the snapshot path to paste into **Base model**.
 
 For the language-model tutorials, download a public-domain short story. The
 tutorials use Charlotte Perkins Gilman's *The Yellow Wallpaper*, but any UTF-8

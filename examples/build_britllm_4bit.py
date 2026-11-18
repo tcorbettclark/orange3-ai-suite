@@ -13,8 +13,8 @@ is given, so the repository is not written to. The second form needs
 ``hf auth login`` and publishes to ``tcorbettclark/britllm-3b-v0.1-4bit-mlx``
 (override with ``--repo-id``), then prints the commit SHA to pin. The classic
 LFS uploader is the default; ``--xet`` opts into the chunked uploader.
-Students use ``examples/fetch_britllm.py`` or the BritLLM Models widget;
-neither converts anything.
+Students use the BritLLM Models widget or
+``orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx``; neither converts anything.
 """
 
 from __future__ import annotations

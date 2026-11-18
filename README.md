@@ -458,8 +458,6 @@ and the prepared tree are cached; repeated calls are offline.
   Cb and Ci at 256x256, with `CREDITS.md`. Cite Zhang et al. (2018), *CloudNet*.
 - `data/text/` - optional downloaded plain-text corpora. No text corpus is
   committed; use **LM Text Loader** to load any UTF-8 `.txt` file.
-- `examples/fetch_britllm.py` - fetches the pinned 4-bit MLX BritLLM into the
-  Hugging Face cache (the headless form of the BritLLM Models widget).
 - `examples/build_britllm_4bit.py` - maintainer script that downloads the fp16
   source, converts it, adds the chat template and (optionally) uploads the
   artifact. It builds in a temporary directory unless `--target` is given, so
@@ -473,7 +471,6 @@ and the prepared tree are cached; repeated calls are offline.
 orange-ai-assets fetch mnist-digits
 orange-ai-assets fetch ccsn-clouds
 orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx
-uv run --extra lora python examples/fetch_britllm.py
 uv run python demo/make_workflows.py
 ```
 
