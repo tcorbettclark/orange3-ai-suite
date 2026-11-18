@@ -9,8 +9,9 @@ import pytest
 
 from orangecontrib.ai_suite.kernel import assets
 from orangecontrib.ai_suite.kernel.assets import Asset, AssetError, cached_path, ensure, verify
+from orangecontrib.ai_suite.kernel.assets.clouds import _prepare_clouds
 from orangecontrib.ai_suite.kernel.assets.hf import _repo_folder
-from orangecontrib.ai_suite.kernel.assets.prepare import prepare_ccsn, prepare_mnist
+from orangecontrib.ai_suite.kernel.assets.mnist import _prepare_mnist
 
 WEIGHTS = b"weights"
 
@@ -194,7 +195,7 @@ def test_prepare_mnist_writes_the_500_100_layout(tmp_path):
     names = [str(i) for i in range(10)]
     images = [Image.new("L", (28, 28), color=i) for i in range(10) for _ in range(2)]
     labels = [i for i in range(10) for _ in range(2)]
-    prepare_mnist(_dataset_dict(names, images, labels), tmp_path)
+    _prepare_mnist(_dataset_dict(names, images, labels), tmp_path)
     assert (tmp_path / "train" / "0").is_dir()
     assert (tmp_path / "val" / "9").is_dir()
     assert len(list((tmp_path / "train").rglob("*.png"))) == 20
@@ -210,8 +211,43 @@ def test_prepare_ccsn_keeps_the_five_genera_and_credits(tmp_path):
     names = ["Ac", "As", "Cb", "Cc", "Ci", "Cs", "Ct", "Cu", "Ns", "Sc", "St"]
     images = [Image.new("RGB", (256, 256), color=(i, i, i)) for i in range(len(names))]
     labels = list(range(len(names)))
-    prepare_ccsn(_dataset_dict(names, images, labels), tmp_path)
+    _prepare_clouds(_dataset_dict(names, images, labels), tmp_path)
     for genus in ("ac", "sc", "cu", "cb", "ci"):
         assert (tmp_path / genus).is_dir()
     assert len(list(tmp_path.glob("*/*.jpg"))) == 5
     assert (tmp_path / "CREDITS.md").is_file()
+
+
+def test_cli_lists_all_assets(capsys):
+    from orangecontrib.ai_suite.kernel.assets import main
+
+    assert main(["list"]) == 0
+    output = capsys.readouterr().out
+    assert "britllm-3b-v0.1-4bit-mlx" in output
+    assert "mnist-digits" in output
+    assert "ccsn-clouds" in output
+
+
+def test_asset_getters_delegate_to_ensure(monkeypatch, tmp_path):
+    from orangecontrib.ai_suite.kernel import assets
+    from orangecontrib.ai_suite.kernel.assets import britllm, clouds, mnist
+
+    calls = []
+    for module, getter, name in (
+        (britllm, britllm.get_britllm, britllm.BRITLLM_4BIT.name),
+        (mnist, mnist.get_mnist, mnist.MNIST_DIGITS.name),
+        (clouds, clouds.get_clouds, clouds.CCSN_CLOUDS.name),
+    ):
+        monkeypatch.setattr(
+            module,
+            "ensure",
+            lambda asset, cache, progress, name=name: (
+                calls.append((name, asset.name, cache, progress)) or tmp_path
+            ),
+        )
+        assert getter(tmp_path, None) == tmp_path
+    assert [call[0] for call in calls] == [
+        assets.BRITLLM_4BIT.name,
+        assets.MNIST_DIGITS.name,
+        assets.CCSN_CLOUDS.name,
+    ]

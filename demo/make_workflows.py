@@ -5,7 +5,7 @@ Builds (idempotently):
     demo/mnist_features.ows   (Import Images -> Image Features ->
                                Test & Score + Neural Network, plus
                                Data Table / Column Statistics / Confusion Matrix)
-    demo/cloud_features.ows   (same shape, cloud corpus settings)
+    demo/cloud_features.ows   (same shape, CCSN cloud settings)
 
 The canvas API (orangecanvas.scheme) writes the .ows XML we would otherwise
 hand-craft; widget settings are pre-seeded per node (Import Images path,
@@ -27,6 +27,8 @@ from orangecanvas.registry.description import (
     WidgetDescription,
 )
 from orangecanvas.scheme import Scheme, SchemeLink, SchemeNode
+
+from orangecontrib.ai_suite.kernel.assets import get_clouds, get_mnist
 
 BASE = Path(__file__).resolve().parent
 
@@ -153,22 +155,23 @@ def build_workflow(
 
 
 def main() -> None:
+    mnist = get_mnist()
+    clouds = get_clouds()
     build_workflow(
         "MNIST digits — interpretable features",
-        "Import Images (demo/mnist/train) -> Image Features (working "
+        "Import Images (MNIST_DIGITS/train) -> Image Features (working "
         "size 56) -> Test & Score with the Neural Network; Data Table, Column "
         "Statistics and Confusion Matrix for inspection.",
-        BASE.parent / "demo" / "mnist" / "train",
+        mnist / "train",
         {"working_size": 56, "groups_enabled": "ABCDEF"},
         BASE / "mnist_features.ows",
     )
     build_workflow(
-        "WMO Cloud Atlas genera — interpretable features",
-        "Import Images (data/clouds, fetched by demo/fetch_clouds.py) -> "
-        "Image Features -> Test & Score with the Neural Network; inspect "
-        "features in Data Table / Column Statistics; Confusion Matrix shows "
-        "which genera confound.",
-        BASE.parent / "data" / "clouds",
+        "CCSN cloud genera — interpretable features",
+        "Import Images (CCSN_CLOUDS) -> Image Features -> Test & Score with "
+        "the Neural Network; inspect features in Data Table / Column "
+        "Statistics; Confusion Matrix shows which genera confound.",
+        clouds,
         {"working_size": 128, "groups_enabled": "ABCDEF"},
         BASE / "cloud_features.ows",
     )

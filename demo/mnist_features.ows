@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<scheme version="2.0" title="MNIST digits — interpretable features" description="Import Images (demo/mnist/train) -&gt; Image Features (working size 56) -&gt; Test &amp; Score with the Neural Network; Data Table, Column Statistics and Confusion Matrix for inspection.">
+<scheme version="2.0" title="MNIST digits — interpretable features" description="Import Images (MNIST_DIGITS/train) -&gt; Image Features (working size 56) -&gt; Test &amp; Score with the Neural Network; Data Table, Column Statistics and Confusion Matrix for inspection.">
 	<nodes>
 		<node id="0" name="Import Images" qualified_name="orangecontrib.imageanalytics.widgets.owimageimport.OWImportImages" project_name="" version="" title="Import Images" position="(60, 40)" />
 		<node id="1" name="Image Features" qualified_name="orangecontrib.ai_suite.widgets.ow_image_features.OWImageFeatures" project_name="" version="" title="Image Features" position="(300, 40)" />
@@ -20,11 +20,11 @@
 	<annotations />
 	<thumbnail />
 	<node_properties>
-		<properties node_id="0" format="pickle">gASV2gAAAAAAAAB9lIwMcmVjZW50X3BhdGhzlF2UjB5vcmFuZ2V3aWRnZXQudXRpbHMuZmlsZWRp
-YWxvZ3OUjApSZWNlbnRQYXRolJOUKYGUfZQojAdhYnNwYXRolIw/L1VzZXJzL3Rjb3JiZXR0Y2xh
-cmsvUHJvamVjdHMvb3JhbmdlMy1haS1zdWl0ZS9kZW1vL21uaXN0L3RyYWlulIwGcHJlZml4lIwF
-dHJhaW6UjAdyZWxwYXRolE6MBXRpdGxllIwAlIwFc2hlZXSUaA6MC2ZpbGVfZm9ybWF0lE51YmFz
-Lg==
+		<properties node_id="0" format="pickle">gASVEAEAAAAAAAB9lIwMcmVjZW50X3BhdGhzlF2UjB5vcmFuZ2V3aWRnZXQudXRpbHMuZmlsZWRp
+YWxvZ3OUjApSZWNlbnRQYXRolJOUKYGUfZQojAdhYnNwYXRolIx1L1VzZXJzL3Rjb3JiZXR0Y2xh
+cmsvLmNhY2hlL2h1Z2dpbmdmYWNlL2RhdGFzZXRzL3ByZXBhcmVkL21uaXN0LWRpZ2l0cy83N2Yz
+Mjc5MDkyYTFjMTU3OWIyMjUwZGI4ZWFmZWQwYWQ0MjIwODhjL3RyYWlulIwGcHJlZml4lIwFdHJh
+aW6UjAdyZWxwYXRolE6MBXRpdGxllIwAlIwFc2hlZXSUaA6MC2ZpbGVfZm9ybWF0lE51YmFzLg==
 </properties>
 		<properties node_id="1" format="literal">{'working_size': 56, 'groups_enabled': 'ABCDEF'}</properties>
 	</node_properties>

@@ -36,17 +36,18 @@ and **Visualize**.
 
 ## 2. Data
 
-The committed demo data is enough for the image tutorials:
+The image tutorials use two pinned Hugging Face assets; no `demo/` or `data/`
+checkout is needed:
 
-- `demo/mnist/train/` - PNG digits in one subfolder per label.
+- **MNIST digits** - `orange-ai-assets fetch mnist-digits` (or
+  `get_mnist()`). The prepared root has `train/` and `val/`, 28x28, 500/100
+  images per digit.
+- **CCSN clouds** - `orange-ai-assets fetch ccsn-clouds` (or `get_clouds()`).
+  The prepared root has `ac/`, `sc/`, `cu/`, `cb/`, `ci/` and `CREDITS.md`.
+  The CCSN database is CC0; cite Zhang et al. (2018), *CloudNet*.
 
-The cloud corpus is optional. Fetch it when a tutorial asks for it:
-
-```bash
-uv run python demo/fetch_clouds.py
-```
-
-The BritLLM model is downloaded by the **BritLLM Models** widget (or headlessly
+Both commands print the prepared root; use it for **Import Images**. The
+BritLLM model is downloaded by the **BritLLM Models** widget (or headlessly
 with `orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`). In a source checkout
 you can also run `uv run --extra lora python examples/fetch_britllm.py` and
 paste the printed path into **Base model**.
@@ -104,7 +105,8 @@ The repository ships two canvases:
 
 Use **File > Open** and choose one. The Import Images paths inside are
 machine-local. If a path is stale, open **Import Images**, click the folder
-button and point it at `demo/mnist/train` or `data/clouds`.
+button and point it at the prepared MNIST `train/` or CCSN root printed by
+`orange-ai-assets path mnist-digits` / `orange-ai-assets path ccsn-clouds`.
 
 If you prefer to build from scratch, every tutorial lists the widgets and
 links.

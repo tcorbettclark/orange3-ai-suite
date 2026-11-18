@@ -17,12 +17,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from orangecontrib.ai_suite.kernel.assets import (
-    BRITLLM_4BIT,
-    AssetError,
-    ensure,
-    hub_cache,
-)
+from orangecontrib.ai_suite.kernel.assets import AssetError, get_britllm, hub_cache
 
 
 def report(done: int, total: int) -> None:
@@ -37,8 +32,7 @@ def main() -> int:
     parser.add_argument("--cache", help=f"cache root (default: {hub_cache()})")
     args = parser.parse_args()
     try:
-        path = ensure(
-            BRITLLM_4BIT,
+        path = get_britllm(
             Path(args.cache) if args.cache else None,
             report,
         )

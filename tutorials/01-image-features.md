@@ -18,11 +18,13 @@ Neural Network -> Test & Score
 Image Features is already set to working size 56 and groups A-F.
 
 If the Import Images path is stale, open **Import Images**, click the folder
-button and choose `demo/mnist/train`.
+button and choose the prepared MNIST `train/` directory. Run
+`orange-ai-assets fetch mnist-digits` first if it is not cached; the command
+prints the prepared root.
 
 **From scratch:**
 
-1. Add **Import Images** and point it at `demo/mnist/train`.
+1. Add **Import Images** and point it at the prepared MNIST `train/` directory.
 2. Add **Image Features**, set the working size to 56 (type the
    number and press Enter), and connect *Import Images* **Data** to its
    **Images** input.

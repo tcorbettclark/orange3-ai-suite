@@ -9,15 +9,16 @@ extending the widgets.
 
 1. Install the add-on into the Orange environment and launch the canvas. The
    commands are in the project [README](../README.md#installation).
-2. Work from the repository root, so the relative paths in these tutorials
-   point at the bundled demo data.
-3. The MNIST images are committed in `demo/`. The cloud corpus and BritLLM model
-   are optional. Text tutorials use a public-domain `.txt` downloaded by the
-   reader; no corpus is committed.
+2. Work from the repository root so the generated `demo/*.ows` paths are easy
+   to re-point.
+3. The MNIST and CCSN assets are pinned Hub datasets, prepared by
+   `orange-ai-assets fetch mnist-digits` and `fetch ccsn-clouds`; the BritLLM
+   model is optional for the LoRA tutorials. Text tutorials use a public-domain
+   `.txt` downloaded by the reader.
 
 ```bash
-uv run python demo/fetch_mnist.py   # only needed to rebuild demo/mnist
-uv run python demo/fetch_clouds.py     # optional cloud-corpus tutorial
+orange-ai-assets fetch mnist-digits
+orange-ai-assets fetch ccsn-clouds
 uv run --extra lora python examples/fetch_britllm.py   # optional LoRA tutorials
 ```
 
@@ -37,7 +38,7 @@ uv run --extra lora python examples/fetch_britllm.py   # optional LoRA tutorials
 |---|---|---|
 | [00 - Setup](00-setup.md) | Installation, data, text Tables | add-on |
 | [01 - Image features](01-image-features.md) | Import Images → features → model → evaluation | MNIST |
-| [02 - Colour shortcut and baselines](02-colour-shortcut.md) | Cloud workflow, group ablation, several learners | cloud corpus |
+| [02 - Colour shortcut and baselines](02-colour-shortcut.md) | Cloud workflow, group ablation, several learners | CCSN clouds |
 | [03 - Tokenizers](03-tokenizers.md) | Data → LM Vocab Viewer | text Table |
 | [04 - Train from scratch](04-train-from-scratch.md) | Bigram, MLP and LSTM training | text Table |
 | [05 - Generation and temperature](05-generation.md) | LM Pre-trainer → LM Generator | tutorial 04 |

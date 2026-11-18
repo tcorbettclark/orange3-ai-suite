@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<scheme version="2.0" title="WMO Cloud Atlas genera — interpretable features" description="Import Images (data/clouds, fetched by demo/fetch_clouds.py) -&gt; Image Features -&gt; Test &amp; Score with the Neural Network; inspect features in Data Table / Column Statistics; Confusion Matrix shows which genera confound.">
+<scheme version="2.0" title="CCSN cloud genera — interpretable features" description="Import Images (CCSN_CLOUDS) -&gt; Image Features -&gt; Test &amp; Score with the Neural Network; inspect features in Data Table / Column Statistics; Confusion Matrix shows which genera confound.">
 	<nodes>
 		<node id="0" name="Import Images" qualified_name="orangecontrib.imageanalytics.widgets.owimageimport.OWImportImages" project_name="" version="" title="Import Images" position="(60, 40)" />
 		<node id="1" name="Image Features" qualified_name="orangecontrib.ai_suite.widgets.ow_image_features.OWImageFeatures" project_name="" version="" title="Image Features" position="(300, 40)" />
@@ -20,10 +20,12 @@
 	<annotations />
 	<thumbnail />
 	<node_properties>
-		<properties node_id="0" format="pickle">gASV1gAAAAAAAAB9lIwMcmVjZW50X3BhdGhzlF2UjB5vcmFuZ2V3aWRnZXQudXRpbHMuZmlsZWRp
-YWxvZ3OUjApSZWNlbnRQYXRolJOUKYGUfZQojAdhYnNwYXRolIw6L1VzZXJzL3Rjb3JiZXR0Y2xh
-cmsvUHJvamVjdHMvb3JhbmdlMy1haS1zdWl0ZS9kYXRhL2Nsb3Vkc5SMBnByZWZpeJSMBmNsb3Vk
-c5SMB3JlbHBhdGiUTowFdGl0bGWUjACUjAVzaGVldJRoDowLZmlsZV9mb3JtYXSUTnViYXMu
+		<properties node_id="0" format="pickle">gASVLAEAAAAAAAB9lIwMcmVjZW50X3BhdGhzlF2UjB5vcmFuZ2V3aWRnZXQudXRpbHMuZmlsZWRp
+YWxvZ3OUjApSZWNlbnRQYXRolJOUKYGUfZQojAdhYnNwYXRolIxuL1VzZXJzL3Rjb3JiZXR0Y2xh
+cmsvLmNhY2hlL2h1Z2dpbmdmYWNlL2RhdGFzZXRzL3ByZXBhcmVkL2Njc24tY2xvdWRzL2NjMTk1
+Y2Y5MmZiYjRiNjY4YjdkYjA2MTFkYjhjMTAxNWM3ZjVjZDSUjAZwcmVmaXiUjChjYzE5NWNmOTJm
+YmI0YjY2OGI3ZGIwNjExZGI4YzEwMTVjN2Y1Y2Q0lIwHcmVscGF0aJROjAV0aXRsZZSMAJSMBXNo
+ZWV0lGgOjAtmaWxlX2Zvcm1hdJROdWJhcy4=
 </properties>
 		<properties node_id="1" format="literal">{'working_size': 128, 'groups_enabled': 'ABCDEF'}</properties>
 	</node_properties>

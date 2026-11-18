@@ -10,8 +10,8 @@ The path, and the lines where the parts meet:
     catalogue ──────────────────────> 38 feature classes, each with a description
     groups ─────────────────────────> membership lists, for ablation and display
 
-The three photographs are real skies from the WMO International Cloud Atlas,
-not synthetic ones: `examples/CREDITS.md` names their photographers. Nothing
+The three photographs are real skies from the CCSN database (CC0), not
+synthetic ones: `examples/CREDITS.md` gives the source and citation. Nothing
 here needs Orange or Qt.
 """
 
@@ -40,9 +40,9 @@ def load(name: str) -> np.ndarray:
     return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
 
-CIRRUS = load("cirrus.jpg")  # wispy streaks, blue sky
-VOLUTUS = load("volutus.jpg")  # one thick roll cloud over trees
-OVER_GROUND = load("clouds_over_ground.jpg")  # vegetation fills the bottom
+CIRRUS = load("cirrus.jpg")  # wispy streaks, high cloud
+VOLUTUS = load("volutus.jpg")  # a stratocumulus layer
+LOW_CLOUD = load("low_cloud.jpg")  # a low cumulus layer
 
 # 1. The catalogue is the whole feature set: one class per feature, in column
 #    order, each carrying the sentence a person reads to understand the number.
@@ -98,7 +98,7 @@ print(
 #    scale, thick cloud at the coarse end. One ratio orders the three photos.
 print("\ntexture     where the detail lives, 0.5 = scale-neutral")
 print(f"  {'':10s} {'fine':>6s} {'coarse':>7s} {'ratio':>6s} {'size px':>8s}")
-for label, image in (("cirrus", CIRRUS), ("volutus", VOLUTUS), ("ground", OVER_GROUND)):
+for label, image in (("cirrus", CIRRUS), ("volutus", VOLUTUS), ("low", LOW_CLOUD)):
     texture = extract_features(image)
     ratio = texture["coarse_to_fine_texture_ratio"]
     leaning = (
@@ -110,10 +110,11 @@ for label, image in (("cirrus", CIRRUS), ("volutus", VOLUTUS), ("ground", OVER_G
     )
 
 # 5. The colour shortcut, stated as data rather than as a warning: colour alone
-#    separates sky from ground, which is why the colour group is off by default.
+#    separates wispy high cloud from thick low cloud, which is why the colour
+#    group is off by default.
 print("\nshortcut    colour features alone, off by default")
-sky = extract_features(CIRRUS, groups="G")
-ground = extract_features(OVER_GROUND, groups="G")
-for name in sky.names():
-    print(f"  {name:18s} sky {sky[name]:6.3f}   ground {ground[name]:6.3f}")
+high = extract_features(CIRRUS, groups="G")
+low = extract_features(LOW_CLOUD, groups="G")
+for name in high.names():
+    print(f"  {name:18s} high {high[name]:6.3f}   low {low[name]:6.3f}")
 print(f"  -> {get_feature('bluish_fraction').description.summary}")

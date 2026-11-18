@@ -6,12 +6,12 @@ the deliberate shortcut.
 ## Prepare the corpus
 
 ```bash
-uv run python demo/fetch_clouds.py
+orange-ai-assets fetch ccsn-clouds
 ```
 
-This writes `data/clouds/<genus>/` and a credits file. The images are for
-personal, non-commercial teaching use and are not part of the repository's
-code licence.
+This prepares the five-genus CCSN subset (Ac, Sc, Cu, Cb, Ci) and its
+`CREDITS.md`. The CCSN database is CC0; cite Zhang et al. (2018), *CloudNet*.
+The command prints the prepared root.
 
 ## 1. Open or build the workflow
 
@@ -19,11 +19,11 @@ code licence.
 Image Features is set to working size 128 and groups A-F.
 
 If the Import Images path is stale, open **Import Images**, click the folder
-button and choose `data/clouds`.
+button and choose the prepared CCSN root.
 
 **From scratch:**
 
-1. **Import Images** → folder `data/clouds`.
+1. **Import Images** → the prepared CCSN root.
 2. **Image Features**: set working size to 128 (type the number and
    press Enter).
 3. **Test & Score**, **Confusion Matrix**, **Data Table**, **Column
