@@ -26,7 +26,7 @@ def _parser() -> argparse.ArgumentParser:
         epilog="""examples:
   orange-ai-assets list
   orange-ai-assets fetch mnist-digits
-  orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx --cache ./hf-cache""",
+  orange-ai-assets fetch britllm-4bit --cache ./hf-cache""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")

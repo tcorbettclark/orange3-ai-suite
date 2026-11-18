@@ -2,7 +2,7 @@
 
 Data/artifact/metric-parsing tests always run; end-to-end training tests
 require the pinned model (the BritLLM Models widget or
-``orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx``) — skipped elsewhere. They must run in plain Python without Orange/Qt (kernel rule).
+``orange-ai-assets fetch britllm-4bit``) — skipped elsewhere. They must run in plain Python without Orange/Qt (kernel rule).
 """
 
 import json
@@ -27,7 +27,7 @@ from orangecontrib.ai_suite.kernel.lora.training import _adapter_weights, _lora_
 
 _NO_MODEL = (
     "pinned 4-bit model not cached — use the BritLLM Models widget or "
-    "`orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`"
+    "`orange-ai-assets fetch britllm-4bit`"
 )
 slow = pytest.mark.slow  # end-to-end runs (model load + iterations); excluded
 # from the default suite via addopts -m "not slow"; run with `-m slow` when

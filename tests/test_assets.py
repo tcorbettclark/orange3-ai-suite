@@ -229,7 +229,7 @@ def test_cli_lists_all_assets(capsys):
 
     assert main(["list"]) == 0
     output = capsys.readouterr().out
-    assert "britllm-3b-v0.1-4bit-mlx" in output
+    assert "britllm-4bit" in output
     assert "mnist-digits" in output
     assert "ccsn-clouds" in output
 

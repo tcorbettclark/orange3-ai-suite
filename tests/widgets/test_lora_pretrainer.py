@@ -43,7 +43,7 @@ def test_real_training_path(qapp, capture):
     if model_dir is None:
         pytest.skip(
             "pinned 4-bit model not cached — use the BritLLM Models widget "
-            "or `orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`"
+            "or `orange-ai-assets fetch britllm-4bit`"
         )
 
     w = OWLoRAPretrainer()

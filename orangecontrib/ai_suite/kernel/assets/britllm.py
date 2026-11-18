@@ -7,7 +7,7 @@ from pathlib import Path
 from .hf import Asset, Progress, ensure
 
 BRITLLM_4BIT = Asset(
-    name="britllm-3b-v0.1-4bit-mlx",
+    name="britllm-4bit",
     repo_id="tcorbettclark/britllm-3b-v0.1-4bit-mlx",
     repo_type="model",
     revision="02241a91ab39f8296bb98e6c25afa5a98c676a4f",

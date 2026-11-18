@@ -48,7 +48,7 @@ checkout is needed:
 
 Both commands print the prepared root; use it for **Import Images**. The
 BritLLM model is downloaded by the **BritLLM Models** widget (or headlessly
-with `orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx`); the command prints
+with `orange-ai-assets fetch britllm-4bit`); the command prints
 the snapshot path to paste into **Base model**.
 
 For the language-model tutorials, download a public-domain short story. The

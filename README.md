@@ -474,7 +474,7 @@ and the prepared tree are cached; repeated calls are offline.
 orange-ai-assets list
 orange-ai-assets fetch mnist-digits
 orange-ai-assets fetch ccsn-clouds
-orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx
+orange-ai-assets fetch britllm-4bit
 uv run python demo/make_workflows.py
 ```
 

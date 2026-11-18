@@ -19,7 +19,7 @@ extending the widgets.
 ```bash
 orange-ai-assets fetch mnist-digits
 orange-ai-assets fetch ccsn-clouds
-orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx   # optional LoRA model
+orange-ai-assets fetch britllm-4bit   # optional LoRA model
 ```
 
 ## Conventions

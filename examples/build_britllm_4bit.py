@@ -14,7 +14,7 @@ is given, so the repository is not written to. The second form needs
 (override with ``--repo-id``), then prints the commit SHA to pin. The classic
 LFS uploader is the default; ``--xet`` opts into the chunked uploader.
 Students use the BritLLM Models widget or
-``orange-ai-assets fetch britllm-3b-v0.1-4bit-mlx``; neither converts anything.
+``orange-ai-assets fetch britllm-4bit``; neither converts anything.
 """
 
 from __future__ import annotations
@@ -210,7 +210,7 @@ def asset_block(repo_id: str, revision: str | None, manifest: dict) -> str:
     revision_text = "None" if revision is None else repr(revision)
     note = "  # pin the upload's commit SHA" if revision is None else ""
     return f"""BRITLLM_4BIT = Asset(
-    name="{repo_id.split("/")[-1]}",
+    name="britllm-4bit",
     repo_id="{repo_id}",
     repo_type="model",
     revision={revision_text},{note}
