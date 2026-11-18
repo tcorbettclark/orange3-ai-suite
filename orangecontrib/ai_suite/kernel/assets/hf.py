@@ -13,7 +13,8 @@ The Hub cache is ``HF_HUB_CACHE``, else ``$HF_HOME/hub``, else
 
 Transfers use the classic Hugging Face LFS path by default. It leaves a
 resumable ``.incomplete`` file under ``blobs`` and is more reliable than Xet for
-these artifacts. Set ``HF_HUB_DISABLE_XET=0`` before importing to opt into Xet.
+these artifacts. Set ``HF_HUB_DISABLE_XET=0`` to opt into Xet at download time;
+the choice is applied when a download runs, never at import.
 """
 
 from __future__ import annotations
@@ -36,19 +37,27 @@ _WEIGHTS = "model.safetensors"
 _VERIFIED = ".orange3-verified.json"
 _PREPARED = ".orange3-prepared.json"
 
-# Classic LFS by default: reliable progress and a resumable .incomplete file.
-# ``setdefault`` lets HF_HUB_DISABLE_XET=0 opt in; if HF imported first, its
-# constant is already fixed, so patch it (file_download reads it at call time).
-_DISABLE_XET = os.environ.setdefault("HF_HUB_DISABLE_XET", "1").lower() not in {
-    "0",
-    "false",
-    "no",
-    "off",
-}
-if _DISABLE_XET and "huggingface_hub.constants" in sys.modules:
-    import huggingface_hub.constants as _hf_constants
 
-    _hf_constants.HF_HUB_DISABLE_XET = True
+def _prefer_classic_lfs() -> None:
+    """Prefer the classic LFS transfer over Xet; called at download time, never
+    at import, so importing this module changes no process-global state.
+
+    Classic LFS leaves a resumable ``.incomplete`` file under ``blobs`` and is
+    more reliable for these artifacts. The ``setdefault`` lets an explicit
+    ``HF_HUB_DISABLE_XET=0`` opt in; if ``huggingface_hub`` was imported first,
+    its constant is already fixed, so patch it (``file_download`` reads it at
+    call time).
+    """
+    disable_xet = os.environ.setdefault("HF_HUB_DISABLE_XET", "1").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    if disable_xet and "huggingface_hub.constants" in sys.modules:
+        import huggingface_hub.constants as _hf_constants
+
+        _hf_constants.HF_HUB_DISABLE_XET = True
 
 
 class AssetError(RuntimeError):
@@ -113,6 +122,7 @@ def _snapshot_download(
 ) -> Path:
     from huggingface_hub import snapshot_download
 
+    _prefer_classic_lfs()
     kwargs: dict[str, Any] = {
         "repo_id": asset.repo_id,
         "repo_type": asset.repo_type,
