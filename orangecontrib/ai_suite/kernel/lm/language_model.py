@@ -20,7 +20,7 @@ import numpy as np
 
 from .architecture import Architecture, architecture_from_dict
 from .pairs import make_pairs
-from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict
+from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict, stream_units
 from .training import (
     EpochStats,
     TrainingOptions,
@@ -38,14 +38,9 @@ def _last_unit(stream: Iterable[int]) -> list[int]:
 
     Prompting with anything before the last EOS would condition the model on a
     context it never saw in training, because contexts never cross a unit end.
+    Unit structure is :func:`.tokenizer.stream_units`'s to derive.
     """
-    units: list[list[int]] = [[]]
-    for i in stream:
-        if i == EOS_ID:
-            units.append([])
-        elif i != BOS_ID:
-            units[-1].append(i)
-    return next((unit for unit in reversed(units) if unit), [])
+    return next((unit for unit in reversed(stream_units(stream)) if unit), [])
 
 
 def _sample(logits: np.ndarray, temperature: float, rng: np.random.Generator) -> int:

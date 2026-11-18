@@ -57,7 +57,7 @@ import inspect
 import re
 from abc import ABC, abstractmethod
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 from typing import ClassVar
@@ -71,6 +71,29 @@ BOS_ID = 0
 UNK_ID = 1
 EOS_ID = 2
 SPECIAL_TOKENS = (BOS, UNK, EOS)
+
+
+def stream_units(stream: Iterable[int], *, keep_bos: bool = False) -> list[list[int]]:
+    """Split an id stream into its units at the EOS boundaries.
+
+    The kernel's one spelling of unit structure, shared by
+    :meth:`Tokenizer.decode`, :func:`pairs.make_pairs` and the prompt trimming
+    in :mod:`language_model`. A unit may be empty (an empty unit is a doubled
+    EOS); a trailing run of ids after the last EOS comes back as the final
+    unit, so a renderer sees text the stream carries even without a
+    terminator. BOS is dropped from unit content unless "keep_bos" - it never
+    travels in a stream :meth:`Tokenizer.encode` produced, but a caller that
+    re-checks can keep it. A stream without a trailing EOS still yields
+    exactly the units it carries, which is why :func:`pairs.make_pairs`
+    re-checks the terminator itself.
+    """
+    units: list[list[int]] = [[]]
+    for i in map(int, stream):
+        if i == EOS_ID:
+            units.append([])
+        elif i != BOS_ID or keep_bos:
+            units[-1].append(i)
+    return units
 
 
 @dataclass(frozen=True)
@@ -223,12 +246,7 @@ class Tokenizer(ABC):
         newline or a run of spaces comes back as a single space. ``<unk>`` is not
         dropped: it shows literally.
         """
-        units: list[list[int]] = [[]]
-        for i in map(int, ids):
-            if i == EOS_ID:
-                units.append([])
-            elif i != BOS_ID:
-                units[-1].append(i)
+        units: list[list[int]] = stream_units(ids)
         return " ".join(text for text in map(self._decode_unit, units) if text)
 
     @abstractmethod

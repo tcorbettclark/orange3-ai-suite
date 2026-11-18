@@ -29,7 +29,7 @@ from itertools import pairwise
 import numpy as np
 
 from .._split import key_order
-from .tokenizer import BOS_ID, EOS_ID
+from .tokenizer import BOS_ID, EOS_ID, stream_units
 
 
 @dataclass
@@ -167,9 +167,14 @@ def make_pairs(stream: Sequence[int], context_width: int) -> Pairs:
     contexts = np.full((len(ids), context_width), BOS_ID, dtype=np.int32)
     targets = np.empty(len(ids), dtype=np.int32)
     row = 0
-    for start, end in zip(starts, ends, strict=True):
-        # BOS opens the unit's context; EOS is its last target.
-        seq = np.concatenate(([BOS_ID], ids[start:end], [EOS_ID]))
+    # BOS is kept in unit content here so a stray one counts as data; encode
+    # never emits it, so the two paths agree on every stream encode produces.
+    # The validation guarantees the stream ends with EOS, whose trailing empty
+    # entry stream_units added; drop it so the last pair is the EOS prediction.
+    units = stream_units(ids, keep_bos=True)
+    units.pop()
+    for unit in units:
+        seq = np.concatenate(([BOS_ID], np.asarray(unit, dtype=np.int32), [EOS_ID]))
         for i in range(1, len(seq)):
             lo = max(0, i - context_width)
             contexts[row, context_width - (i - lo) :] = seq[lo:i]
