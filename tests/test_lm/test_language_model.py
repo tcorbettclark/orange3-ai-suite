@@ -56,7 +56,7 @@ def mlp_model(tokenizer):
     )
 
 
-# ---- builders ------------------------------------------------------------
+# ---- architectures --------------------------------------------------------
 
 
 def test_context_width_is_a_hyperparameter_only_where_it_is_tunable():
@@ -120,7 +120,7 @@ def test_architectures_are_cloneable_estimators():
     assert config.set_params(context_width=12).context_width == 12
 
 
-def test_builder_error_paths(tokenizer):
+def test_architecture_error_paths(tokenizer):
     with pytest.raises(ValueError, match="vocab_size"):
         MLP(context_width=2).build(vocab_size=2)
     with pytest.raises(ValueError, match="context_width"):
@@ -230,6 +230,10 @@ def test_training_options_and_split_are_validated():
         TrainingOptions(validation_fraction=0.0)
     with pytest.raises(ValueError, match="epochs"):
         TrainingOptions(epochs=0)
+    with pytest.raises(ValueError, match="batch_size"):
+        TrainingOptions(batch_size=0)
+    with pytest.raises(ValueError, match="learning_rate"):
+        TrainingOptions(learning_rate=0)
     with pytest.raises(ValueError, match="at least 2"):
         # a single sentence cannot yield a sentence-level split
         fit(

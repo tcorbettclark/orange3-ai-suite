@@ -37,6 +37,10 @@ class TrainingOptions:
     def __post_init__(self) -> None:
         if self.epochs < 1:
             raise ValueError("epochs must be >= 1")
+        if self.batch_size < 1:
+            raise ValueError("batch_size must be >= 1")
+        if self.learning_rate <= 0:
+            raise ValueError("learning_rate must be > 0")
         if not 0.0 < self.validation_fraction < 1.0:
             raise ValueError("validation_fraction must be strictly between 0 and 1")
 
