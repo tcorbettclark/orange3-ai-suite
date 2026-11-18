@@ -335,9 +335,9 @@ title, sentence and intuition are shown beside its values, and **Technical
 details…** opens the mechanics for that one feature.
 
 What that plain baseline produces, cell by cell, is shown by
-`examples/image_pixel_values.py` (`uv run python examples/image_pixel_values.py`);
-it prints one photograph as a grid of numbers and as characters, with the
-column name of every value.
+`examples/image_pixels.py` (`uv run python examples/image_pixels.py`); it prints
+one photograph as a grid of numbers and as characters, with the column name of
+every value.
 
 A runnable script lives in `examples/image_features.py`
 (`uv run python examples/image_features.py`). It reads three real cloud
@@ -467,9 +467,10 @@ orangecontrib/
     __init__.py
     adapters.py Orange <-> kernel conversion
     kernel/
-      images/     image data, decoded once and measured two ways
-        decode.py    RGB/luminance, alpha and [0,1] conventions (shared)
-        pixel_values.py  the raw luminance grid baseline (not catalogue features)
+      images/     image data: decoded, resampled, then measured
+        decode.py    RGB/luma, alpha and [0,1] conventions (shared)
+        resize.py    one resampling policy: area shrinking, bilinear growing
+        flatten.py   a grid as one row, with a coordinate name per cell
         features/    the feature package
           catalogue/   one module and one class per feature, plus the index
           description.py  the four descriptions, checked when a feature is created

@@ -2,12 +2,13 @@
 
 Run it from the repository root:
 
-    uv run python examples/image_pixel_values.py [photo] [grid size]
+    uv run python examples/image_pixels.py [photo] [grid size]
 
-``kernel/images/pixel_values.py`` is the plain baseline: one image array in, one
-flat vector of luma values out. It does not read files, name columns, build tables
-or handle batches - the Image Pixels widget supplies those. This script shows the
-three things the module does guarantee:
+The plain baseline is three kernel steps, and the Image Pixels widget composes
+them: ``decode`` (luma, [0, 1]), ``resize`` (a fixed square resolution) and
+``flatten`` (one row, with a coordinate name per cell). None of them reads a file
+or builds a table - the widget supplies those. This script shows what the three
+steps guarantee:
 
 * values are luma in [0, 1], in row-major order;
 * there are exactly ``size * size`` of them, and the grid size is passed in;
@@ -21,15 +22,18 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.images.pixel_values import pixel_values
+from orangecontrib.ai_suite.kernel.images.decode import to_luminance, to_unit_scale
+from orangecontrib.ai_suite.kernel.images.flatten import flatten
+from orangecontrib.ai_suite.kernel.images.resize import resize_square
 
 HERE = Path(__file__).parent
 RAMP = " .:-=+*#%@"  # ten steps from dark to bright
 
 
-def column_names(size: int) -> list[str]:
-    """What the Image Pixels widget calls the cells: a coordinate, not a concept."""
-    return [f"pixel_r{row}_c{column}" for row in range(size) for column in range(size)]
+def pixel_values(image: np.ndarray, size: int) -> tuple[np.ndarray, tuple[str, ...]]:
+    """The widget's pipeline, in the open: decode, resize, flatten."""
+    grid = resize_square(to_unit_scale(to_luminance(image)), size)
+    return flatten(grid)
 
 
 def load(path: Path) -> np.ndarray:
@@ -68,8 +72,7 @@ def main(argv: list[str]) -> None:
     resampling = "INTER_AREA (shrinking)" if size < min(height, width) else "INTER_LINEAR"
     print(f"resampling   {resampling}")
 
-    values = pixel_values(image, size)
-    names = column_names(size)
+    values, names = pixel_values(image, size)
     print(f"\n  pixel_values(image, {size})")
     print(f"    shape {values.shape}, dtype {values.dtype}")
     print(f"    values {values.min():.3f} .. {values.max():.3f}, mean {values.mean():.3f}")
@@ -91,18 +94,18 @@ def main(argv: list[str]) -> None:
 
     print("\n  the same photograph at three resolutions:")
     for other in (4, 10, 20):
-        coarse = pixel_values(image, other)
+        coarse, other_names = pixel_values(image, other)
         print(
-            f"    {other:2d} x {other:<2d} -> {len(column_names(other)):3d} columns, "
-            f"mean {coarse.mean():.3f}"
+            f"    {other:2d} x {other:<2d} -> {len(other_names):3d} columns, mean {coarse.mean():.3f}"
         )
     print("\n    at 4 x 4 the same frame is that coarse:")
-    show_grid(pixel_values(image, 4), 4)
+    show_grid(pixel_values(image, 4)[0], 4)
     print("    fewer cells keep the overall brightness and lose the detail; the count")
     print("    grows as the square of the side, which is why the widget defaults to 10.")
 
-    print("\n  not stretched: the range above comes from the input's own scale")
-    print("  (255 -> 1.0), not from this photograph's darkest and brightest cell.")
+    print("\n  the frame is stretched to a square, but the values are not rescaled:")
+    print("  the range comes from the input's own scale (255 -> 1.0), not from this")
+    print("  photograph's darkest and brightest cell.")
 
 
 if __name__ == "__main__":

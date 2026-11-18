@@ -19,6 +19,7 @@ import cv2
 import numpy as np
 
 from ..decode import drop_alpha, to_luminance, to_unit_scale
+from ..resize import resize_square
 from ._conventions import EPS
 from .options import FeatureOptions
 
@@ -34,12 +35,15 @@ def _centre_crop_to_square(image: np.ndarray) -> np.ndarray:
 
 
 def _geometry(image: np.ndarray, options: FeatureOptions) -> np.ndarray:
-    """The geometric half of both pipelines: centre-crop, then resize."""
+    """The geometric half of both pipelines: centre-crop, then resize.
+
+    Cropping is this pipeline's choice, not a resampling rule: the feature
+    definitions assume the subject is central. Resampling is :mod:`..resize`.
+    """
     if options.centre_crop:
         image = _centre_crop_to_square(image)
-    size = options.working_size
-    if size is not None and image.shape != (size,) * 2:
-        image = cv2.resize(image, (size, size), interpolation=cv2.INTER_AREA)
+    if options.working_size is not None:
+        image = resize_square(image, options.working_size)
     return image
 
 

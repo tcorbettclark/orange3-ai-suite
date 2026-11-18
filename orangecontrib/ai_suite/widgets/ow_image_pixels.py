@@ -22,20 +22,15 @@ from Orange.widgets.widget import Input, Msg, Output, OWWidget
 from orangecontrib.ai_suite.adapters import image_paths
 
 
-def _pixel_column_names(size: int) -> list[str]:
-    """Column names of the grid, row-major: the table's coordinate system."""
-    return [f"pixel_r{row}_c{column}" for row in range(size) for column in range(size)]
-
-
 @dataclass
 class _PixelResult:
     generation: int
     data_version: int
     values: np.ndarray
+    names: tuple[str, ...]
     readable_source: tuple[int, ...]
     n_unreadable: int
     skipped_no_path: int
-    size: int
 
 
 class PixelValuesWorker(QThread):
@@ -69,9 +64,15 @@ class PixelValuesWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.images.pixel_values import pixel_values
+            from orangecontrib.ai_suite.kernel.images.decode import (
+                to_luminance,
+                to_unit_scale,
+            )
+            from orangecontrib.ai_suite.kernel.images.flatten import flatten
+            from orangecontrib.ai_suite.kernel.images.resize import resize_square
 
             rows = []
+            names: tuple[str, ...] = ()
             readable = []
             n_unreadable = 0
             total = max(1, len(self._paths))
@@ -83,7 +84,9 @@ class PixelValuesWorker(QThread):
                     n_unreadable += 1
                 else:
                     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                    rows.append(pixel_values(rgb, self._size))
+                    grid = resize_square(to_unit_scale(to_luminance(rgb)), self._size)
+                    values, names = flatten(grid)
+                    rows.append(values)
                     readable.append(source)
                 self.progress.emit(int(100 * (n + 1) / total))
 
@@ -96,10 +99,10 @@ class PixelValuesWorker(QThread):
                 self._generation,
                 self._data_version,
                 values,
+                names,
                 tuple(readable),
                 n_unreadable,
                 self._skipped_no_path,
-                self._size,
             )
             self.finished_ok.emit(self.result)
         except Exception:
@@ -299,11 +302,10 @@ class OWImagePixels(OWWidget):
             self.Outputs.features.send(None)
             return
 
-        names = _pixel_column_names(result.size)
         source = self.data.domain
         keep = np.asarray(result.readable_source, dtype=int)
         domain = Domain(
-            [ContinuousVariable(name) for name in names],
+            [ContinuousVariable(name) for name in result.names],
             class_vars=list(source.class_vars),
             metas=list(source.metas),
         )

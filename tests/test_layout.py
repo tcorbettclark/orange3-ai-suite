@@ -28,7 +28,8 @@ def test_the_image_domain_has_three_parts():
     assert {p.name for p in IMAGES.iterdir() if p.suffix == ".py"} == {
         "__init__.py",
         "decode.py",
-        "pixel_values.py",
+        "flatten.py",
+        "resize.py",
     }
     assert (IMAGES / "features").is_dir()
     # no second home for the same code
