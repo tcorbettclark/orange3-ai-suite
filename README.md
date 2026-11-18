@@ -16,7 +16,7 @@ and generations come back as corpora that Orange's text widgets can analyse.
   Orange or Qt imports: image features, tokenizers and pairs, the architectures,
   the model that trains and generates, and MLX LoRA wrappers. The same code runs in
   the widgets or in a plain Python session.
-- **`orangecontrib/ai_suite/`** - the Orange add-on. Nine widgets and the signal
+- **`orangecontrib/ai_suite/`** - the Orange add-on. Ten widgets and the signal
   adapters that convert between Orange objects and kernel types. The widgets
   are thin shells: options, thumbnail grids, live plots and Orange signals.
 - **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
@@ -423,10 +423,14 @@ data = LoRAData.from_texts(corpus)  # or LoRAData.from_pairs(pairs)
 adapter = train_lora(
     base,
     data,
-    "my-adapter",
     options=LoRAOptions(iters=300, num_layers=16),
 )
-model = LoRAModel(adapter.base_model, adapter.adapter_path)
+# the run writes into a fresh run-scoped temp directory; save the artifact
+# somewhere you own to keep it:
+from pathlib import Path
+
+artifact = adapter.save(Path("adapters") / adapter.name)
+model = LoRAModel.from_artifact(artifact)
 model.generate("In the second century", temperature=0)
 model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}
 model.adapter_enabled = False  # the same base model, before adaptation
@@ -538,11 +542,12 @@ orangecontrib/
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
       lora/       LoRA data formats, MLX training subprocess, artifact/model objects
+      assets/     Hugging Face assets: download cache policy, prepare, asset registry
       text/       plain text into training rows, behind one facade
         _clean.py    raw text -> clean text (Gutenberg, page numbers, reflow)
         _split.py    clean text -> table rows (whole file, paragraph, sentence)
         _qa.py       clean text -> Q/A prompt/completion pairs
-    widgets/      the nine Orange widgets and their icons
+    widgets/      the ten Orange widgets and their icons
 demo/             generated .ows workflows and their generator
 examples/         runnable kernel examples
 tests/            kernel tests + offscreen widget tests

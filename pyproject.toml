@@ -58,7 +58,9 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["orangecontrib"]
 # orangecontrib is a PEP 420 namespace shared with other add-ons; Orange
-# >= 3.38 discovers add-ons through entry points.
+# >= 3.38 discovers add-ons through entry points. The same entry point is
+# deliberately registered under both spellings ("orange.widgets" per the
+# namespace package, "Orange.widgets" per older discovery code) - keep both.
 
 [project.entry-points."orange.widgets"]
 "Language Models" = "orangecontrib.ai_suite.widgets"
