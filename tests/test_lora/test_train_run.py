@@ -97,10 +97,10 @@ def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm, tmp
         on_metric=seen.append,
     )
     assert (tmp_path / "adapter" / "adapters.safetensors").exists()
-    assert adapter.hyperparameters["iters_completed"] == 3
-    assert adapter.hyperparameters["stopped"] is False
+    assert adapter.training["iters_completed"] == 3
+    assert adapter.training["stopped"] is False
     assert {m["kind"] for m in seen} == {"params", "train", "val"}
-    config = adapter.hyperparameters["adapter_config"]
+    config = adapter.training["adapter_config"]
     assert config["fine_tune_type"] == "lora"
     assert config["mask_prompt"] is False
     argv = json.loads((tmp_path / "adapter" / "argv.json").read_text())
@@ -116,7 +116,7 @@ def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
         tmp_path / "adapter",
         options=_options(iters=1),
     )
-    assert adapter.hyperparameters["adapter_config"]["mask_prompt"] is True
+    assert adapter.training["adapter_config"]["mask_prompt"] is True
 
 
 def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
@@ -136,8 +136,8 @@ def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
         stop_requested=reported.is_set,
     )
     assert (adapter_dir / "adapters.safetensors").exists()
-    assert adapter.hyperparameters["iters_completed"] == 1
-    assert adapter.hyperparameters["stopped"] is True
+    assert adapter.training["iters_completed"] == 1
+    assert adapter.training["stopped"] is True
 
 
 def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm, tmp_path):

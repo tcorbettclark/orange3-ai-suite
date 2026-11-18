@@ -305,15 +305,16 @@ class LoRATrainerBase(OWWidget, openclass=True):
         self.model = LoRAModel(
             adapter.base_model,
             adapter.adapter_path,
-            adapter.hyperparameters,
+            adapter.training,
             adapter.name,
         )
         self.Outputs.model.send(self.model)
         detail = f" ({self._trainable_note})" if self._trainable_note else ""
-        hp = adapter.hyperparameters
+        training = adapter.training
         stopped = (
-            f" Stopped at iteration {hp['iters_completed']} of {hp['iters']}."
-            if hp.get("stopped")
+            f" Stopped at iteration {training['iters_completed']} of "
+            f"{training['options']['iters']}."
+            if training.get("stopped")
             else ""
         )
         self.status_label.setText(

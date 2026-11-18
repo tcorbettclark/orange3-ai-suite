@@ -20,7 +20,7 @@ from orangecontrib.ai_suite.kernel.lora import (
     parse_metric,
     train_lora,
 )
-from orangecontrib.ai_suite.kernel.lora.model import _segments
+from orangecontrib.ai_suite.kernel.lora.model import _echo, _segments
 from orangecontrib.ai_suite.kernel.lora.training import _adapter_weights, _lora_command, _stage
 
 _NO_MODEL = (
@@ -226,20 +226,20 @@ def test_adapter_artifact_round_trip(tmp_path):
     adapter = LoRAAdapter(
         base_model="some/base-model",
         adapter_path=None,  # no trained weights yet: the raw base model
-        hyperparameters={"iters": 300},
+        training={"options": {"iters": 300}},
     )
     saved = adapter.save(tmp_path / "adapter")
     assert (saved / "lora_meta.json").exists()
     loaded = LoRAAdapter.load(saved)
     assert loaded.base_model == "some/base-model"
-    assert loaded.hyperparameters["iters"] == 300
+    assert loaded.training["options"]["iters"] == 300
 
 
 def test_adapter_without_adapters_loads_fine(tmp_path):
     # a copy of only the meta (adapter weights omitted) still loads as the
     # base model with adapter off: the raw-model comparison
     (tmp_path / "a").mkdir()
-    LoRAAdapter(base_model="b/x", adapter_path=None, hyperparameters={}).save(tmp_path / "a")
+    LoRAAdapter(base_model="b/x", adapter_path=None, training={}).save(tmp_path / "a")
     loaded = LoRAAdapter.load(tmp_path / "a")
     assert loaded.adapter_path is None
 
@@ -247,7 +247,7 @@ def test_adapter_without_adapters_loads_fine(tmp_path):
 def test_saving_an_adapter_without_weights_raises(tmp_path):
     (tmp_path / "empty").mkdir()
     adapter = LoRAAdapter(
-        base_model="b/x", adapter_path=str(tmp_path / "empty"), hyperparameters={}
+        base_model="b/x", adapter_path=str(tmp_path / "empty"), training={}
     )
     with pytest.raises(FileNotFoundError, match="adapters.safetensors"):
         adapter.save(tmp_path / "artifact")
@@ -269,6 +269,19 @@ def test_model_import_requires_apple(monkeypatch):
         LoRAModel("some/model")
 
 
+def test_echo_inserts_one_space_between_words():
+    assert _echo("hello", "world") == "hello world"
+    assert _echo("hello ", "world") == "hello world"
+    assert _echo("hello", " world") == "hello world"
+
+
+def test_echo_leaves_empty_sides_and_punctuation_alone():
+    assert _echo("", "hello") == "hello"
+    assert _echo("hello", "") == "hello"
+    assert _echo("hello", ".") == "hello."
+    assert _echo("hello", "\nworld") == "hello\nworld"
+
+
 # ---- end-to-end (converted model required) ---------------------------------
 
 
@@ -288,7 +301,7 @@ def test_train_lora_tiny_run(tmp_path):
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=128, num_layers=4),
     )
     assert (Path(adapter.adapter_path) / "adapters.safetensors").exists()
-    assert adapter.hyperparameters["iters"] == 2
+    assert adapter.training["options"]["iters"] == 2
 
     model = LoRAModel(adapter.base_model, adapter.adapter_path)
     prompt = "the quick brown fox"

@@ -340,8 +340,8 @@ def train_lora(
     return LoRAAdapter(
         base_model=str(base_model),
         adapter_path=str(adapter_dir),
-        hyperparameters={
-            **asdict(opts),
+        training={
+            "options": asdict(opts),
             "adapter_config": adapter_config,
             "iters_completed": completed,
             "stopped": completed < opts.iters,

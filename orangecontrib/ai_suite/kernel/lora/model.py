@@ -2,8 +2,8 @@
 
 An adapter is meaningless without the exact base model it was trained against,
 so a :class:`LoRAAdapter` is a directory containing the adapter weights, its
-config, and a ``lora_meta.json`` with the base-model identity and
-hyperparameters. Loading the artifact reproduces the trained setup.
+config, and a ``lora_meta.json`` with the base-model identity and the training
+run that produced it. Loading the artifact reproduces the trained setup.
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import math
 import shutil
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,6 +33,23 @@ def _require_mlx() -> None:
         raise ImportError(_MLX_IMPORT_ERROR) from exc
 
 
+def _echo(prompt: str, completion: str) -> str:
+    """The prompt with the completion appended, one space between words.
+
+    mlx-lm returns the completion only; the kernel convention is the full text
+    (prompt echoed), matching the Keras ``LanguageModel``. mlx-lm does not say
+    whether the completion begins with a space, so one is inserted only when the
+    prompt ends in a non-space and the completion starts with an alphanumeric
+    character.
+    """
+    sep = (
+        " "
+        if prompt and completion and not prompt[-1].isspace() and completion[0].isalnum()
+        else ""
+    )
+    return prompt + sep + completion
+
+
 def _segments(ids: list[int], max_tokens: int, window: int) -> list[list[int]]:
     """Windows of at most ``window`` inputs, plus the target that follows each.
 
@@ -54,7 +70,7 @@ class LoRAAdapter:
 
     base_model: str  # path or HF repo id of the base model
     adapter_path: str | None  # None = the raw base model itself (no adapter)
-    hyperparameters: dict[str, Any]
+    training: dict[str, Any]  # options, mlx-lm adapter config, iterations reached
     name: str = ""
 
     def save(self, dest: str | Path) -> Path:
@@ -77,9 +93,8 @@ class LoRAAdapter:
             json.dumps(
                 {
                     "base_model": self.base_model,
-                    "hyperparameters": self.hyperparameters,
+                    "training": self.training,
                     "name": self.name,
-                    "saved_at": time.strftime("%Y-%m-%d %H:%M"),
                 },
                 indent=1,
             )
@@ -100,10 +115,10 @@ class LoRAAdapter:
             return cls(
                 base_model=meta["base_model"],
                 adapter_path=str(src) if has_weights else None,
-                hyperparameters=meta.get("hyperparameters", {}),
+                training=meta["training"],
                 name=meta.get("name", ""),
             )
-        return cls(base_model=str(src), adapter_path=None, hyperparameters={})
+        return cls(base_model=str(src), adapter_path=None, training={})
 
     def __repr__(self):  # pragma: no cover - cosmetic
         return (
@@ -125,14 +140,14 @@ class LoRAModel:
         self,
         base_model: str,
         adapter_path: str | None = None,
-        hyperparameters: dict[str, Any] | None = None,
+        training: dict[str, Any] | None = None,
         name: str = "",
     ):
         _require_mlx()
         self.base_model = base_model
         self.adapter_path = adapter_path
         self.adapter_enabled = adapter_path is not None
-        self.hyperparameters = dict(hyperparameters or {})
+        self.training = dict(training or {})
         self.name = name
         self._models: dict[bool, tuple[Any, Any]] = {}  # variant -> (model, tokenizer)
 
@@ -182,11 +197,8 @@ class LoRAModel:
             verbose=False,
         )
         # mlx-lm returns the completion only; the kernel convention is the full
-        # text (prompt echoed), matching the Keras LanguageModel. mlx-lm does not
-        # say whether the completion begins with a space, so one is inserted
-        # only when both sides are word characters.
-        sep = " " if prompt and output and not prompt[-1:].isspace() and output[0].isalnum() else ""
-        return prompt + sep + output
+        # text (prompt echoed), matching the Keras LanguageModel.
+        return _echo(prompt, output)
 
     def evaluate(self, text: str, max_tokens: int = 4000) -> dict:
         """Loss and perplexity over ``text``, in fixed 512-token windows.
@@ -223,7 +235,7 @@ class LoRAModel:
         return LoRAAdapter(
             base_model=self.base_model,
             adapter_path=self.adapter_path,
-            hyperparameters=self.hyperparameters,
+            training=self.training,
             name=self.name,
         )
 
@@ -234,7 +246,7 @@ class LoRAModel:
         return cls(
             adapter.base_model,
             adapter.adapter_path,
-            adapter.hyperparameters,
+            adapter.training,
             adapter.name,
         )
 
