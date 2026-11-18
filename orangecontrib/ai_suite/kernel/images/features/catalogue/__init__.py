@@ -14,9 +14,9 @@ rather than discovered by scanning the directory: a module that nothing imports
 would otherwise be silently invisible, which is a worse failure than a stale
 list. The tests assert that the catalogue and the directory agree.
 
-``POSITION`` and ``is_known`` are the seam :mod:`..extraction` uses; they are
-public names but not advertised, because a caller reading features should go
-through the accessors.
+``POSITION`` and ``is_known`` are the seam :mod:`..extraction` and :mod:`..groups`
+use; they are public names but not advertised, because a caller reading features
+should go through the accessors.
 
 Order here is column order and nothing else. Which features belong together is
 a grouping concern (:mod:`..groups`), so neither this file nor the classes it
