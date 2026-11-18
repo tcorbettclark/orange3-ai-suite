@@ -105,7 +105,7 @@ The repository ships two canvases:
 Use **File > Open** and choose one. The Import Images paths inside are
 machine-local. If a path is stale, open **Import Images**, click the folder
 button and point it at the prepared MNIST `train/` or CCSN root printed by
-`orange-ai-assets path mnist-digits` / `orange-ai-assets path ccsn-clouds`.
+`orange-ai-assets fetch mnist-digits` / `orange-ai-assets fetch ccsn-clouds`.
 
 If you prefer to build from scratch, every tutorial lists the widgets and
 links.

@@ -7,12 +7,12 @@ import sys
 from pathlib import Path
 
 from .catalogue import ASSETS, BRITLLM_4BIT
-from .hf import AssetError, cached_path, ensure, verify
+from .hf import AssetError, ensure
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=("fetch", "path", "verify", "list"))
+    parser.add_argument("command", choices=("fetch", "list"))
     parser.add_argument("asset", nargs="?", default=BRITLLM_4BIT.name)
     parser.add_argument(
         "--cache",
@@ -33,22 +33,6 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"unknown asset {args.asset!r}; choose from {', '.join(ASSETS)}")
 
     cache = Path(args.cache) if args.cache else None
-    if args.command == "path":
-        path = cached_path(asset, cache)
-        if path is None:
-            print(f"{asset.name} is not cached", file=sys.stderr)
-            return 1
-        print(path)
-        return 0
-    if args.command == "verify":
-        path = cached_path(asset, cache)
-        if path is None:
-            print(f"{asset.name} is not cached", file=sys.stderr)
-            return 1
-        verify(asset, path)
-        print(f"{asset.name} verified at {path}")
-        return 0
-
     last = [-1]
 
     def report(done: int, total: int) -> None:
