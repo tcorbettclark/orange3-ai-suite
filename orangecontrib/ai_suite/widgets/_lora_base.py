@@ -196,7 +196,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         """Build the kernel's ``LoRAData`` from the connected Table."""
         raise NotImplementedError
 
-    def _collect_request(self, tmp_dir, data_obj) -> dict:
+    def _collect_request(self, data_obj) -> dict:
         options = LoRAOptions(
             iters=self.iters,
             learning_rate=self.learning_rate,
@@ -210,8 +210,6 @@ class LoRATrainerBase(OWWidget, openclass=True):
         return dict(
             base_model=self.base_model.strip(),
             data=data_obj,
-            adapter_dir=tmp_dir / "adapter",
-            data_dir=tmp_dir / "staged-data",
             options=options,
         )
 
@@ -243,17 +241,13 @@ class LoRATrainerBase(OWWidget, openclass=True):
             self.Warning.no_model()
             return None
 
-        import tempfile
-        from pathlib import Path
-
-        tmp_dir = Path(tempfile.mkdtemp(prefix="lora_"))
         try:
             data_obj = self._make_lora_data()
         except ValueError as exc:
             self.Warning.no_text(str(exc))
             return None
         try:
-            return self._collect_request(tmp_dir, data_obj)
+            return self._collect_request(data_obj)
         except ValueError as exc:
             self.Warning.bad_settings(str(exc))
             return None

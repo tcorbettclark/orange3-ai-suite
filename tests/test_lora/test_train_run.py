@@ -7,6 +7,7 @@ process-group signal all run; it needs no MLX and no model weights.
 import json
 import os
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -54,6 +55,7 @@ print("Trainable parameters: 0.233% (6.210M/2667.000M)", flush=True)
 for it in range(1, min(args.iters, 3) + 1):
     if it % args.save_every == 0:
         (out / f"{it:07d}_adapters.safetensors").write_bytes(b"weights")
+        (out / f"{it:07d}_adapter_config.json").write_text(json.dumps({"iteration": it}))
     print(f"  {it:>4}    {1.0 / it:>5.3f} \u25bc      184      3.3k", flush=True)
     print(f"  {it:>4}    val {1.0 / it:>5.3f}    0.02s", flush=True)
     time.sleep(0.05)
@@ -87,40 +89,48 @@ def _options(**kwargs):
     return LoRAOptions(**values)
 
 
-def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm, tmp_path):
+def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm):
     seen = []
     adapter = train_lora(
         "base-model",
         _data(),
-        tmp_path / "adapter",
         options=_options(iters=3),
         on_metric=seen.append,
     )
-    assert (tmp_path / "adapter" / "adapters.safetensors").exists()
+    adapter_dir = Path(adapter.adapter_path)
+    assert (adapter_dir / "adapters.safetensors").exists()
+    # the run owns fresh scratch: adapter sibling to its staged data, unique per run
+    assert adapter_dir.parent.name.startswith("orange-ai-lora-")
+    assert (adapter_dir.parent / "data" / "train.jsonl").is_file()
+    assert adapter.training["run_dir"] == str(adapter_dir.parent)
     assert adapter.training["iters_completed"] == 3
     assert adapter.training["stopped"] is False
     assert {m["kind"] for m in seen} == {"params", "train", "val"}
     config = adapter.training["adapter_config"]
     assert config["fine_tune_type"] == "lora"
     assert config["mask_prompt"] is False
-    argv = json.loads((tmp_path / "adapter" / "argv.json").read_text())
+    argv = json.loads((adapter_dir / "argv.json").read_text())
     assert argv[0] == "lora"
     assert "--save-every" in argv
     assert "--mask-prompt" not in argv
 
 
-def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
+def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm):
     adapter = train_lora(
         "base-model",
         LoRAData.from_pairs([("q1", "a1"), ("q2", "a2"), ("q3", "a3"), ("q4", "a4")]),
-        tmp_path / "adapter",
         options=_options(iters=1),
     )
     assert adapter.training["adapter_config"]["mask_prompt"] is True
 
 
-def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
-    adapter_dir = tmp_path / "adapter"
+def test_two_runs_never_share_a_directory(fake_mlx_lm):
+    first = train_lora("base-model", _data(), options=_options(iters=1))
+    second = train_lora("base-model", _data(), options=_options(iters=1))
+    assert first.adapter_path != second.adapter_path  # each run its own scratch
+
+
+def test_stop_adopts_the_last_checkpoint(fake_mlx_lm):
     reported = threading.Event()
 
     def on_metric(metric):
@@ -130,17 +140,19 @@ def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
     adapter = train_lora(
         "base-model",
         _data(),
-        adapter_dir,
         options=_options(iters=1000, save_every=1),
         on_metric=on_metric,
         stop_requested=reported.is_set,
     )
+    adapter_dir = Path(adapter.adapter_path)
     assert (adapter_dir / "adapters.safetensors").exists()
     assert adapter.training["iters_completed"] == 1
+    # The adopted checkpoint travels with its own config, not the run's.
+    assert adapter.training["adapter_config"] == {"iteration": 1}
     assert adapter.training["stopped"] is True
 
 
-def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm, tmp_path):
+def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm):
     reported = threading.Event()
 
     def on_metric(metric):
@@ -151,15 +163,28 @@ def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm, tmp_path):
         train_lora(
             "base-model",
             _data(),
-            tmp_path / "adapter",
             options=_options(iters=1000, save_every=100),
             on_metric=on_metric,
             stop_requested=reported.is_set,
         )
 
 
-def test_a_nonzero_exit_reports_the_tail(fake_mlx_lm, tmp_path, monkeypatch):
+def test_a_nonzero_exit_reports_the_tail(fake_mlx_lm, monkeypatch):
     monkeypatch.setenv("FAKE_MLX_LM_EXIT", "1")
     with pytest.raises(RuntimeError, match=r"failed \(3\)") as excinfo:
-        train_lora("base-model", _data(), tmp_path / "adapter", options=_options())
+        train_lora("base-model", _data(), options=_options())
     assert "simulated failure" in str(excinfo.value)
+
+
+def test_a_run_gets_a_fresh_run_directory(fake_mlx_lm):
+    import shutil
+
+    adapter = train_lora("base-model", _data(), options=_options(iters=3))
+    run_dir = adapter.training["run_dir"]
+    try:
+        assert Path(run_dir).name.startswith("orange-ai-lora-")
+        assert Path(run_dir, "data", "train.jsonl").is_file()
+        assert Path(run_dir, "adapter", "adapters.safetensors").is_file()
+        assert adapter.name == Path(run_dir).name
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)

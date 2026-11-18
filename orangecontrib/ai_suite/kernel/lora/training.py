@@ -30,6 +30,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
@@ -280,12 +281,11 @@ def _adapter_weights(adapter_dir: Path) -> Path | None:
 def train_lora(
     base_model: str | Path,
     data: LoRAData,
-    adapter_dir: str | Path,
+    *,
     options: LoRAOptions | None = None,
     on_metric: Callable[[dict], None] | None = None,
     on_line: Callable[[str], None] | None = None,
     stop_requested: Callable[[], bool] | None = None,
-    data_dir: str | Path | None = None,
 ) -> LoRAAdapter:
     """Run LoRA training (QLoRA on a quantised base); stream metrics; return the artifact.
 
@@ -295,11 +295,24 @@ def train_lora(
     ``options.save_every`` iterations; if the run is stopped, the newest
     checkpoint becomes the adapter and ``iters_completed`` records the iteration
     it reached. A stop before the first checkpoint raises :class:`TrainingStopped`.
+
+    The run owns all of its scratch: the staged "train"/"valid" rows and the
+    adapter live in one fresh run-scoped directory under the system temp root
+    (two subdirectories, "data" and "adapter"), so no run can ever meet
+    another run's files and a checkpoint can never be mistaken for a previous
+    result. The returned :class:`LoRAAdapter.adapter_path` records where the
+    adapter went and ``training["run_dir"]`` names the whole scratch directory;
+    the caller owns cleanup - delete it once the artifact is saved with
+    :meth:`LoRAAdapter.save` or discarded. On a failure the raised exception
+    names the directory so the log tail can be inspected first.
     """
     opts = options or LoRAOptions()
     train, valid = split_for_training(data, opts)
-    adapter_dir = Path(adapter_dir)
-    staged = _stage(data.format, train, valid, data_dir or Path(f"{adapter_dir}.data"))
+    # One fresh scratch directory per run: a re-run can never meet an earlier
+    # run's adapter, and a checkpoint can never be mistaken for its result.
+    run_dir = Path(tempfile.mkdtemp(prefix="orange-ai-lora-"))
+    adapter_dir = run_dir / "adapter"
+    staged = _stage(data.format, train, valid, run_dir / "data")
     adapter_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = _lora_command(base_model, staged, adapter_dir, opts, data.format)
@@ -331,7 +344,10 @@ def train_lora(
         reader.join(timeout=10)
         if process.returncode not in (0, None, -signal.SIGTERM):
             tail_text = "".join(tail[-20:])
-            raise RuntimeError(f"mlx_lm lora failed ({process.returncode}):\n{tail_text}")
+            raise RuntimeError(
+                f"mlx_lm lora failed ({process.returncode}); the run directory "
+                f"{run_dir} keeps the staged data and log tail:\n{tail_text}"
+            )
     finally:
         if process.poll() is None:
             _terminate(process)
@@ -341,14 +357,21 @@ def train_lora(
         if stopped:
             raise TrainingStopped(
                 "training was stopped before mlx-lm wrote a checkpoint "
-                "(save_every iterations must elapse first)"
+                "(save_every iterations must elapse first); nothing was adopted, and "
+                f"the run directory {run_dir} holds the log tail"
             )
-        raise RuntimeError("training ended without adapter files")
+        raise RuntimeError(f"training ended without adapter files; see {run_dir}")
     canonical = adapter_dir / _ADAPTER_WEIGHTS
     completed = opts.iters
     if weights != canonical:
         completed = int(weights.name.split("_", 1)[0])
         shutil.copy2(weights, canonical)
+        # A checkpoint may carry its own config; adopt it with the weights so an
+        # adopted mid-run adapter never travels without its matching config.
+        prefix = weights.name[: -len(_ADAPTER_WEIGHTS)]
+        paired_config = adapter_dir / f"{prefix}{_ADAPTER_CONFIG}"
+        if paired_config.is_file():
+            shutil.copy2(paired_config, adapter_dir / _ADAPTER_CONFIG)
     adapter_config = {}
     config_path = adapter_dir / _ADAPTER_CONFIG
     if config_path.exists():
@@ -361,8 +384,9 @@ def train_lora(
             "adapter_config": adapter_config,
             "iters_completed": completed,
             "stopped": completed < opts.iters,
+            "run_dir": str(run_dir),
         },
-        name=adapter_dir.name,
+        name=run_dir.name,
     )
 
 

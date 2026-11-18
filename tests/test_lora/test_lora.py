@@ -18,12 +18,16 @@ from orangecontrib.ai_suite.kernel.lora import (
     LoRAData,
     LoRAModel,
     LoRAOptions,
-    parse_metric,
     split_for_training,
     train_lora,
 )
 from orangecontrib.ai_suite.kernel.lora.model import _echo, _segments
-from orangecontrib.ai_suite.kernel.lora.training import _adapter_weights, _lora_command, _stage
+from orangecontrib.ai_suite.kernel.lora.training import (
+    _adapter_weights,
+    _lora_command,
+    _stage,
+    parse_metric,
+)
 
 _NO_MODEL = (
     "pinned 4-bit model not cached — use the BritLLM Models widget or "
@@ -307,7 +311,6 @@ def test_train_lora_tiny_run(tmp_path):
     adapter = train_lora(
         model_dir,
         data,
-        tmp_path / "adapter",
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=128, num_layers=4),
     )
     assert (Path(adapter.adapter_path) / "adapters.safetensors").exists()
@@ -343,7 +346,6 @@ def test_train_lora_greedy_determinism(tmp_path):
     a = train_lora(
         model_dir,
         data,
-        tmp_path / "a1",
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=64, num_layers=2, seed=7),
     )
     m1 = LoRAModel(a.base_model, a.adapter_path)
