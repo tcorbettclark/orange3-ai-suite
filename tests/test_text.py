@@ -171,6 +171,93 @@ def test_rows_do_not_change_the_sentences_the_model_sees():
     assert len(set(map(tuple, streams.values()))) == 1
 
 
+# ---- page numbers: what counts as one, what must survive ------------------
+
+#: Lines that are a page number and nothing else.
+PAGE_NUMBER_LINES = [
+    "12",
+    "  7  ",
+    "- 42 -",
+    "\u2014 9",
+    "page 13",
+    "Page 13 of 200",
+    "p. 8",
+    "13 / 200",
+    "iv",
+    "IV",
+    "xii",
+    "XII",
+    "MMXXIV",
+    "mix",  # a valid numeral (1009), so this is the documented loss
+]
+
+#: Lines that must be kept. The whitespace and bare-dash cases are the
+#: regression: every part of the numeral grammar can match nothing, so a
+#: pattern without a non-empty assertion eats every paragraph break in a book.
+NOT_PAGE_NUMBER_LINES = [
+    "",
+    "   ",
+    "\t",
+    "-",
+    "\u2014",
+    " - ",
+    "page",
+    "page of 200",
+    "did",
+    "mid",
+    "mind",
+    "civic",
+    "im",
+    "chapter iv",
+    "the 3rd of May",
+    "12 monkeys",
+]
+
+
+@pytest.mark.parametrize("line", PAGE_NUMBER_LINES)
+def test_a_page_number_line_is_removed(line):
+    result = clean_text(f"before\n{line}\nafter\n", CleanOptions(remove_page_numbers=True))
+    assert result.text == "before\nafter"
+    assert result.removed_lines == 1
+
+
+@pytest.mark.parametrize("line", NOT_PAGE_NUMBER_LINES)
+def test_a_non_page_number_line_survives(line):
+    result = clean_text(f"before\n{line}\nafter\n", CleanOptions(remove_page_numbers=True))
+    assert result.text == f"before\n{line}\nafter"
+    assert result.removed_lines == 0
+
+
+@pytest.mark.parametrize("line", ["", "   ", "\t", "-", "\u2014", " - "])
+def test_the_page_number_pattern_never_matches_an_empty_numeral(line):
+    # Pinned at the pattern, not only at the outcome: a blank line is the
+    # paragraph break, and the rule that removes numbers must not touch it.
+    from orangecontrib.ai_suite.kernel.text._clean import _PAGE_NUMBER
+
+    assert _PAGE_NUMBER.match(line) is None
+
+
+def test_removing_page_numbers_keeps_paragraph_breaks():
+    text = "para A line 1\npara A line 2\n\n\npara B line 1\n\n12\n\npara C\n"
+    result = clean_text(text, CleanOptions(remove_page_numbers=True))
+    assert result.text == "para A line 1\npara A line 2\n\n\npara B line 1\n\n\npara C"
+    assert result.removed_lines == 1  # the page number, and nothing else
+
+
+def test_reflow_after_removing_page_numbers_keeps_each_paragraph():
+    # The end-to-end consequence of the two tests above: reflow splits on blank
+    # lines, so eating them merges the whole document into one paragraph.
+    text = (
+        "Line one of para A\nand its second line.\n\n12\n\n"
+        "Line one of para B\nand its second line.\n"
+    )
+    result = clean_text(text, CleanOptions(remove_page_numbers=True, reflow=True))
+    assert result.text.split("\n\n") == [
+        "Line one of para A and its second line.",
+        "Line one of para B and its second line.",
+    ]
+
+
 def test_page_number_rule_keeps_roman_spelled_words():
     # Best-effort on purpose: the roman branch uses valid-numeral grammar and is
     # case-insensitive, so "iv"/"XII"/"mix" (a valid numeral, 1009) are taken as

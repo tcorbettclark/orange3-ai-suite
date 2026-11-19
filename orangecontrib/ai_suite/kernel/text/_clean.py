@@ -15,9 +15,12 @@ _PG_END = re.compile(
 # best-effort on purpose: a stray one-word page number may cost a line of text
 # (e.g. "mix" is a valid roman numeral, 1009), but the grammar still keeps the
 # common words that merely look roman ("did", "mid", "civic" are not numerals).
+# The lookahead is what keeps the branch non-empty: every part of the numeral
+# grammar can match nothing, so without it a blank line - or a bare dash - would
+# be stripped as a page number, and with it every paragraph break in the book.
 _PAGE_NUMBER = re.compile(
     r"^\s*[-–—]?\s*(?:(?:page|p\.)\s*)?"
-    r"(?:\d{1,4}|(?:m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})))"
+    r"(?:\d{1,4}|(?=[ivxlcdm])(?:m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})))"
     r"(?:\s*(?:of|/)\s*\d{1,4})?\s*[-–—]?\s*$",
     re.IGNORECASE,
 )
@@ -78,8 +81,14 @@ def reflow(text: str) -> str:
 
 
 def _remove_page_numbers(text: str) -> tuple[str, int]:
-    kept = [line for line in text.splitlines() if not _PAGE_NUMBER.match(line)]
-    return "\n".join(kept), len(text.splitlines()) - len(kept)
+    """Drop the lines that are a page number and nothing else.
+
+    A blank line is never a page number: it is the paragraph break, and the rule
+    that removes numbers must not touch it (see :data:`_PAGE_NUMBER`).
+    """
+    lines = text.splitlines()
+    kept = [line for line in lines if not line.strip() or not _PAGE_NUMBER.match(line)]
+    return "\n".join(kept), len(lines) - len(kept)
 
 
 def _remove_repeated_lines(text: str) -> tuple[str, int]:
