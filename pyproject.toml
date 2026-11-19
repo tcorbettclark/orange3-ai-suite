@@ -61,6 +61,15 @@ filterwarnings = [
     "ignore::DeprecationWarning:orangecanvas.*",
 ]
 
+[tool.release]
+smoke = "import orangecontrib.ai_suite as add_on; print(add_on.__file__)"
+dependency = "edu-ai-suite"
+tests = [
+    ["uv", "run", "pytest"],
+    ["${ORANGE_PYTHON:-/Applications/Orange.app/Contents/MacOS/python}", "-m", "pytest", "tests/widgets"],
+]
+test_env = { QT_QPA_PLATFORM = "offscreen" }
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100

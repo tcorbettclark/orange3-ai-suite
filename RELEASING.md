@@ -23,6 +23,16 @@ typed.
 - **major** — 1.0 and after, for a breaking change. A renamed or removed widget
   setting or signal is breaking: `.ows` files persist both.
 
+## Settings
+
+`[tool.release]` in `pyproject.toml` holds what a release of this repository
+does: the commands to run, their environment, the smoke call, and optionally the
+dependency whose floor is checked. The package name comes from `[project].name`,
+and `${NAME}` or `${NAME:-default}` in a command is read from the environment.
+
+`scripts/release.py` is identical in both repositories. Change one and copy it to
+the other; `diff` is the sync check.
+
 ## The release
 
 ```bash

@@ -7,6 +7,9 @@ the tag, and with --publish uploads the artifacts and verifies them on PyPI.
 publish uploads the version already tagged at HEAD, so a tagged release can reach
 PyPI later without a second bump. verify compares the project, the tag at HEAD,
 and the digests PyPI records for the artifacts in dist/.
+
+The settings are [tool.release] in pyproject.toml, and this file is identical in
+both repositories.
 """
 
 from __future__ import annotations
@@ -27,21 +30,8 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-CONFIG = {
-    "package": "orange3-ai-suite",
-    "tests": [
-        ["uv", "run", "pytest"],
-        [
-            os.environ.get("ORANGE_PYTHON", "/Applications/Orange.app/Contents/MacOS/python"),
-            "-m",
-            "pytest",
-            "tests/widgets",
-        ],
-    ],
-    "test_env": {"QT_QPA_PLATFORM": "offscreen"},
-    "smoke": "import orangecontrib.ai_suite as add_on; print(add_on.__file__)",
-    "dependency": "edu-ai-suite",
-}
+#: Filled by main from [tool.release] in pyproject.toml.
+CONFIG = {}
 
 
 def say(message):
@@ -50,6 +40,57 @@ def say(message):
 
 def fail(message):
     raise SystemExit(f"release: {message}")
+
+
+VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def expand(text):
+    """Replace ``${NAME}`` and ``${NAME:-default}`` with the environment value."""
+
+    def replace(match):
+        value = os.environ.get(match.group(1), match.group(2))
+        if value is None:
+            fail(f"{match.group(1)} is not set and has no default")
+        return value
+
+    return VARIABLE.sub(replace, text)
+
+
+def load_config():
+    """The settings from ``[tool.release]`` in pyproject.toml, plus the project's name."""
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    settings = project.get("tool", {}).get("release")
+    if settings is None:
+        fail("add [tool.release] to pyproject.toml")
+    unknown = set(settings) - {"smoke", "tests", "test_env", "dependency"}
+    if unknown:
+        fail(f"unknown [tool.release] keys: {', '.join(sorted(unknown))}")
+    for key in ("smoke", "tests"):
+        if key not in settings:
+            fail(f"[tool.release] needs {key}")
+    if not isinstance(settings["smoke"], str):
+        fail("[tool.release] smoke must be a Python one-liner")
+    tests = settings["tests"]
+    if not isinstance(tests, list) or not tests:
+        fail("[tool.release] tests must be a non-empty list of command arrays")
+    for command in tests:
+        if not isinstance(command, list) or not command:
+            fail("[tool.release] tests must be a non-empty list of command arrays")
+        if not all(isinstance(part, str) for part in command):
+            fail("[tool.release] tests: every part of a command must be a string")
+    test_env = settings.get("test_env", {})
+    if not isinstance(test_env, dict) or not all(
+        isinstance(item, str) for item in test_env.values()
+    ):
+        fail("[tool.release] test_env must be a table of strings")
+    return {
+        "package": project["project"]["name"],
+        "smoke": settings["smoke"],
+        "tests": [[expand(part) for part in command] for command in tests],
+        "test_env": {name: expand(value) for name, value in test_env.items()},
+        "dependency": settings.get("dependency"),
+    }
 
 
 def run(command, env=None, show=True, capture=False, cwd=None):
@@ -278,6 +319,7 @@ def cmd_verify():
 
 
 def main():
+    global CONFIG
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -292,6 +334,7 @@ def main():
     commands.add_parser("publish", help="upload the version already tagged at HEAD")
     commands.add_parser("verify", help="compare the project, the tag, PyPI and dist/")
     arguments = parser.parse_args()
+    CONFIG = load_config()
     if arguments.command == "check":
         cmd_check()
     elif arguments.command == "release":
