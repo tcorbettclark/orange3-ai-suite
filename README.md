@@ -75,6 +75,7 @@ uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
 |---|---|---|---|
 | Image Features | Image Analytics | Images | Features, Selected image (Table) | no |
 | Image Pixels | Image Analytics | Images | Features (Table) | no |
+| BritLLM Models | Language Models | none | Model path (object) | yes |
 | LM Text Loader | Language Models | none | Data (Table) | no |
 | LM Pre-trainer | Language Models | Data (text) | Model, Checkpoint (Table) | no |
 | LM Generator | Language Models | Model | Generations (Table) | no |
@@ -322,7 +323,7 @@ grouping never touches the feature itself.
 | D | 6 | Texture: gradient, edge density, fine/coarse texture, autocorrelation width |
 | E | 3 | Topology: hole count, foreground area, stroke crossings |
 | F | 3 | Symmetry: left-right, top-bottom, quadrant similarity |
-| G | 4 | Colour (opt-in): bluish fraction, blueness, saturation, greenery |
+| G | 4 | Colour (opt-in): bluish fraction, the blue-red balance, colourfulness, greenery |
 
 Groups A-F run on a preprocessed luminance image. Group G reads colour
 directly and is off by default.
@@ -415,21 +416,24 @@ callables; the kernel never imports Qt.
 ### LoRA
 
 ```python
+import tempfile
+from pathlib import Path
+
 from orangecontrib.ai_suite.kernel.assets import get_britllm
 from orangecontrib.ai_suite.kernel.lora import LoRAData, LoRAOptions, LoRAModel, train_lora
 
 base = get_britllm()  # pinned 4-bit MLX weights, cached on first use
 data = LoRAData.from_texts(corpus)  # or LoRAData.from_pairs(pairs)
-adapter = train_lora(
-    base,
-    data,
-    options=LoRAOptions(iters=300, num_layers=16),
-)
-# the run writes into a fresh run-scoped temp directory; save the artifact
-# somewhere you own to keep it:
-from pathlib import Path
-
-artifact = adapter.save(Path("adapters") / adapter.name)
+with tempfile.TemporaryDirectory() as scratch:  # this run's scratch, deleted on exit
+    adapter = train_lora(
+        base,
+        data,
+        options=LoRAOptions(iters=300, num_layers=16),
+        workdir=scratch,  # each run gets a fresh child of it
+        name="my-adapter",  # the artifact's name is the caller's to choose
+    )
+    # keep the artifact somewhere you own; the scratch can then be discarded
+    artifact = adapter.save(Path("adapters") / adapter.name)
 model = LoRAModel.from_artifact(artifact)
 model.generate("In the second century", temperature=0)
 model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}

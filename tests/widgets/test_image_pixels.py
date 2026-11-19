@@ -6,7 +6,7 @@ from Orange.data import Domain, StringVariable, Table
 from orangecontrib.ai_suite.widgets.ow_image_pixels import OWImagePixels
 
 
-def test_pixel_values_output(qapp, capture, images_table):
+def test_pixel_columns_output(qapp, capture, images_table):
     w = OWImagePixels()
     w.show()
     sent = capture(w.Outputs.features)
@@ -31,7 +31,7 @@ def test_pixel_values_output(qapp, capture, images_table):
     assert w._summary.text() == "10 x 10 = 100 values"
 
 
-def test_pixel_values_dimensions_change_output(qapp, capture, images_table):
+def test_pixel_columns_dimensions_change_output(qapp, capture, images_table):
     w = OWImagePixels()
     w.show()
     sent = capture(w.Outputs.features)
@@ -46,7 +46,7 @@ def test_pixel_values_dimensions_change_output(qapp, capture, images_table):
     assert w._summary.text() == "4 x 4 = 16 values"
 
 
-def test_pixel_values_missing_file_skips_row(qapp, capture, image_dir):
+def test_pixel_columns_missing_file_skips_row(qapp, capture, image_dir):
     d, _ = image_dir
     var = StringVariable("image")
     var.attributes["type"] = "image"
@@ -66,7 +66,7 @@ def test_pixel_values_missing_file_skips_row(qapp, capture, image_dir):
     assert w.Warning.rows_skipped.is_shown()
 
 
-def test_pixel_values_no_image_column(qapp):
+def test_pixel_columns_no_image_column(qapp):
     w = OWImagePixels()
     w.show()
     domain = Domain([], metas=[StringVariable("text")])

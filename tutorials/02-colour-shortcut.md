@@ -58,8 +58,8 @@ Tick **G: colour**. The output grows from 34 to 38 columns.
 Look at the new features in **Data Table**:
 
 - `bluish_fraction` - fraction of pixels bluer than red;
-- `mean_blueness` - overall blue-red balance;
-- `mean_saturation` - colourfulness;
+- `blue_minus_red_mean` - overall blue-red balance;
+- `mean_chroma` - colourfulness;
 - `greenery_fraction` - ground clutter.
 
 Run **Test & Score** again. Accuracy usually rises. The model has found a

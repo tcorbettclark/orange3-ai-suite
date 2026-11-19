@@ -25,3 +25,30 @@ def test_widget_category_layout():
         "LM Vocab Viewer": "Language Models",
         "Neural Network Viewer": "Visualize",
     }
+
+
+def test_the_readme_widget_table_lists_exactly_the_registered_widgets():
+    """The README table is a page beside the registry: it must not drift.
+
+    The same discovery the toolbox uses is compared with the table's rows, so a
+    new widget with no row - or a row for a widget that no longer exists - fails
+    here rather than in a classroom.
+    """
+    import pathlib
+
+    readme = (pathlib.Path(__file__).resolve().parents[2] / "README.md").read_text()
+    table = readme.split("## Widgets", 1)[1].split("\nEach widget class", 1)[0]
+    rows = {
+        row.split("|")[1].strip()
+        for row in table.splitlines()
+        if row.startswith("|") and not row.startswith(("| Widget", "|---"))
+    }
+
+    discovery = WidgetDiscovery(registry=WidgetRegistry())
+    registered = {
+        desc.name
+        for desc in discovery.iter_widget_descriptions(
+            "orangecontrib.ai_suite.widgets", category_name="Language Models"
+        )
+    }
+    assert rows == registered

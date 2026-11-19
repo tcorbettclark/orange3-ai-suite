@@ -87,16 +87,20 @@ Pairs are built by the pair builder (`kernel/lm/pairs.py`).
 - **pair** — one (context, target). One prediction. Also called an
   **example**.
 - **`Pairs`** — all the pairs of a corpus, held as two arrays: `contexts` and
-  `targets`.
+  `targets`; reached through `make_pairs`, which returns one. Not exported by the
+  package façade, so a caller that needs the type by name imports it from
+  `kernel/lm/pairs.py`.
 - **stream length** — the number of ids in the stream. Equal to the number of
   predictions, and therefore to the number of pairs. Written `len(stream)` and
   called **`N`**.
 - **pairs per unit** — how many pairs one unit contributes: a unit of `m` tokens
   contributes `m + 1` pairs, because every token is predicted once and EOS is predicted too.
 - **split** — the division of pairs into training and validation sets. Made per
-  unit, so the pairs from a unit are either in the training or the validation
-  set, not both. How units are chosen, and what that guarantees under reordering
-  or appending, is documented on :meth:`Pairs.split`.
+  unit, so every pair of a unit lands on the same side. Which units are held out
+  is a stride over the corpus - every n-th unit, offset by the seed - so the
+  split follows corpus order: reordering the corpus can move a unit across, and
+  appending can only add to the held-out set. How it works is documented on
+  :meth:`Pairs.split` and `kernel/_holdout.py`.
 - **batch** — a stack of pairs handed to the model at once.
 
 ## Shapes
