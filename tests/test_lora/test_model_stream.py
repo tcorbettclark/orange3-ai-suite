@@ -9,8 +9,7 @@ import pytest
 
 pytest.importorskip("mlx_lm", reason="the lora extra (mlx-lm) is not installed")
 
-from orangecontrib.ai_suite.kernel.lora import LoRAModel
-from orangecontrib.ai_suite.kernel.lora import mlx_runtime as lora_mlx
+from orangecontrib.ai_suite.kernel.lora import LoRAModel, mlx_runtime
 
 
 @pytest.fixture
@@ -26,17 +25,17 @@ def _chunks(*pieces):
 
 
 def test_the_prompt_is_the_first_chunk_so_it_can_be_shown_at_once(model, monkeypatch):
-    monkeypatch.setattr(lora_mlx, "stream_text", _chunks(" the", " end"))
+    monkeypatch.setattr(mlx_runtime, "stream_text", _chunks(" the", " end"))
     assert list(model.stream("Once", temperature=0.0)) == ["Once the", " end"]
 
 
 def test_generate_is_the_stream_joined(model, monkeypatch):
-    monkeypatch.setattr(lora_mlx, "stream_text", _chunks(" the", " end"))
+    monkeypatch.setattr(mlx_runtime, "stream_text", _chunks(" the", " end"))
     assert model.generate("Once", temperature=0.0) == "Once the end"
 
 
 def test_an_empty_completion_leaves_only_the_prompt(model, monkeypatch):
-    monkeypatch.setattr(lora_mlx, "stream_text", _chunks())
+    monkeypatch.setattr(mlx_runtime, "stream_text", _chunks())
     assert list(model.stream("Once")) == ["Once"]
     assert model.generate("Once") == "Once"
 
@@ -46,7 +45,7 @@ def test_the_chunks_come_straight_from_the_sampler(model, monkeypatch):
     # once, against the first chunk, and then passed through.
     # "p" ends in a letter and "a" starts with one, so the echo inserts the one
     # space mlx-lm does not promise; the rest is passed through untouched.
-    monkeypatch.setattr(lora_mlx, "stream_text", _chunks("a", "b", "c"))
+    monkeypatch.setattr(mlx_runtime, "stream_text", _chunks("a", "b", "c"))
     assert list(model.stream("p")) == ["p a", "b", "c"]
 
 
@@ -59,7 +58,7 @@ def test_the_stream_carries_the_sampling_settings(model, monkeypatch):
         )
         return iter(["x"])
 
-    monkeypatch.setattr(lora_mlx, "stream_text", fake)
+    monkeypatch.setattr(mlx_runtime, "stream_text", fake)
     list(model.stream("p", 0.5, 7, 3))
     assert seen == {"prompt": "p", "temperature": 0.5, "max_new_tokens": 7, "seed": 3}
 
