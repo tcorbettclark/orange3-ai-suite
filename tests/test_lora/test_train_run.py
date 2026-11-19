@@ -1,81 +1,162 @@
-"""train_lora against a stand-in mlx_lm child: flags, streaming, stop, failure.
+"""train_lora against a stand-in mlx_lm: metrics, checkpoints, stop, failure.
 
-The stand-in is a real subprocess, so Popen, the reader thread, polling and the
-process-group signal all run; it needs no MLX and no model weights.
+The stand-in is a real subprocess running our child module, so Popen, the reader
+thread, polling and the process-group signal all run; only mlx-lm itself is
+replaced. It stands in for the *Python API* the child calls - `build_parser`,
+`load`, `load_dataset`, `train_model`, `print_trainable_parameters` and
+`TrainingCallback` - so the surface we depend on is written down here, and a
+renamed mlx-lm function fails in this file rather than in a classroom.
 """
 
 import json
 import os
+import shutil
+import tempfile
 import threading
 from pathlib import Path
 
 import pytest
 
 from orangecontrib.ai_suite.kernel.lora import (
+    LoRAAdapter,
     LoRAData,
     LoRAOptions,
     TrainingStopped,
     train_lora,
 )
 
-FAKE_MLX_LM = r'''
-import argparse, json, os, sys, time
+#: The stand-in packages: `mlx/__init__.py`, `mlx/utils.py`, `mlx_lm/__init__.py`
+FAKE_MLX_INIT = ""
+#: `mlx.utils.tree_flatten` - the only MLX function our child uses.
+FAKE_MLX_UTILS = r"""
+def tree_flatten(tree):
+    return list(tree)
+"""
+FAKE_MLX_LM_INIT = r"""
+class _Leaf:
+    def __init__(self, size):
+        self.size = size
+
+
+class _Model:
+    # Enough of an MLX module for the trainable-parameter report.
+
+    def trainable_parameters(self):
+        return [("lora_a", _Leaf(6_210_000.0)), ("lora_b", _Leaf(0.0))]
+
+
+def load(model, tokenizer_config=None, trust_remote_code=None):
+    return _Model(), object()
+"""
+
+#: `mlx_lm/utils.py` - the parameter counter our child uses.
+FAKE_MLX_LM_UTILS = r"""
+def get_total_parameters(model):
+    return 2_667_000_000.0
+"""
+
+#: `mlx_lm/lora.py` - the names our child reaches for, nothing else.
+FAKE_MLX_LM_LORA = r"""
+import json, os, sys, time
 from pathlib import Path
 
-parser = argparse.ArgumentParser()
-parser.add_argument("command")
-parser.add_argument("--model")
-parser.add_argument("--train", action="store_true")
-parser.add_argument("--data")
-parser.add_argument("--adapter-path")
-parser.add_argument("--iters", type=int)
-parser.add_argument("--learning-rate", type=float)
-parser.add_argument("--num-layers", type=int)
-parser.add_argument("--batch-size", type=int)
-parser.add_argument("--max-seq-length", type=int)
-parser.add_argument("--steps-per-report", type=int)
-parser.add_argument("--steps-per-eval", type=int)
-parser.add_argument("--save-every", type=int, default=100)
-parser.add_argument("--seed", type=int)
-parser.add_argument("--fine-tune-type")
-parser.add_argument("--mask-prompt", action="store_true")
-args = parser.parse_args()
 
-if os.environ.get("FAKE_MLX_LM_EXIT"):
-    print("mlx_lm: simulated failure", flush=True)
-    sys.exit(3)
+class _Args:
+    # Only the defaults our child relies on, spelled out so a rename shows up.
+    model = None
+    data = None
+    adapter_path = None
+    train = False
+    test = False
+    iters = 100
+    learning_rate = 1e-5
+    num_layers = 8
+    batch_size = 4
+    max_seq_length = 2048
+    steps_per_report = 10
+    steps_per_eval = 200
+    save_every = 100
+    seed = 0
+    fine_tune_type = "lora"
+    mask_prompt = None
+    trust_remote_code = False
 
-out = Path(args.adapter_path)
-out.mkdir(parents=True, exist_ok=True)
-(out / "argv.json").write_text(json.dumps(sys.argv[1:]))
-(out / "adapter_config.json").write_text(
-    json.dumps({"fine_tune_type": args.fine_tune_type, "mask_prompt": args.mask_prompt})
-)
-print("Trainable parameters: 0.233% (6.210M/2667.000M)", flush=True)
-for it in range(1, min(args.iters, 3) + 1):
-    if it % args.save_every == 0:
-        (out / f"{it:07d}_adapters.safetensors").write_bytes(b"weights")
-        (out / f"{it:07d}_adapter_config.json").write_text(json.dumps({"iteration": it}))
-    print(f"  {it:>4}    {1.0 / it:>5.3f} \u25bc      184      3.3k", flush=True)
-    print(f"  {it:>4}    val {1.0 / it:>5.3f}    0.02s", flush=True)
-    time.sleep(0.05)
-    if args.iters > 3:
-        time.sleep(5)  # a long run: stay alive until the test stops us
-(out / "adapters.safetensors").write_bytes(b"weights")
-'''
+
+class _Parser:
+    def parse_args(self, argv):
+        return _Args()
+
+
+def build_parser():
+    return _Parser()
+
+
+def load_dataset(args, tokenizer):
+    return ["train"], ["valid"], []
+
+
+def print_trainable_parameters(model):
+    print("Trainable parameters: 0.233% (6.210M/2667.000M)", flush=True)
+
+
+def train_model(args, model, train_set, valid_set, training_callback=None):
+    if os.environ.get("FAKE_MLX_LM_EXIT"):
+        print("mlx_lm: simulated failure", flush=True)
+        sys.exit(3)
+
+    out = Path(args.adapter_path)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "child.pid").write_text(str(os.getpid()))  # for the reaping test
+    # what mlx-lm's save_config(vars(args), ...) writes, and the run as asked for
+    (out / "adapter_config.json").write_text(json.dumps(vars(args), default=str))
+    (out / "asked.json").write_text(json.dumps(vars(args), default=str))
+
+    print_trainable_parameters(model)
+    for it in range(1, min(args.iters, 3) + 1):
+        if it % args.save_every == 0:
+            # mlx-lm writes numbered weights only; the config is one per run,
+            # written once before training starts.
+            (out / f"{it:07d}_adapters.safetensors").write_bytes(b"weights")
+        training_callback.on_train_loss_report(
+            {"iteration": it, "train_loss": 1.0 / it, "tokens_per_second": 184.0}
+        )
+        training_callback.on_val_loss_report(
+            {"iteration": it - 1, "val_loss": 2.0 / it, "val_time": 0.02}
+        )
+        time.sleep(0.05)
+        if args.iters > 3:
+            time.sleep(5)  # a long run: stay alive until the test stops us
+    (out / "adapters.safetensors").write_bytes(b"weights")
+"""
+
+#: `mlx_lm/tuner/callbacks.py` - the base class our child subclasses.
+FAKE_MLX_LM_CALLBACKS = r"""
+class TrainingCallback:
+    def on_train_loss_report(self, info):
+        pass
+
+    def on_val_loss_report(self, info):
+        pass
+"""
 
 
 @pytest.fixture
 def fake_mlx_lm(tmp_path, monkeypatch):
     site = tmp_path / "site"
+    mlx = site / "mlx"
     package = site / "mlx_lm"
-    package.mkdir(parents=True)
-    (package / "__init__.py").write_text("")
-    (package / "__main__.py").write_text(FAKE_MLX_LM)
+    tuner = package / "tuner"
+    for directory in (mlx, package, tuner):
+        directory.mkdir(parents=True)
+    (mlx / "__init__.py").write_text(FAKE_MLX_INIT)
+    (mlx / "utils.py").write_text(FAKE_MLX_UTILS)
+    (package / "__init__.py").write_text(FAKE_MLX_LM_INIT)
+    (package / "lora.py").write_text(FAKE_MLX_LM_LORA)
+    (package / "utils.py").write_text(FAKE_MLX_LM_UTILS)
+    (tuner / "__init__.py").write_text("")
+    (tuner / "callbacks.py").write_text(FAKE_MLX_LM_CALLBACKS)
     existing = os.environ.get("PYTHONPATH")
-    monkeypatch.setenv(
-        "PYTHONPATH", str(site) if not existing else f"{site}{os.pathsep}{existing}"
-    )
+    monkeypatch.setenv("PYTHONPATH", str(site) if not existing else f"{site}{os.pathsep}{existing}")
     return site
 
 
@@ -89,18 +170,19 @@ def _options(**kwargs):
     return LoRAOptions(**values)
 
 
-def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm):
+def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm, tmp_path):
     seen = []
     adapter = train_lora(
         "base-model",
         _data(),
         options=_options(iters=3),
         on_metric=seen.append,
+        workdir=tmp_path,
     )
     adapter_dir = Path(adapter.adapter_path)
     assert (adapter_dir / "adapters.safetensors").exists()
-    # the run owns fresh scratch: adapter sibling to its staged data, unique per run
-    assert adapter_dir.parent.name.startswith("orange-ai-lora-")
+    # the run owns fresh scratch: the adapter is a sibling of its staged data
+    assert adapter_dir.parent.name.startswith("run-")  # inside the caller's workdir
     assert (adapter_dir.parent / "data" / "train.jsonl").is_file()
     assert adapter.training["run_dir"] == str(adapter_dir.parent)
     assert adapter.training["iters_completed"] == 3
@@ -109,28 +191,48 @@ def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm):
     config = adapter.training["adapter_config"]
     assert config["fine_tune_type"] == "lora"
     assert config["mask_prompt"] is False
-    argv = json.loads((adapter_dir / "argv.json").read_text())
-    assert argv[0] == "lora"
-    assert "--save-every" in argv
-    assert "--mask-prompt" not in argv
+
+    # What mlx-lm was actually asked for: the run's options, not flags.
+    asked = json.loads((adapter_dir / "asked.json").read_text())
+    assert asked["train"] is True and asked["test"] is False
+    assert asked["model"] == "base-model"
+    assert asked["iters"] == 3
+    assert asked["save_every"] == 50
+    assert asked["fine_tune_type"] == "lora"
+
+    # One metric per report, in the order they happened, with the fields the
+    # widget plots. The params metric arrives once, before any loss.
+    assert seen[0]["kind"] == "params"
+    train = [m for m in seen if m["kind"] == "train"]
+    val = [m for m in seen if m["kind"] == "val"]
+    assert [m["iter"] for m in train] == [1, 2, 3]
+    assert [m["iter"] for m in val] == [1, 2, 3]  # val is on the same axis as train
+    assert train[0]["loss"] == pytest.approx(1.0)
+    assert train[0]["tok_s"] == 184
+    params = next(m for m in seen if m["kind"] == "params")
+    assert params["pct"] == pytest.approx(100 * 6_210_000 / 2_667_000_000)
+    assert params["detail"] == "6.210M/2667.000M"
 
 
-def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm):
+def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
     adapter = train_lora(
         "base-model",
         LoRAData.from_pairs([("q1", "a1"), ("q2", "a2"), ("q3", "a3"), ("q4", "a4")]),
         options=_options(iters=1),
+        workdir=tmp_path,
     )
     assert adapter.training["adapter_config"]["mask_prompt"] is True
+    asked = json.loads((Path(adapter.adapter_path) / "asked.json").read_text())
+    assert asked["mask_prompt"] is True
 
 
-def test_two_runs_never_share_a_directory(fake_mlx_lm):
-    first = train_lora("base-model", _data(), options=_options(iters=1))
-    second = train_lora("base-model", _data(), options=_options(iters=1))
+def test_two_runs_never_share_a_directory(fake_mlx_lm, tmp_path):
+    first = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
+    second = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
     assert first.adapter_path != second.adapter_path  # each run its own scratch
 
 
-def test_stop_adopts_the_last_checkpoint(fake_mlx_lm):
+def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
     reported = threading.Event()
 
     def on_metric(metric):
@@ -143,16 +245,46 @@ def test_stop_adopts_the_last_checkpoint(fake_mlx_lm):
         options=_options(iters=1000, save_every=1),
         on_metric=on_metric,
         stop_requested=reported.is_set,
+        workdir=tmp_path,
     )
     adapter_dir = Path(adapter.adapter_path)
     assert (adapter_dir / "adapters.safetensors").exists()
     assert adapter.training["iters_completed"] == 1
-    # The adopted checkpoint travels with its own config, not the run's.
-    assert adapter.training["adapter_config"] == {"iteration": 1}
     assert adapter.training["stopped"] is True
 
+    # The adopted checkpoint keeps the run's config, because that is the only
+    # config mlx-lm writes (once, before training). How far the run got is
+    # recorded by iters_completed, not by the config.
+    config = adapter.training["adapter_config"]
+    assert config["fine_tune_type"] == "lora"
+    assert config["iters"] == 1000
+    assert not list(adapter_dir.glob("*_adapter_config.json")), "mlx-lm writes none"
 
-def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm):
+
+def test_a_stopped_run_reaps_its_child_before_it_reads_the_directory(fake_mlx_lm, tmp_path):
+    # The child saves its checkpoint straight to its final path, so a directory
+    # read while it is still alive can pick up a truncated file. By the time
+    # train_lora returns, the pid must be gone - exited, and reaped by us.
+    reported = threading.Event()
+
+    def on_metric(metric):
+        if metric["kind"] == "train":
+            reported.set()
+
+    adapter = train_lora(
+        "base-model",
+        _data(),
+        options=_options(iters=1000, save_every=1),
+        on_metric=on_metric,
+        stop_requested=reported.is_set,
+        workdir=tmp_path,
+    )
+    pid = int((Path(adapter.adapter_path) / "child.pid").read_text())
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm, tmp_path):
     reported = threading.Event()
 
     def on_metric(metric):
@@ -166,25 +298,71 @@ def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm):
             options=_options(iters=1000, save_every=100),
             on_metric=on_metric,
             stop_requested=reported.is_set,
+            workdir=tmp_path,
         )
 
 
-def test_a_nonzero_exit_reports_the_tail(fake_mlx_lm, monkeypatch):
+def test_a_nonzero_exit_reports_the_tail(fake_mlx_lm, tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_MLX_LM_EXIT", "1")
     with pytest.raises(RuntimeError, match=r"failed \(3\)") as excinfo:
-        train_lora("base-model", _data(), options=_options())
+        train_lora("base-model", _data(), options=_options(), workdir=tmp_path)
     assert "simulated failure" in str(excinfo.value)
 
 
-def test_a_run_gets_a_fresh_run_directory(fake_mlx_lm):
-    import shutil
+# ---- whose directory a run writes into -------------------------------------
 
+
+def test_a_run_without_a_workdir_lands_in_the_temp_root(fake_mlx_lm):
     adapter = train_lora("base-model", _data(), options=_options(iters=3))
-    run_dir = adapter.training["run_dir"]
+    run_dir = Path(adapter.training["run_dir"])
     try:
-        assert Path(run_dir).name.startswith("orange-ai-lora-")
-        assert Path(run_dir, "data", "train.jsonl").is_file()
-        assert Path(run_dir, "adapter", "adapters.safetensors").is_file()
-        assert adapter.name == Path(run_dir).name
+        assert run_dir.parent.resolve() == Path(tempfile.gettempdir()).resolve()
+        # the shared root is nobody's, so the name says whose directory it is
+        assert run_dir.name.startswith("orange-ai-lora-")
+        assert (run_dir / "data" / "train.jsonl").is_file()
+        assert (run_dir / "adapter" / "adapters.safetensors").is_file()
     finally:
-        shutil.rmtree(run_dir, ignore_errors=True)
+        shutil.rmtree(run_dir, ignore_errors=True)  # no workdir, so we own it
+
+
+def test_a_workdir_gets_a_fresh_child_per_run(fake_mlx_lm, tmp_path):
+    workdir = tmp_path / "runs"
+    first = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
+    second = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
+    dirs = [Path(a.training["run_dir"]) for a in (first, second)]
+    assert all(run_dir.parent.resolve() == workdir.resolve() for run_dir in dirs)
+    assert dirs[0] != dirs[1]  # never a re-run into the previous run's files
+    # inside a directory the caller named, a run directory is just a run
+    assert all(run_dir.name.startswith("run-") for run_dir in dirs)
+    # ... so the workdir holds exactly this caller's runs, which is what makes
+    # "delete the workdir" a complete cleanup
+    assert sorted(p.name for p in workdir.iterdir()) == sorted(d.name for d in dirs)
+
+
+def test_a_workdir_is_created_if_it_is_missing(fake_mlx_lm, tmp_path):
+    workdir = tmp_path / "runs" / "today"
+    adapter = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
+    assert Path(adapter.training["run_dir"]).parent == workdir
+
+
+def test_a_workdir_that_is_a_file_is_refused(fake_mlx_lm, tmp_path):
+    not_a_directory = tmp_path / "file"
+    not_a_directory.write_text("not a directory")
+    with pytest.raises(ValueError, match="workdir must be a directory"):
+        train_lora("base-model", _data(), options=_options(iters=1), workdir=not_a_directory)
+
+
+def test_the_artifact_name_is_the_callers(fake_mlx_lm, tmp_path):
+    # A generated directory name is not a name to show a person, so the caller
+    # supplies it - and it travels into the artifact the run returns.
+    adapter = train_lora(
+        "base-model", _data(), options=_options(iters=1), workdir=tmp_path, name="shakespeare"
+    )
+    assert adapter.name == "shakespeare"
+    assert LoRAAdapter.load(adapter.save(tmp_path / "artifact")).name == "shakespeare"
+
+
+def test_an_unnamed_run_is_not_named_after_its_directory(fake_mlx_lm, tmp_path):
+    adapter = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
+    assert adapter.name == ""
+    assert adapter.name != Path(adapter.training["run_dir"]).name

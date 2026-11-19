@@ -1,11 +1,12 @@
 """orangecontrib.ai_suite.kernel.lora tests.
 
-Data/artifact/metric-parsing tests always run; end-to-end training tests
+Data/artifact/protocol tests always run; end-to-end training tests
 require the pinned model (the BritLLM Models widget or
 ``orange-ai-assets fetch britllm-4bit``) — skipped elsewhere. They must run in plain Python without Orange/Qt (kernel rule).
 """
 
 import json
+import sys
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -21,13 +22,9 @@ from orangecontrib.ai_suite.kernel.lora import (
     split_for_training,
     train_lora,
 )
+from orangecontrib.ai_suite.kernel.lora._protocol import MARKER, decode, encode
 from orangecontrib.ai_suite.kernel.lora.model import _echo, _segments
-from orangecontrib.ai_suite.kernel.lora.training import (
-    _adapter_weights,
-    _lora_command,
-    _stage,
-    parse_metric,
-)
+from orangecontrib.ai_suite.kernel.lora.training import _child_command, _run_spec, _stage
 
 _NO_MODEL = (
     "pinned 4-bit model not cached — use the BritLLM Models widget or "
@@ -36,16 +33,6 @@ _NO_MODEL = (
 slow = pytest.mark.slow  # end-to-end runs (model load + iterations); excluded
 # from the default suite via addopts -m "not slow"; run with `-m slow` when
 # the converted model is present to validate the full path in one go.
-
-SAMPLE_LOG_LINES = [
-    "\x1b[1miter   train_loss     tok/s     tokens\x1b[0m",
-    "\x1b[1;35m   1\x1b[0m    \x1b[1;35mval\x1b[0m \x1b[1m3.419\x1b[0m    \x1b[38;5;244m2.38s\x1b[0m",
-    "\x1b[38;5;244m  20\x1b[0m    \x1b[1;32m0.725 \u25bc\x1b[0m    \x1b[1m  184\x1b[0m    \x1b[38;5;244m  3.3k\x1b[0m",
-    "\x1b[38;5;244m  50\x1b[0m    \x1b[1;35mval\x1b[0m \x1b[1m0.018\x1b[0m    \x1b[38;5;244m1.40s\x1b[0m",
-    "Model loaded: britllm/britllm-3b-v0.1 (some header noise line)",
-    "Trainable parameters: 0.233% (6.210M/2667.000M)",
-]
-
 
 # ---- data staging (the two teaching formats) ------------------------------
 
@@ -80,12 +67,21 @@ def test_pair_corpus_staging_is_sft(tmp_path):
     assert sorted((r["prompt"], r["completion"]) for r in rows) == sorted(pairs)
 
 
-def test_split_depends_on_content_not_arrival_order():
+def test_the_split_reads_positions_not_content():
     texts = [f"document {i}" for i in range(40)]
-    first = LoRAData.from_texts(texts).split(valid_fraction=0.25, seed=3)
-    shuffled = LoRAData.from_texts(list(reversed(texts))).split(valid_fraction=0.25, seed=3)
-    assert set(first[0]) == set(shuffled[0])
-    assert set(first[1]) == set(shuffled[1])
+    first_train, first_valid = LoRAData.from_texts(texts).split(valid_fraction=0.25, seed=3)
+    # every 4th row, offset by the seed: 3, 7, 11, ... 39
+    assert first_valid == [texts[i] for i in range(3, 40, 4)]
+    assert first_train == [row for i, row in enumerate(texts) if i % 4 != 3]
+
+    # Reordering the corpus moves rows across the split, and identical rows are
+    # no exception: the contract is about where a row sits, not what it says.
+    _reversed_train, reversed_valid = LoRAData.from_texts(list(reversed(texts))).split(
+        valid_fraction=0.25, seed=3
+    )
+    assert set(reversed_valid) != set(first_valid)
+    duplicated = LoRAData.from_texts(["same"] * 8).split(valid_fraction=0.25, seed=0)
+    assert duplicated[1] == ["same"] * 2  # two of eight, both identical
 
 
 def test_lora_data_guards():
@@ -151,33 +147,41 @@ def test_options_validate_and_are_frozen():
         LoRAOptions(learning_rate=0.0)
     with pytest.raises(ValueError, match="validation_fraction"):
         LoRAOptions(validation_fraction=1.0)
+    with pytest.raises(ValueError, match="seed"):
+        LoRAOptions(seed=-1)  # mlx-lm's --seed is unsigned
     with pytest.raises(FrozenInstanceError):
         LoRAOptions().iters = 1
 
 
-# ---- metric streaming (the widget's live-loss source) ----------------------
+# ---- the child's wire format (the widget's live-loss source) --------------
 
 
-def test_parse_metric_parses_the_real_log():
-    seen = [parse_metric(line) for line in SAMPLE_LOG_LINES]
-    train = next(m for m in seen if m and m["kind"] == "train")
-    val = next(m for m in seen if m and m["kind"] == "val")
-    assert train == {"iter": 20, "loss": 0.725, "tok_s": 184, "kind": "train"}
-    assert val == {"iter": 1, "loss": 3.419, "kind": "val"}
-    params = next(m for m in seen if m and m["kind"] == "params")
-    assert params == {"kind": "params", "pct": 0.233, "detail": "6.210M/2667.000M"}
-    assert parse_metric("Model loaded: header noise") is None
+def test_a_metric_round_trips_through_the_wire_format():
+    metric = {"kind": "train", "iter": 20, "loss": 0.725, "tok_s": 184}
+    assert decode(encode(metric) + "\n") == metric
 
 
-def test_parse_metric_accepts_a_thousands_separator():
-    # mlx-lm formats tokens/s with "{:,.0f}"
-    assert parse_metric("  30    0.700 \u25bc   1,184    6.7k")["tok_s"] == 1184
+def test_mlx_lm_human_output_is_not_a_metric():
+    # Everything the child does not mark stays a log line, ANSI and all.
+    for line in (
+        "Loading pretrained model\n",
+        "Trainable parameters: 0.233% (6.210M/2667.000M)\n",
+        "\x1b[1miter   train_loss     tok/s\x1b[0m\n",
+        "\n",
+        "",
+    ):
+        assert decode(line) is None
 
 
-# ---- the mlx-lm command -----------------------------------------------------
+def test_a_malformed_metric_is_a_bug_in_our_own_child():
+    with pytest.raises(ValueError, match="malformed metric"):
+        decode(MARKER + "{not json}\n")
 
 
-def test_lora_command_passes_the_options(tmp_path):
+# ---- what the child is asked for -------------------------------------------
+
+
+def test_the_child_spec_carries_every_option_but_the_split(tmp_path):
     options = LoRAOptions(
         iters=7,
         learning_rate=2e-5,
@@ -189,34 +193,37 @@ def test_lora_command_passes_the_options(tmp_path):
         save_every=3,
         seed=11,
     )
-    cmd = _lora_command("base", tmp_path / "data", tmp_path / "adapter", options, "pairs")
-    value = lambda flag: cmd[cmd.index(flag) + 1]  # noqa: E731
-    assert value("--model") == "base"
-    assert value("--iters") == "7"
-    assert value("--learning-rate") == "2e-05"
-    assert value("--num-layers") == "3"
-    assert value("--batch-size") == "2"
-    assert value("--max-seq-length") == "64"
-    assert value("--steps-per-report") == "1"
-    assert value("--steps-per-eval") == "2"
-    assert value("--save-every") == "3"
-    assert value("--seed") == "11"
-    assert value("--fine-tune-type") == "lora"
-    # SFT trains on the completion only; a corpus must not ask for prompt masking
-    assert "--mask-prompt" in cmd
-    assert "--mask-prompt" not in _lora_command(
-        "base", tmp_path / "data", tmp_path / "adapter", options, "text"
-    )
+    spec = _run_spec("base", tmp_path / "data", tmp_path / "adapter", options, "pairs")
+    assert spec["model"] == "base"
+    assert spec["data"] == str(tmp_path / "data")
+    assert spec["adapter_path"] == str(tmp_path / "adapter")
+    assert spec["iters"] == 7
+    assert spec["learning_rate"] == 2e-5
+    assert spec["num_layers"] == 3
+    assert spec["batch_size"] == 2
+    assert spec["max_seq_length"] == 64
+    assert spec["steps_per_report"] == 1
+    assert spec["steps_per_eval"] == 2
+    assert spec["save_every"] == 3
+    assert spec["seed"] == 11
+    assert spec["mask_prompt"] is True  # SFT: the prompt is not the target
+    # every setting the run owns travels; the fraction stays here, it decides
+    # which rows are staged and never reaches mlx-lm
+    assert "validation_fraction" not in spec
+    assert set(spec) == {"model", "data", "adapter_path", "mask_prompt"} | {
+        field for field in spec if field not in {"model", "data", "adapter_path", "mask_prompt"}
+    }
 
 
-def test_adapter_weights_prefers_the_final_file_and_takes_the_newest(tmp_path):
-    assert _adapter_weights(tmp_path) is None
-    (tmp_path / "0000010_adapters.safetensors").write_bytes(b"x")
-    (tmp_path / "0000002_adapters.safetensors").write_bytes(b"x")
-    (tmp_path / "junk_adapters.safetensors").write_bytes(b"x")  # not a checkpoint
-    assert _adapter_weights(tmp_path) == tmp_path / "0000010_adapters.safetensors"
-    (tmp_path / "adapters.safetensors").write_bytes(b"x")
-    assert _adapter_weights(tmp_path) == tmp_path / "adapters.safetensors"
+def test_a_text_run_does_not_mask_the_prompt(tmp_path):
+    spec = _run_spec("base", tmp_path, tmp_path, LoRAOptions(), "text")
+    assert spec["mask_prompt"] is False
+
+
+def test_the_command_runs_our_child_with_the_spec_as_one_argument():
+    cmd = _child_command({"iters": 1})
+    assert cmd[:3] == [sys.executable, "-m", "orangecontrib.ai_suite.kernel.lora._child"]
+    assert json.loads(cmd[3]) == {"iters": 1}
 
 
 # ---- perplexity windows (pure, no MLX needed) ------------------------------

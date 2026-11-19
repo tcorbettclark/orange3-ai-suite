@@ -133,3 +133,17 @@ def test_base_model_input_sets_the_line_edit_and_the_request(
     w.batch_size = 1  # the two-row fixture cannot fill a larger validation batch
     request = w._build_request()
     assert request["base_model"] == model
+
+
+def test_each_run_gets_a_fresh_scratch_and_drops_the_previous(qapp):
+    # One directory for the widget, not one per run: the kernel gives every run
+    # a fresh child of it, so the parent can be reused - and dropping the parent
+    # is how the previous run's adapter stops taking up space.
+    w = OWLoRAPretrainer()
+    first = w._fresh_workdir()
+    assert first.is_dir()
+    second = w._fresh_workdir()
+    assert second.is_dir()
+    assert second != first
+    assert not first.exists(), "the previous run's adapter should be gone"
+    w.onDeleteWidget()

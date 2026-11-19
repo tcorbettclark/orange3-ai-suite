@@ -27,10 +27,12 @@ def test_package_exports_only_the_use_case():
 
 
 def test_internals_live_in_their_own_module():
-    # Supported, but not part of the façade: log parsing and the options split
-    # belong to whoever owns the run.
+    # Supported, but not part of the façade: the wire format shared with the
+    # training child, and the run's own helpers, belong to whoever owns the run.
+    from orangecontrib.ai_suite.kernel.lora._protocol import decode, encode
     from orangecontrib.ai_suite.kernel.lora.model import _echo
-    from orangecontrib.ai_suite.kernel.lora.training import parse_metric
+    from orangecontrib.ai_suite.kernel.lora.training import _run_spec
 
     assert callable(_echo)
-    assert callable(parse_metric)
+    assert callable(encode) and callable(decode)
+    assert callable(_run_spec)

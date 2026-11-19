@@ -27,8 +27,8 @@ from .training import (
 
 __all__ = [
     "LoRAAdapter",
-    "LoRAModel",
     "LoRAData",
+    "LoRAModel",
     "LoRAOptions",
     "TrainingStopped",
     "split_for_training",

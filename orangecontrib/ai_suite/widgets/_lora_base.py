@@ -10,7 +10,9 @@ graceful-degradation message.
 
 from __future__ import annotations
 
+import tempfile
 import traceback
+from pathlib import Path
 
 from AnyQt.QtCore import QThread, pyqtSignal
 from AnyQt.QtWidgets import QLabel
@@ -20,8 +22,8 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.kernel.lora import (
-    LoRAOptions,
     LoRAModel,
+    LoRAOptions,
     TrainingStopped,
     split_for_training,
     train_lora,
@@ -114,6 +116,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         self.data = None
         self.worker: LoraWorker | None = None
         self.model = None
+        self._scratch = None  # this widget's run directory; one at a time
         self._losses: list[tuple[int, float, str]] = []  # (iter, loss, kind)
         self._trainable_note = ""
 
@@ -258,6 +261,9 @@ class LoRATrainerBase(OWWidget, openclass=True):
             return
         self.Outputs.model.send(None)
         self.model = None
+        # Now that nothing points at the previous run's adapter, this run gets a
+        # fresh scratch directory (which drops the previous one).
+        request["workdir"] = self._fresh_workdir()
         self._losses = []
         self._trainable_note = ""
         self._train_curve.setData([], [])
@@ -274,6 +280,20 @@ class LoRATrainerBase(OWWidget, openclass=True):
         else:
             worker.start()
             self.Information.training()
+
+    def _fresh_workdir(self):
+        """This run's scratch parent, deleting the previous run's.
+
+        One directory per widget, not one per run: the kernel gives each run a
+        fresh child of it, so reusing the parent is safe, and dropping it deletes
+        the previous run's adapter. It is dropped here rather than in
+        ``onDeleteWidget`` because it has to outlive training - a ``LoRAModel``
+        on the Model output keeps reading the adapter directory after the run.
+        """
+        if self._scratch is not None:
+            self._scratch.cleanup()
+        self._scratch = tempfile.TemporaryDirectory(prefix="orange-lora-")
+        return Path(self._scratch.name)
 
     def start_training(self):
         if self.worker is not None and self.worker.isRunning():
@@ -326,7 +346,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
             else ""
         )
         self.status_label.setText(
-            f"Done: adapter trained ({adapter.name or 'adapter'}){detail}.{stopped} "
+            f"Done: adapter trained{detail}.{stopped} "
             "Connect the Model output to LM Generator for the before/after "
             "comparison."
         )

@@ -6,13 +6,14 @@ Two data formats:
    loss; rows are ``{"text": ...}``.
 2. **Prompt-response pairs -> supervised fine-tuning.** A human authored the
    prompt and the completion. Rows are ``{"prompt": ..., "completion": ...}``;
-   ``--mask-prompt`` keeps the prompt tokens out of the loss, so only the
+   mlx-lm's prompt masking keeps the prompt tokens out of the loss, so only the
    completion is trained.
 
-The run is ``python -m mlx_lm lora`` in a subprocess. Its stdout is parsed into
-per-iteration metric dicts. ``stop_requested`` terminates the child process
-tree; mlx-lm writes a checkpoint every ``save_every`` iterations and the final
-adapter after the last iteration, so a stop adopts the last checkpoint and
+The run is our own child module (:mod:`._child`) in a subprocess: it calls
+mlx-lm's Python API and writes one JSON metric per line to stdout, which
+:func:`._protocol.decode` reads. ``stop_requested`` terminates the child's
+process group; mlx-lm writes a checkpoint every ``save_every`` iterations and the
+final adapter after the last iteration, so a stop adopts the last checkpoint and
 records how far the run got.
 
 The train/validation split is a run setting, not a property of the rows: it
@@ -24,7 +25,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -32,21 +32,24 @@ import sys
 import tempfile
 import threading
 from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Literal
 
-from .._split import key_order
+from .._holdout import held_out_positions
+from ._protocol import decode
 from .model import _ADAPTER_CONFIG, _ADAPTER_WEIGHTS, LoRAAdapter
 
 Format = Literal["text", "pairs"]
 Rows = list[str] | list[tuple[str, str]]
 
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
-# training row: "  20    0.725 ▼    184    3.3k";  val row: "  50  val  0.018  1.40s"
-_TRAIN_ROW = re.compile(r"^\s*(\d+)\s+([\d.]+)\s*[▲▼]\s+([\d,]+)\s+([\dk.]+)\s*$")
-_VAL_ROW = re.compile(r"^\s*(\d+)\s+val\s+([\d.]+)\s+([\d.]+s)\s*$")
-_TRAINABLE = re.compile(r"Trainable parameters:\s*([\d.]+)%\s*\(([^)]+)\)")
+_CHILD = "orangecontrib.ai_suite.kernel.lora._child"
+
+#: Name of one run's directory. In the shared temp root the name also says whose
+#: directory it is; inside a directory the caller named, only uniqueness is left
+#: to say, so the run directory is just a run.
+_SHARED_PREFIX = "orange-ai-lora-"
+_RUN_PREFIX = "run-"
 
 
 class TrainingStopped(RuntimeError):
@@ -85,6 +88,16 @@ class LoRAOptions:
             raise ValueError("max_seq_length must be >= 2")
         if not 0.0 <= self.validation_fraction < 1.0:
             raise ValueError("validation_fraction must be in [0, 1)")
+        if self.seed < 0:
+            raise ValueError("seed must be >= 0")
+
+
+#: Every LoRAOptions field except the split's, which never leaves this module:
+#: derived, so a new setting is handed to the child automatically - and the child
+#: refuses a setting it does not know, so it cannot be dropped on the floor.
+_CHILD_OPTION_FIELDS = tuple(
+    field.name for field in fields(LoRAOptions) if field.name != "validation_fraction"
+)
 
 
 @dataclass(frozen=True)
@@ -121,21 +134,22 @@ class LoRAData:
         return cls("pairs", rows)
 
     def split(self, valid_fraction: float, seed: int) -> tuple[Rows, Rows]:
-        """Train and validation rows, ordered by a salted hash of each row.
+        """Train and validation rows, chosen by position in the corpus.
 
-        The hashing is shared with lm's unit split (see :mod:`.._split`); this
-        method owns the row-level policy: ``0`` means no validation at all,
-        and at least one row stays on each side. A row's side depends on
-        ``(seed, the row)``, not on the order the rows arrived in. Identical
-        rows hash alike and may land in both splits.
+        The stride is shared with lm's unit split (see :mod:`.._holdout`); this
+        method owns the row-level policy: ``0`` means no validation at all, and
+        at least one row stays on each side. A row's side therefore depends on
+        where it sits in the corpus, not on its content, so identical rows may
+        land on different sides and reordering the rows can move one across.
         """
         if not 0.0 <= valid_fraction < 1.0:
             raise ValueError("valid_fraction must be in [0, 1)")
         if valid_fraction == 0.0:
             return list(self.rows), []
-        n_valid = min(max(1, round(len(self.rows) * valid_fraction)), len(self.rows) - 1)
-        ordered = [self.rows[i] for i in key_order([repr(row).encode() for row in self.rows], seed)]
-        return ordered[n_valid:], ordered[:n_valid]
+        held = set(held_out_positions(len(self.rows), valid_fraction, seed))
+        train = [row for index, row in enumerate(self.rows) if index not in held]
+        # sorted: the rows come back in corpus order, not in set order
+        return train, [self.rows[index] for index in sorted(held)]
 
 
 def _stage(format: Format, train: Rows, valid: Rows, directory: str | Path) -> Path:
@@ -184,80 +198,45 @@ def split_for_training(data: LoRAData, options: LoRAOptions) -> tuple[Rows, Rows
     return train, valid
 
 
-def parse_metric(line: str) -> dict | None:
-    """Parse one mlx-lm training-log line into a metric dict (or None)."""
-    line = _ANSI.sub("", line.rstrip("\n"))
-    m = _TRAINABLE.search(line)
-    if m:
-        return {
-            "kind": "params",
-            "pct": float(m.group(1)),
-            "detail": m.group(2).strip(),
-        }
-    m = _TRAIN_ROW.match(line)
-    if m:
-        return {
-            "iter": int(m.group(1)),
-            "loss": float(m.group(2)),
-            "tok_s": int(m.group(3).replace(",", "")),
-            "kind": "train",
-        }
-    m = _VAL_ROW.match(line)
-    if m:
-        return {"iter": int(m.group(1)), "loss": float(m.group(2)), "kind": "val"}
-    return None
-
-
-def _lora_command(
+def _run_spec(
     base_model: str | Path,
     data_dir: str | Path,
     adapter_dir: str | Path,
     options: LoRAOptions,
     format: Format,
-) -> list[str]:
-    """The mlx_lm lora invocation: one flag per option, prompt masking for SFT."""
-    cmd = [
-        sys.executable,
-        "-m",
-        "mlx_lm",
-        "lora",
-        "--model",
-        str(base_model),
-        "--train",
-        "--data",
-        str(data_dir),
-        "--adapter-path",
-        str(adapter_dir),
-        "--iters",
-        str(options.iters),
-        "--learning-rate",
-        str(options.learning_rate),
-        "--num-layers",
-        str(options.num_layers),
-        "--batch-size",
-        str(options.batch_size),
-        "--max-seq-length",
-        str(options.max_seq_length),
-        "--steps-per-report",
-        str(options.steps_per_report),
-        "--steps-per-eval",
-        str(options.steps_per_eval),
-        "--save-every",
-        str(options.save_every),
-        "--seed",
-        str(options.seed),
-        "--fine-tune-type",
-        "lora",
-    ]
-    if format == "pairs":
-        cmd.append("--mask-prompt")
-    return cmd
+) -> dict:
+    """The run as the child receives it: one dict, one spelling of "this run".
+
+    Paths are resolved here, and prompt masking follows the data format rather
+    than a caller's flag: SFT masks the prompt because the prompt is the
+    caller's text, not a target.
+    """
+    return {
+        "model": str(base_model),
+        "data": str(data_dir),
+        "adapter_path": str(adapter_dir),
+        "mask_prompt": format == "pairs",
+        **{name: getattr(options, name) for name in _CHILD_OPTION_FIELDS},
+    }
+
+
+def _child_command(spec: dict) -> list[str]:
+    """The one way to start a run: our child module, and the run as one JSON argument."""
+    return [sys.executable, "-m", _CHILD, json.dumps(spec)]
 
 
 def _terminate(process: subprocess.Popen) -> None:
-    """Stop the child's process group; it may already be gone."""
+    """Ask the child's process group to stop; it may already be gone."""
     try:
         os.killpg(process.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _kill(process: subprocess.Popen) -> None:
+    """Stop the child's process group whether it agrees or not."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         pass
 
@@ -276,6 +255,24 @@ def _adapter_weights(adapter_dir: Path) -> Path | None:
     return max(checkpoints, key=lambda item: item[0])[1] if checkpoints else None
 
 
+def _run_directory(workdir: Path | None) -> Path:
+    """A fresh directory for one run: the caller's to delete, never reused.
+
+    Each run gets its own child, even inside a workdir, so a re-run can never
+    meet a previous run's checkpoint - the failure this whole scheme exists to
+    prevent. ``workdir`` must be a directory the caller owns exclusively:
+    deleting it is how the caller cleans up, which is only safe if nothing else
+    writes there.
+    """
+    if workdir is None:
+        return Path(tempfile.mkdtemp(prefix=_SHARED_PREFIX))
+    workdir = Path(workdir)
+    if workdir.exists() and not workdir.is_dir():
+        raise ValueError(f"workdir must be a directory, got a file: {workdir}")
+    workdir.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=_RUN_PREFIX, dir=workdir))
+
+
 def train_lora(
     base_model: str | Path,
     data: LoRAData,
@@ -284,36 +281,46 @@ def train_lora(
     on_metric: Callable[[dict], None] | None = None,
     on_line: Callable[[str], None] | None = None,
     stop_requested: Callable[[], bool] | None = None,
+    workdir: str | Path | None = None,
+    name: str = "",
 ) -> LoRAAdapter:
     """Run LoRA training (QLoRA on a quantised base); stream metrics; return the artifact.
 
-    The split is ``options.validation_fraction`` of the rows, ordered with
-    ``options.seed``. The subprocess runs in its own process group, so stopping
-    terminates the whole child tree. mlx-lm writes a checkpoint every
+    The split is ``options.validation_fraction`` of the rows, taken as a stride
+    from ``options.seed``. The child runs in its own process group, so stopping
+    terminates it and anything it started. mlx-lm writes a checkpoint every
     ``options.save_every`` iterations; if the run is stopped, the newest
     checkpoint becomes the adapter and ``iters_completed`` records the iteration
     it reached. A stop before the first checkpoint raises :class:`TrainingStopped`.
 
     The run owns all of its scratch: the staged "train"/"valid" rows and the
-    adapter live in one fresh run-scoped directory under the system temp root
-    (two subdirectories, "data" and "adapter"), so no run can ever meet
-    another run's files and a checkpoint can never be mistaken for a previous
-    result. The returned :class:`LoRAAdapter.adapter_path` records where the
-    adapter went and ``training["run_dir"]`` names the whole scratch directory;
-    the caller owns cleanup - delete it once the artifact is saved with
-    :meth:`LoRAAdapter.save` or discarded. On a failure the raised exception
-    names the directory so the log tail can be inspected first.
+    adapter live in one fresh run-scoped directory (two subdirectories, "data"
+    and "adapter"), so no run can ever meet another run's files and a checkpoint
+    can never be mistaken for a previous result.
+
+    That directory is the caller's to delete, and where it goes is the caller's
+    choice: ``workdir`` is a directory the caller owns *exclusively* - every
+    child of it is one run's scratch, so deleting the workdir is the whole
+    cleanup - and each run gets a fresh child inside it. Without ``workdir`` the
+    run lands in the system temp root. Either way the returned
+    :class:`LoRAAdapter.adapter_path` points inside that directory and
+    ``training["run_dir"]`` names it, so a caller can find it again. Keep the
+    directory alive for as long as a :class:`LoRAModel` points into it, and call
+    :meth:`LoRAAdapter.save` to copy the artifact somewhere durable. On a
+    failure the raised exception names the directory, so the log tail can be
+    inspected first.
+
+    ``name`` is the artifact's name, and only the caller can know it: a
+    directory generated here is not a name to show a person.
     """
     opts = options or LoRAOptions()
     train, valid = split_for_training(data, opts)
-    # One fresh scratch directory per run: a re-run can never meet an earlier
-    # run's adapter, and a checkpoint can never be mistaken for its result.
-    run_dir = Path(tempfile.mkdtemp(prefix="orange-ai-lora-"))
+    run_dir = _run_directory(workdir)
     adapter_dir = run_dir / "adapter"
     staged = _stage(data.format, train, valid, run_dir / "data")
     adapter_dir.mkdir(parents=True, exist_ok=True)
 
-    cmd = _lora_command(base_model, staged, adapter_dir, opts, data.format)
+    cmd = _child_command(_run_spec(base_model, staged, adapter_dir, opts, data.format))
     env = dict(os.environ, PYTHONUNBUFFERED="1")
     tail: list[str] = []
     process = subprocess.Popen(
@@ -325,6 +332,7 @@ def train_lora(
         start_new_session=True,
     )
     stopped = False
+    reader: threading.Thread | None = None
     try:
         reader = threading.Thread(
             target=_pump, args=(process, tail, on_metric, on_line), daemon=True
@@ -347,8 +355,19 @@ def train_lora(
                 f"{run_dir} keeps the staged data and log tail:\n{tail_text}"
             )
     finally:
+        # Nothing below may read the directory while the child can still write
+        # to it: mlx-lm saves a checkpoint straight to its final path, so a
+        # SIGTERM landing mid-write would leave a truncated file for
+        # _adapter_weights to prefer over an intact older one.
         if process.poll() is None:
             _terminate(process)
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                _kill(process)
+                process.wait()
+        if reader is not None:
+            reader.join()
 
     weights = _adapter_weights(adapter_dir)
     if weights is None:
@@ -364,12 +383,10 @@ def train_lora(
     if weights != canonical:
         completed = int(weights.name.split("_", 1)[0])
         shutil.copy2(weights, canonical)
-        # A checkpoint may carry its own config; adopt it with the weights so an
-        # adopted mid-run adapter never travels without its matching config.
-        prefix = weights.name[: -len(_ADAPTER_WEIGHTS)]
-        paired_config = adapter_dir / f"{prefix}{_ADAPTER_CONFIG}"
-        if paired_config.is_file():
-            shutil.copy2(paired_config, adapter_dir / _ADAPTER_CONFIG)
+        # mlx-lm writes one config per run, at the start (lora.py: save_config),
+        # and none beside the numbered checkpoints, so the run's config is the
+        # only one there is and it stays: the LoRA structure it describes does
+        # not change mid-run. How far the run got is training["iters_completed"].
     adapter_config = {}
     config_path = adapter_dir / _ADAPTER_CONFIG
     if config_path.exists():
@@ -384,7 +401,7 @@ def train_lora(
             "stopped": completed < opts.iters,
             "run_dir": str(run_dir),
         },
-        name=run_dir.name,
+        name=name,
     )
 
 
@@ -394,15 +411,16 @@ def _pump(
     on_metric: Callable[[dict], None] | None,
     on_line: Callable[[str], None] | None,
 ) -> None:
-    """Stream the child's stdout; keep the last lines for error reporting."""
+    """Stream the child's stdout: metrics to ``on_metric``, everything else as a log line."""
     assert process.stdout is not None
     for line in process.stdout:
+        metric = decode(line)
+        if metric is not None:
+            if on_metric is not None:
+                on_metric(metric)
+            continue  # the data is consumed; the tail keeps the human log only
         tail.append(line)
         if len(tail) > 200:
             tail.pop(0)
         if on_line is not None:
             on_line(line)
-        if on_metric is not None:
-            metric = parse_metric(line)
-            if metric is not None:
-                on_metric(metric)
