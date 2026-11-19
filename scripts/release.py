@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Release this package: check the tree, bump the version, tag, push and publish.
 
-``check`` writes nothing. ``release`` writes ``pyproject.toml`` and ``uv.lock``,
-commits ``release: X.Y.Z``, creates the annotated tag ``vX.Y.Z``, pushes ``main``
-and the tag, and with ``--publish`` uploads the artifacts and verifies them on
-PyPI. ``verify`` compares the project, the tag at HEAD, PyPI and ``dist/``.
+``check`` writes no tracked file; it rebuilds ``dist/``. ``release`` writes
+``pyproject.toml`` and ``uv.lock``, commits ``release: X.Y.Z``, creates the
+annotated tag ``vX.Y.Z``, pushes ``main`` and the tag, and with ``--publish``
+uploads the artifacts and verifies them on PyPI. ``verify`` compares the project,
+the tag at HEAD, PyPI and ``dist/``.
 """
 
 from __future__ import annotations
@@ -226,7 +227,7 @@ def cmd_release(kind, publish, gate_confirmed, dry_run):
     if publish and CONFIG["publish_gate"] and not gate_confirmed:
         fail("--publish needs --gate-confirmed for this package")
     if dry_run:
-        print("dry run: nothing was written", flush=True)
+        print("dry run: nothing was committed, tagged or published", flush=True)
         return
     run(["uv", "version", "--bump", kind, "--no-sync"])
     run_tests()
@@ -257,7 +258,7 @@ def cmd_verify():
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("check", help="run every pre-release check; write nothing")
+    commands.add_parser("check", help="run every pre-release check; write no tracked file")
     release = commands.add_parser("release", help="bump, test, commit, tag and push")
     release.add_argument("kind", choices=["patch", "minor", "major"])
     release.add_argument("--publish", action="store_true", help="upload and verify on PyPI")
