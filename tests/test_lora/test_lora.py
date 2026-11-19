@@ -24,7 +24,14 @@ from orangecontrib.ai_suite.kernel.lora import (
     split_for_training,
     train_lora,
 )
-from orangecontrib.ai_suite.kernel.lora.mlx.protocol import MARKER, decode, encode
+from orangecontrib.ai_suite.kernel.lora.mlx.protocol import (
+    MARKER,
+    Params,
+    TrainReport,
+    ValReport,
+    decode,
+    encode,
+)
 from orangecontrib.ai_suite.kernel.lora.mlx.runtime import segments as _segments
 from orangecontrib.ai_suite.kernel.lora.model import _echo
 from orangecontrib.ai_suite.kernel.lora.training import _run_spec
@@ -159,9 +166,23 @@ def test_options_validate_and_are_frozen():
 # ---- the child's wire format (the widget's live-loss source) --------------
 
 
-def test_a_metric_round_trips_through_the_wire_format():
-    metric = {"kind": "train", "iter": 20, "loss": 0.725, "tok_s": 184}
-    assert decode(encode(metric) + "\n") == metric
+@pytest.mark.parametrize(
+    "event",
+    [
+        Params(fraction=0.233, detail="6.210M/2667.000M"),
+        TrainReport(iteration=20, loss=0.725, tokens_per_second=184),
+        ValReport(iteration=1, loss=3.419),
+    ],
+)
+def test_an_event_round_trips_through_the_wire_format(event):
+    assert decode(encode(event) + "\n") == event
+
+
+def test_every_event_type_has_a_wire_name():
+    from orangecontrib.ai_suite.kernel.lora.mlx.protocol import _BY_KIND, _KINDS
+
+    assert set(_KINDS) == {Params, TrainReport, ValReport}
+    assert set(_BY_KIND) == {"params", "train", "val"}
 
 
 def test_mlx_lm_human_output_is_not_a_metric():
@@ -176,9 +197,14 @@ def test_mlx_lm_human_output_is_not_a_metric():
         assert decode(line) is None
 
 
-def test_a_malformed_metric_is_a_bug_in_our_own_child():
-    with pytest.raises(ValueError, match="malformed metric"):
+def test_a_malformed_event_is_a_bug_in_our_own_child():
+    with pytest.raises(ValueError, match="malformed event"):
         decode(MARKER + "{not json}\n")
+
+
+def test_an_unknown_event_kind_is_refused_rather_than_guessed():
+    with pytest.raises(ValueError, match="unknown event kind"):
+        decode(MARKER + '{"kind": "epoch", "loss": 1.0}\n')
 
 
 # ---- what the child is asked for -------------------------------------------
@@ -327,11 +353,14 @@ def test_train_lora_tiny_run(tmp_path):
     if model_dir is None:
         pytest.skip(_NO_MODEL)
     data = LoRAData.from_texts([f"the quick brown fox jumped over fence {i}" for i in range(8)])
-    adapter = train_lora(
+    training = train_lora(
         model_dir,
         data,
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=128, num_layers=4),
     )
+    events = list(training)
+    assert any(isinstance(event, TrainReport) for event in events)
+    adapter = training.adapter
     assert (Path(adapter.adapter_path) / "adapters.safetensors").exists()
     assert adapter.training["options"]["iters"] == 2
 
@@ -362,11 +391,13 @@ def test_train_lora_greedy_determinism(tmp_path):
     if model_dir is None:
         pytest.skip(_NO_MODEL)
     data = LoRAData.from_texts(["alpha beta gamma delta." for _ in range(6)])
-    a = train_lora(
+    training = train_lora(
         model_dir,
         data,
         options=LoRAOptions(iters=2, batch_size=1, max_seq_length=64, num_layers=2, seed=7),
     )
+    list(training)
+    a = training.adapter
     m1 = LoRAModel(a.base_model, a.adapter_path)
     prompt, kwargs = "alpha", {"temperature": 1.0, "max_new_tokens": 10, "seed": 3}
     first = m1.generate(prompt, **kwargs)

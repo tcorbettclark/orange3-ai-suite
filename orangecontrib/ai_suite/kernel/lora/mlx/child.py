@@ -20,13 +20,13 @@ import sys
 from dataclasses import fields
 from typing import Any
 
-from .protocol import encode
+from .protocol import Params, TrainReport, ValReport, encode
 from .train import TrainingSpec
 
 
-def emit(metric: dict[str, Any]) -> None:
-    """Write one structured metric, flushed: the parent reads lines as they arrive."""
-    sys.stdout.write(encode(metric) + "\n")
+def emit(event: Params | TrainReport | ValReport) -> None:
+    """Write one structured event, flushed: the parent reads lines as they arrive."""
+    sys.stdout.write(encode(event) + "\n")
     sys.stdout.flush()
 
 
@@ -54,11 +54,10 @@ def emit_params(model: Any) -> None:
     total = get_total_parameters(model)
     trainable = sum(v.size for _, v in tree_flatten(model.trainable_parameters()))
     emit(
-        {
-            "kind": "params",
-            "pct": 100.0 * trainable / total,
-            "detail": f"{trainable / 1e6:.3f}M/{total / 1e6:.3f}M",
-        }
+        Params(
+            fraction=100.0 * trainable / total,
+            detail=f"{trainable / 1e6:.3f}M/{total / 1e6:.3f}M",
+        )
     )
 
 
@@ -91,12 +90,11 @@ def emit_metrics(training_callback: type) -> Any:
     class Emitter(training_callback):  # type: ignore[misc, valid-type]
         def on_train_loss_report(self, info: dict) -> None:
             emit(
-                {
-                    "kind": "train",
-                    "iter": int(info["iteration"]),
-                    "loss": float(info["train_loss"]),
-                    "tok_s": int(info["tokens_per_second"]),
-                }
+                TrainReport(
+                    iteration=int(info["iteration"]),
+                    loss=float(info["train_loss"]),
+                    tokens_per_second=int(info["tokens_per_second"]),
+                )
             )
 
         def on_val_loss_report(self, info: dict) -> None:
@@ -104,11 +102,10 @@ def emit_metrics(training_callback: type) -> Any:
             # ("iteration": it - 1 in tuner/trainer.py), so +1 keeps both curves
             # on the same axis as the training reports.
             emit(
-                {
-                    "kind": "val",
-                    "iter": int(info["iteration"]) + 1,
-                    "loss": float(info["val_loss"]),
-                }
+                ValReport(
+                    iteration=int(info["iteration"]) + 1,
+                    loss=float(info["val_loss"]),
+                )
             )
 
     return Emitter()

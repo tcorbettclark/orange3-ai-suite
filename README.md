@@ -427,27 +427,34 @@ from orangecontrib.ai_suite.kernel.lora import LoRAData, LoRAOptions, LoRAModel,
 base = get_britllm()  # pinned 4-bit MLX weights, cached on first use
 data = LoRAData.from_texts(corpus)  # or LoRAData.from_pairs(pairs)
 with tempfile.TemporaryDirectory() as scratch:  # this run's scratch, deleted on exit
-    adapter = train_lora(
+    run = train_lora(
         base,
         data,
         options=LoRAOptions(iters=300, num_layers=16),
         workdir=scratch,  # each run gets a fresh child of it
         name="my-adapter",  # the artifact's name is the caller's to choose
     )
+    for event in run:  # Params, then TrainReport and ValReport as reports arrive
+        print(event)
     # keep the artifact somewhere you own; the scratch can then be discarded
-    artifact = adapter.save(Path("adapters") / adapter.name)
+    artifact = run.adapter.save(Path("adapters") / run.adapter.name)
 model = LoRAModel.from_artifact(artifact)
 model.generate("In the second century", temperature=0)
 model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}
 model.adapter_enabled = False  # the same base model, before adaptation
 ```
 
-`train_lora` reports per-iteration metrics while it runs, and stopping ends the
-run and keeps the newest checkpoint: mlx-lm writes one every `save_every`
-iterations, so `iters_completed` records how far the run got, while a stop before
-the first one raises `TrainingStopped` and produces no model. The training runs in
-its own process - `lora.mlx` hides that, along with mlx-lm's API and file
-conventions, so the rest of `lora/` never sees a subprocess.
+`train_lora` returns a run rather than doing the work: nothing starts until you
+iterate it, each report arrives as a typed event, and `run.adapter` is the
+artifact once the iteration ends. `run.stop()` may be called from any thread -
+a widget's Stop button does exactly that - and it returns at once; the stop itself
+happens in the iteration, which also waits for the training process to be gone
+before anything reads its directory. mlx-lm writes a checkpoint every
+`save_every` iterations, so a stop adopts the newest and `iters_completed` records
+how far the run got, while a stop before the first one raises `TrainingStopped`
+and produces no model. The training runs in its own process - `lora.mlx` hides
+that, along with mlx-lm's API and file conventions, so the rest of `lora/` never
+sees a subprocess.
 
 ## Datasets and workflows
 

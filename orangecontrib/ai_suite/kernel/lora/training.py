@@ -25,7 +25,8 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
-from collections.abc import Callable, Iterable
+import threading
+from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Literal
@@ -187,6 +188,20 @@ def _run_spec(
     )
 
 
+def _check_workdir(workdir: Path | None) -> Path | None:
+    """Refuse a workdir that is not a directory; the caller's to create or not.
+
+    Checked when a run is asked for, so a caller learns about a bad path before
+    anything starts - the directory itself is made when the run begins.
+    """
+    if workdir is None:
+        return None
+    workdir = Path(workdir)
+    if workdir.exists() and not workdir.is_dir():
+        raise ValueError(f"workdir must be a directory, got a file: {workdir}")
+    return workdir
+
+
 def _run_directory(workdir: Path | None) -> Path:
     """A fresh directory for one run: the caller's to delete, never reused.
 
@@ -198,11 +213,152 @@ def _run_directory(workdir: Path | None) -> Path:
     """
     if workdir is None:
         return Path(tempfile.mkdtemp(prefix=_SHARED_PREFIX))
-    workdir = Path(workdir)
-    if workdir.exists() and not workdir.is_dir():
-        raise ValueError(f"workdir must be a directory, got a file: {workdir}")
     workdir.mkdir(parents=True, exist_ok=True)
     return Path(tempfile.mkdtemp(prefix=_RUN_PREFIX, dir=workdir))
+
+
+class TrainingRun:
+    """One LoRA run: iterate it for progress, ``stop()`` it from any thread.
+
+    The split, and the shape of the run, are decided when the run is asked for -
+    a bad setting is an error at the call, not at the first event. What the run
+    *does* happens while it is iterated: the staged rows and the adapter appear
+    in one fresh run-scoped directory (two subdirectories, "data" and "adapter"),
+    so no run can ever meet another run's files and a checkpoint can never be
+    mistaken for a previous result.
+
+    mlx-lm writes a checkpoint every ``options.save_every`` iterations; if the
+    run is stopped, the newest checkpoint is adopted and ``iters_completed``
+    records the iteration it reached. A stop before the first checkpoint adopts
+    nothing and raises :class:`TrainingStopped` from the iteration.
+
+    That directory is the caller's to delete, and where it goes is the caller's
+    choice: ``workdir`` is a directory the caller owns *exclusively* - every child
+    of it is one run's scratch, so deleting the workdir is the whole cleanup - and
+    each run gets a fresh child inside it. Without ``workdir`` the run lands in
+    the system temp root. Either way ``adapter.adapter_path`` points inside that
+    directory and ``training["run_dir"]`` names it, so a caller can find it again.
+    Keep it alive for as long as a :class:`LoRAModel` points into it, and call
+    :meth:`LoRAAdapter.save` to copy the artifact somewhere durable. A failure
+    names the directory, so the log tail can be inspected first.
+
+    ``name`` is the artifact's name, and only the caller can know it: a directory
+    generated here is not a name to show a person.
+    """
+
+    def __init__(
+        self,
+        base_model: str | Path,
+        data: LoRAData,
+        options: LoRAOptions,
+        workdir: str | Path | None,
+        name: str,
+    ) -> None:
+        self.base_model = base_model
+        self.data = data
+        self.options = options
+        self.name = name
+        self.adapter: LoRAAdapter | None = None  # set when the run ends well
+        self.train, self.valid = split_for_training(data, options)  # eager: fail at the call
+        self._workdir = _check_workdir(workdir)
+        self._stop = threading.Event()
+        self._run: mlx.Run | None = None
+        self._iterated = False
+
+    # ---- control ----------------------------------------------------------
+
+    @property
+    def stopped(self) -> bool:
+        """Whether a stop has been asked for (it may not have happened yet)."""
+        return self._stop.is_set()
+
+    def stop(self) -> None:
+        """Ask the run to stop; returns at once, so any thread may call it."""
+        self._stop.set()
+        if self._run is not None:
+            self._run.stop()
+
+    def close(self) -> None:
+        """Stop the run and wait for its child: for a caller that leaves early."""
+        self.stop()
+        if self._run is not None:
+            self._run.close()
+
+    def __enter__(self) -> TrainingRun:
+        return self
+
+    def __exit__(self, *_exception: object) -> None:
+        self.close()
+
+    # ---- the events -------------------------------------------------------
+
+    def __iter__(self) -> Iterator[mlx.Event]:
+        if self._iterated:
+            raise RuntimeError("a run is iterated once: ask for a new one")
+        self._iterated = True
+        if self.stopped:
+            raise TrainingStopped("training was stopped before it started; nothing was adopted")
+        run_dir = _run_directory(self._workdir)
+        adapter_dir = run_dir / "adapter"
+        spec = _run_spec(
+            self.base_model,
+            mlx.write_dataset(run_dir / "data", self.data.format, self.train, self.valid),
+            adapter_dir,
+            self.options,
+            self.data.format,
+        )
+        run = mlx.Run(spec)
+        self._run = run
+        try:
+            try:
+                yield from run
+            except mlx.TrainingFailed as exc:
+                raise RuntimeError(
+                    f"mlx_lm lora failed ({exc.returncode}); the run directory "
+                    f"{run_dir} keeps the staged data and log tail:\n{''.join(exc.tail[-20:])}"
+                ) from exc
+        finally:
+            self._run = None
+        self.adapter = self._adopt(run_dir, adapter_dir, run.outcome)
+
+    # ---- the artifact -----------------------------------------------------
+
+    def _adopt(self, run_dir: Path, adapter_dir: Path, outcome: mlx.Outcome | None) -> LoRAAdapter:
+        """Turn whatever the run left in the adapter directory into an artifact."""
+        weights = mlx.adapter_weights(adapter_dir)
+        if weights is None:
+            if outcome is not None and outcome.stopped:
+                raise TrainingStopped(
+                    "training was stopped before mlx-lm wrote a checkpoint "
+                    "(save_every iterations must elapse first); nothing was adopted, and "
+                    f"the run directory {run_dir} holds the log tail"
+                )
+            raise RuntimeError(f"training ended without adapter files; see {run_dir}")
+        canonical = adapter_dir / mlx.ADAPTER_WEIGHTS
+        completed = self.options.iters
+        if weights != canonical:
+            completed = mlx.checkpoint_iteration(weights)
+            shutil.copy2(weights, canonical)
+            # mlx-lm writes one config per run, at the start (lora.py: save_config),
+            # and none beside the numbered checkpoints, so the run's config is the
+            # only one there is and it stays: the LoRA structure it describes does
+            # not change mid-run. How far the run got is training["iters_completed"].
+        adapter_config = {}
+        config_path = adapter_dir / mlx.ADAPTER_CONFIG
+        if config_path.exists():
+            adapter_config = json.loads(config_path.read_text())
+        return LoRAAdapter(
+            base_model=str(self.base_model),
+            adapter_path=str(adapter_dir),
+            training={
+                "options": asdict(self.options),
+                "adapter_config": adapter_config,
+                "iters_completed": completed,
+                "stopped": completed < self.options.iters,
+                "run_dir": str(run_dir),
+            },
+            name=self.name,
+        )
 
 
 def train_lora(
@@ -210,93 +366,13 @@ def train_lora(
     data: LoRAData,
     *,
     options: LoRAOptions | None = None,
-    on_metric: Callable[[dict], None] | None = None,
-    on_line: Callable[[str], None] | None = None,
-    stop_requested: Callable[[], bool] | None = None,
     workdir: str | Path | None = None,
     name: str = "",
-) -> LoRAAdapter:
-    """Run LoRA training (QLoRA on a quantised base); stream metrics; return the artifact.
+) -> TrainingRun:
+    """A run of LoRA training (QLoRA on a quantised base): iterate it for progress.
 
-    The split is ``options.validation_fraction`` of the rows, taken as a stride
-    from ``options.seed``. The child runs in its own process group, so stopping
-    terminates it and anything it started. mlx-lm writes a checkpoint every
-    ``options.save_every`` iterations; if the run is stopped, the newest
-    checkpoint becomes the adapter and ``iters_completed`` records the iteration
-    it reached. A stop before the first checkpoint raises :class:`TrainingStopped`.
-
-    The run owns all of its scratch: the staged "train"/"valid" rows and the
-    adapter live in one fresh run-scoped directory (two subdirectories, "data"
-    and "adapter"), so no run can ever meet another run's files and a checkpoint
-    can never be mistaken for a previous result.
-
-    That directory is the caller's to delete, and where it goes is the caller's
-    choice: ``workdir`` is a directory the caller owns *exclusively* - every
-    child of it is one run's scratch, so deleting the workdir is the whole
-    cleanup - and each run gets a fresh child inside it. Without ``workdir`` the
-    run lands in the system temp root. Either way the returned
-    :class:`LoRAAdapter.adapter_path` points inside that directory and
-    ``training["run_dir"]`` names it, so a caller can find it again. Keep the
-    directory alive for as long as a :class:`LoRAModel` points into it, and call
-    :meth:`LoRAAdapter.save` to copy the artifact somewhere durable. On a
-    failure the raised exception names the directory, so the log tail can be
-    inspected first.
-
-    ``name`` is the artifact's name, and only the caller can know it: a
-    directory generated here is not a name to show a person.
+    Returned, not started: the child process exists only while the run is being
+    iterated, so a caller that changes its mind costs nothing. See
+    :class:`TrainingRun` for the run's directory, its stop and its artifact.
     """
-    opts = options or LoRAOptions()
-    train, valid = split_for_training(data, opts)
-    run_dir = _run_directory(workdir)
-    adapter_dir = run_dir / "adapter"
-    spec = _run_spec(
-        base_model,
-        mlx.write_dataset(run_dir / "data", data.format, train, valid),
-        adapter_dir,
-        opts,
-        data.format,
-    )
-    try:
-        outcome = mlx.run_training(
-            spec, on_metric=on_metric, on_line=on_line, stop_requested=stop_requested
-        )
-    except mlx.TrainingFailed as exc:
-        raise RuntimeError(
-            f"mlx_lm lora failed ({exc.returncode}); the run directory {run_dir} "
-            f"keeps the staged data and log tail:\n{''.join(exc.tail[-20:])}"
-        ) from exc
-
-    weights = mlx.adapter_weights(adapter_dir)
-    if weights is None:
-        if outcome.stopped:
-            raise TrainingStopped(
-                "training was stopped before mlx-lm wrote a checkpoint "
-                "(save_every iterations must elapse first); nothing was adopted, and "
-                f"the run directory {run_dir} holds the log tail"
-            )
-        raise RuntimeError(f"training ended without adapter files; see {run_dir}")
-    canonical = adapter_dir / mlx.ADAPTER_WEIGHTS
-    completed = opts.iters
-    if weights != canonical:
-        completed = mlx.checkpoint_iteration(weights)
-        shutil.copy2(weights, canonical)
-        # mlx-lm writes one config per run, at the start (lora.py: save_config),
-        # and none beside the numbered checkpoints, so the run's config is the
-        # only one there is and it stays: the LoRA structure it describes does
-        # not change mid-run. How far the run got is training["iters_completed"].
-    adapter_config = {}
-    config_path = adapter_dir / mlx.ADAPTER_CONFIG
-    if config_path.exists():
-        adapter_config = json.loads(config_path.read_text())
-    return LoRAAdapter(
-        base_model=str(base_model),
-        adapter_path=str(adapter_dir),
-        training={
-            "options": asdict(opts),
-            "adapter_config": adapter_config,
-            "iters_completed": completed,
-            "stopped": completed < opts.iters,
-            "run_dir": str(run_dir),
-        },
-        name=name,
-    )
+    return TrainingRun(base_model, data, options or LoRAOptions(), workdir, name)

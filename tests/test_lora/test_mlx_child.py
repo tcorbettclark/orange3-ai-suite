@@ -13,7 +13,13 @@ from types import SimpleNamespace
 import pytest
 
 from orangecontrib.ai_suite.kernel.lora.mlx import child as _child
-from orangecontrib.ai_suite.kernel.lora.mlx.protocol import MARKER, decode
+from orangecontrib.ai_suite.kernel.lora.mlx.protocol import (
+    MARKER,
+    Params,
+    TrainReport,
+    ValReport,
+    decode,
+)
 from orangecontrib.ai_suite.kernel.lora.mlx.train import TrainingSpec
 
 SPEC = TrainingSpec(
@@ -43,9 +49,10 @@ class _TrainingCallback:
         raise AssertionError("the base class is not called")
 
 
-def _lines(capsys) -> list[dict]:
+def _lines(capsys) -> list:
+    """The events the child wrote, in order."""
     out = capsys.readouterr().out
-    return [decode(line + "\n") for line in out.splitlines() if line]
+    return [event for event in map(decode, out.splitlines()) if event is not None]
 
 
 # ---- the specification -----------------------------------------------------
@@ -90,12 +97,12 @@ def test_the_spec_is_rebuilt_by_name_so_a_stray_key_cannot_be_ignored():
 # ---- the metrics -----------------------------------------------------------
 
 
-def test_a_training_report_becomes_the_widgets_metric(capsys):
+def test_a_training_report_becomes_an_event(capsys):
     emitter = _child.emit_metrics(_TrainingCallback)
     emitter.on_train_loss_report(
         {"iteration": 20, "train_loss": 0.725, "tokens_per_second": 184.0, "peak_memory": 3.2}
     )
-    assert _lines(capsys) == [{"kind": "train", "iter": 20, "loss": 0.725, "tok_s": 184}]
+    assert _lines(capsys) == [TrainReport(iteration=20, loss=0.725, tokens_per_second=184)]
 
 
 def test_a_validation_report_is_put_on_the_training_axis(capsys):
@@ -103,7 +110,7 @@ def test_a_validation_report_is_put_on_the_training_axis(capsys):
     # so the child's +1 is what makes the two curves line up in the widget.
     emitter = _child.emit_metrics(_TrainingCallback)
     emitter.on_val_loss_report({"iteration": 0, "val_loss": 3.419, "val_time": 0.02})
-    assert _lines(capsys) == [{"kind": "val", "iter": 1, "loss": 3.419}]
+    assert _lines(capsys) == [ValReport(iteration=1, loss=3.419)]
 
 
 def test_the_metrics_are_json_lines_with_the_shared_marker(capsys):
@@ -149,10 +156,10 @@ def test_the_parameter_counts_are_mlx_lm_arithmetic(monkeypatch, capsys):
         trainable_parameters=lambda: [("lora_a", _Leaf(6_210_000.0)), ("lora_b", _Leaf(0.0))]
     )
     _child.emit_params(model)
-    metric = _lines(capsys)[0]
-    assert metric["kind"] == "params"
-    assert metric["pct"] == pytest.approx(100 * 6_210_000 / 2_667_000_000)
-    assert metric["detail"] == "6.210M/2667.000M"
+    event = _lines(capsys)[0]
+    assert isinstance(event, Params)
+    assert event.fraction == pytest.approx(100 * 6_210_000 / 2_667_000_000)
+    assert event.detail == "6.210M/2667.000M"
 
 
 def test_a_moved_printer_fails_loudly():

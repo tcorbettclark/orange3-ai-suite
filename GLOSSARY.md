@@ -133,6 +133,10 @@ context is padded out with BOS, or when a unit is shorter than `w`.
 - **model** — an instance of an architecture with a tokenizer and weights: what
   `fit` returns, and what generates, evaluates and saves. The architecture is
   the recipe; the model is one fitted result of it.
+- **run** — one fine-tuning job, seen as an iterator: iterating it is what starts
+  the training, each report arrives as an event, `stop()` asks it to end from any
+  thread, and the artifact is ready when the iteration finishes. A run is asked
+  for and then started, so a caller that changes its mind leaves nothing behind.
 - **hyperparameter** — a setting for an architecture, e.g. `context_width`,
   `embedding_dim`, or the LSTM's `units`. Enumerable through `get_params()`.
 - **parameter** — a number the model learns from the data (embeddings, weights,

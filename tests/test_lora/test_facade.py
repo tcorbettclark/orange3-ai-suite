@@ -13,7 +13,11 @@ EXPECTED = frozenset(
         "LoRAModel",
         "LoRAData",
         "LoRAOptions",
+        "Params",
+        "TrainReport",
+        "TrainingRun",
         "TrainingStopped",
+        "ValReport",
         "available",
         "split_for_training",
         "train_lora",
@@ -29,7 +33,7 @@ def test_package_exports_only_the_use_case():
 
 def test_internals_live_in_their_own_module():
     # Supported, but not part of the façade: the MLX boundary (its wire format,
-    # its runtime) and the run's own helpers belong to whoever owns the run.
+    # its run) and the domain's own helpers belong to whoever owns the run.
     from orangecontrib.ai_suite.kernel.lora import mlx
     from orangecontrib.ai_suite.kernel.lora.mlx import protocol
     from orangecontrib.ai_suite.kernel.lora.model import _echo
@@ -38,4 +42,4 @@ def test_internals_live_in_their_own_module():
     assert callable(_echo)
     assert callable(protocol.encode) and callable(protocol.decode)
     assert callable(_run_spec)
-    assert callable(mlx.run_training)
+    assert isinstance(mlx.Run, type)

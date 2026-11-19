@@ -24,7 +24,11 @@ from Orange.widgets.widget import Input, Msg, Output, OWWidget
 from orangecontrib.ai_suite.kernel.lora import (
     LoRAModel,
     LoRAOptions,
+    Params,
+    TrainingRun,
     TrainingStopped,
+    TrainReport,
+    ValReport,
     split_for_training,
     train_lora,
 )
@@ -36,9 +40,9 @@ _OPTION_DEFAULTS = LoRAOptions()
 
 
 class LoraWorker(QThread):
-    """Runs kernel LoRA training off the GUI thread; metrics stream via signals."""
+    """Runs kernel LoRA training off the GUI thread; each event goes out as a signal."""
 
-    metric_signal = pyqtSignal(dict)
+    event_signal = pyqtSignal(object)
     finished_ok = pyqtSignal(object)
     stopped = pyqtSignal(str)
     failed = pyqtSignal(str)
@@ -46,16 +50,31 @@ class LoraWorker(QThread):
     def __init__(self, request, parent=None):
         super().__init__(parent)
         self.request = request  # kwargs for the kernel's train_lora
-        self.request_stop_flag = False
+        self._run: TrainingRun | None = None
+        self._stop_requested = False
+
+    def stop(self):
+        """Ask the run to stop; safe from the GUI thread, and before it starts."""
+        self._stop_requested = True
+        if self._run is not None:
+            self._run.stop()
 
     def run(self):
         try:
-            adapter = train_lora(
-                on_metric=self.metric_signal.emit,
-                stop_requested=lambda: self.request_stop_flag,
-                **self.request,
-            )
-            self.finished_ok.emit(adapter)
+            run = train_lora(**self.request)
+            self._run = run
+            if self._stop_requested:
+                run.stop()
+            try:
+                # The `with` is what makes leaving early deterministic: the child
+                # is terminated and reaped on the way out, not when a generator
+                # happens to be collected.
+                with run:
+                    for event in run:
+                        self.event_signal.emit(event)
+            finally:
+                self._run = None
+            self.finished_ok.emit(run.adapter)
         except TrainingStopped as exc:
             self.stopped.emit(str(exc))
         except Exception:
@@ -268,7 +287,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
         self._val_curve.setData([], [])
 
         worker = LoraWorker(request)
-        worker.metric_signal.connect(self._on_metric)
+        worker.event_signal.connect(self._on_event)
         worker.finished_ok.connect(self._on_done)
         worker.stopped.connect(self._on_stopped)
         worker.failed.connect(self._on_failed)
@@ -304,27 +323,39 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
     def stop_training(self):
         if self.worker is not None:
-            self.worker.request_stop_flag = True
+            self.worker.stop()
 
     # ---- live feedback -------------------------------------------------------
 
-    def _on_metric(self, metric: dict):
-        if metric.get("kind") == "params":
-            self._trainable_note = f"trainable {metric['pct']}% ({metric['detail']})"
-            self.status_label.setText(self._trainable_note)
-            return
-        self._losses.append((metric["iter"], metric["loss"], metric["kind"]))
+    def _on_event(self, event):
+        """One progress event, matched by type: the event *is* the protocol."""
+        match event:
+            case Params():
+                self._trainable_note = f"trainable {event.fraction:.3f}% ({event.detail})"
+                self.status_label.setText(self._trainable_note)
+            case TrainReport():
+                self._losses.append((event.iteration, event.loss, "train"))
+                self._redraw_curves()
+                self.status_label.setText(
+                    f"iter {event.iteration}: loss {event.loss:.3f}, "
+                    f"{event.tokens_per_second} tok/s"
+                    + (f"; {self._trainable_note}" if self._trainable_note else "")
+                )
+            case ValReport():
+                self._losses.append((event.iteration, event.loss, "val"))
+                self._redraw_curves()
+                self.status_label.setText(
+                    f"iter {event.iteration}: val loss {event.loss:.3f}"
+                    + (f"; {self._trainable_note}" if self._trainable_note else "")
+                )
+
+    def _redraw_curves(self):
         train = [(i, loss) for i, loss, kind in self._losses if kind == "train"]
         val = [(i, loss) for i, loss, kind in self._losses if kind == "val"]
         if train:
             self._train_curve.setData(*zip(*train, strict=True))
         if val:
             self._val_curve.setData(*zip(*val, strict=True))
-        self.status_label.setText(
-            f"iter {metric['iter']}: loss {metric['loss']:.3f}"
-            + (f", {metric.get('tok_s')} tok/s" if metric.get("tok_s") else "")
-            + (f"; {self._trainable_note}" if self._trainable_note else "")
-        )
 
     def _on_done(self, adapter):
         self.Information.training.clear()

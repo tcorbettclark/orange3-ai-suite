@@ -9,10 +9,10 @@ invent:
   scoring, and the tuner's entry points and callbacks;
 - **its file conventions** (:mod:`layout`): the jsonl shapes it reads, the names
   it gives the adapter and its numbered checkpoints;
-- **the fact that training is another process** (:mod:`train`): ``run_training``
-  takes a :class:`TrainingSpec` and a callback and returns when the run is over,
-  like any other in-process call. The child, the wire format (:mod:`protocol`),
-  the stop signal and the wait-and-reap behind it are invisible from outside.
+- **the fact that training is another process** (:mod:`train`): a :class:`Run` is
+  iterated for progress events and stopped with ``stop()``, like any other
+  in-process iterator. The child, the wire format (:mod:`protocol`), the stop
+  signal and the wait-and-reap behind it are invisible from outside.
 
 ``lora`` may import this package; nothing above ``lora`` may, and nothing in here
 may import ``lora`` back. ``tests/test_layout.py`` enforces both.
@@ -27,6 +27,7 @@ from .layout import (
     checkpoint_iteration,
     write_dataset,
 )
+from .protocol import Event, Params, TrainReport, ValReport
 from .runtime import (
     EVAL_WINDOW,
     available,
@@ -37,15 +38,20 @@ from .runtime import (
     segments,
     stream_text,
 )
-from .train import Outcome, TrainingFailed, TrainingSpec, command, run_training
+from .train import Outcome, Run, TrainingFailed, TrainingSpec, command
 
 __all__ = [
     "ADAPTER_CONFIG",
     "ADAPTER_WEIGHTS",
     "EVAL_WINDOW",
+    "Event",
     "Outcome",
+    "Params",
+    "Run",
+    "TrainReport",
     "TrainingFailed",
     "TrainingSpec",
+    "ValReport",
     "adapter_weights",
     "available",
     "checkpoint_iteration",
@@ -54,7 +60,6 @@ __all__ = [
     "generate_text",
     "load_model",
     "require",
-    "run_training",
     "segments",
     "stream_text",
     "write_dataset",

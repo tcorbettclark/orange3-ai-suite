@@ -12,7 +12,6 @@ import json
 import os
 import shutil
 import tempfile
-import threading
 from pathlib import Path
 
 import pytest
@@ -21,7 +20,10 @@ from orangecontrib.ai_suite.kernel.lora import (
     LoRAAdapter,
     LoRAData,
     LoRAOptions,
+    Params,
     TrainingStopped,
+    TrainReport,
+    ValReport,
     train_lora,
 )
 
@@ -170,13 +172,25 @@ def _options(**kwargs):
     return LoRAOptions(**values)
 
 
-def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm, tmp_path):
-    seen = []
-    adapter = train_lora(
-        "base-model",
-        _data(),
+def _run(**kwargs):
+    """Drive a run to the end and give back its events and its artifact."""
+    training = train_lora(**kwargs)
+    events = list(training)
+    return events, training.adapter
+
+
+def _stop_at_first_report(training):
+    """Iterate until the first training report, then ask the run to stop."""
+    for event in training:
+        if isinstance(event, TrainReport):
+            training.stop()
+
+
+def test_a_completed_run_reports_its_events_and_yields_the_artifact(fake_mlx_lm, tmp_path):
+    seen, adapter = _run(
+        base_model="base-model",
+        data=_data(),
         options=_options(iters=3),
-        on_metric=seen.append,
         workdir=tmp_path,
     )
     adapter_dir = Path(adapter.adapter_path)
@@ -187,7 +201,7 @@ def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm, tmp
     assert adapter.training["run_dir"] == str(adapter_dir.parent)
     assert adapter.training["iters_completed"] == 3
     assert adapter.training["stopped"] is False
-    assert {m["kind"] for m in seen} == {"params", "train", "val"}
+    assert {type(event) for event in seen} == {Params, TrainReport, ValReport}
     config = adapter.training["adapter_config"]
     assert config["fine_tune_type"] == "lora"
     assert config["mask_prompt"] is False
@@ -200,24 +214,23 @@ def test_completed_run_streams_metrics_and_returns_the_artifact(fake_mlx_lm, tmp
     assert asked["save_every"] == 50
     assert asked["fine_tune_type"] == "lora"
 
-    # One metric per report, in the order they happened, with the fields the
-    # widget plots. The params metric arrives once, before any loss.
-    assert seen[0]["kind"] == "params"
-    train = [m for m in seen if m["kind"] == "train"]
-    val = [m for m in seen if m["kind"] == "val"]
-    assert [m["iter"] for m in train] == [1, 2, 3]
-    assert [m["iter"] for m in val] == [1, 2, 3]  # val is on the same axis as train
-    assert train[0]["loss"] == pytest.approx(1.0)
-    assert train[0]["tok_s"] == 184
-    params = next(m for m in seen if m["kind"] == "params")
-    assert params["pct"] == pytest.approx(100 * 6_210_000 / 2_667_000_000)
-    assert params["detail"] == "6.210M/2667.000M"
+    # One event per report, in the order they happened, typed rather than
+    # tagged: the params report arrives once, before any loss.
+    assert isinstance(seen[0], Params)
+    train = [event for event in seen if isinstance(event, TrainReport)]
+    val = [event for event in seen if isinstance(event, ValReport)]
+    assert [event.iteration for event in train] == [1, 2, 3]
+    assert [event.iteration for event in val] == [1, 2, 3]  # val shares train's axis
+    assert train[0].loss == pytest.approx(1.0)
+    assert train[0].tokens_per_second == 184
+    assert seen[0].fraction == pytest.approx(100 * 6_210_000 / 2_667_000_000)
+    assert seen[0].detail == "6.210M/2667.000M"
 
 
 def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
-    adapter = train_lora(
-        "base-model",
-        LoRAData.from_pairs([("q1", "a1"), ("q2", "a2"), ("q3", "a3"), ("q4", "a4")]),
+    _events, adapter = _run(
+        base_model="base-model",
+        data=LoRAData.from_pairs([("q1", "a1"), ("q2", "a2"), ("q3", "a3"), ("q4", "a4")]),
         options=_options(iters=1),
         workdir=tmp_path,
     )
@@ -227,26 +240,24 @@ def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
 
 
 def test_two_runs_never_share_a_directory(fake_mlx_lm, tmp_path):
-    first = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
-    second = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
+    _events, first = _run(
+        base_model="base-model", data=_data(), options=_options(iters=1), workdir=tmp_path
+    )
+    _events, second = _run(
+        base_model="base-model", data=_data(), options=_options(iters=1), workdir=tmp_path
+    )
     assert first.adapter_path != second.adapter_path  # each run its own scratch
 
 
 def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
-    reported = threading.Event()
-
-    def on_metric(metric):
-        if metric["kind"] == "train":
-            reported.set()
-
-    adapter = train_lora(
+    training = train_lora(
         "base-model",
         _data(),
         options=_options(iters=1000, save_every=1),
-        on_metric=on_metric,
-        stop_requested=reported.is_set,
         workdir=tmp_path,
     )
+    _stop_at_first_report(training)
+    adapter = training.adapter
     adapter_dir = Path(adapter.adapter_path)
     assert (adapter_dir / "adapters.safetensors").exists()
     assert adapter.training["iters_completed"] == 1
@@ -263,49 +274,38 @@ def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
 
 def test_a_stopped_run_reaps_its_child_before_it_reads_the_directory(fake_mlx_lm, tmp_path):
     # The child saves its checkpoint straight to its final path, so a directory
-    # read while it is still alive can pick up a truncated file. By the time
-    # train_lora returns, the pid must be gone - exited, and reaped by us.
-    reported = threading.Event()
-
-    def on_metric(metric):
-        if metric["kind"] == "train":
-            reported.set()
-
-    adapter = train_lora(
+    # read while it is still alive can pick up a truncated file. By the time the
+    # iteration ends, the pid must be gone - exited, and reaped by us.
+    training = train_lora(
         "base-model",
         _data(),
         options=_options(iters=1000, save_every=1),
-        on_metric=on_metric,
-        stop_requested=reported.is_set,
         workdir=tmp_path,
     )
-    pid = int((Path(adapter.adapter_path) / "child.pid").read_text())
+    _stop_at_first_report(training)
+    pid = int((Path(training.adapter.adapter_path) / "child.pid").read_text())
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
 
 
 def test_stop_before_the_first_checkpoint_raises(fake_mlx_lm, tmp_path):
-    reported = threading.Event()
-
-    def on_metric(metric):
-        if metric["kind"] == "train":
-            reported.set()
-
+    training = train_lora(
+        "base-model",
+        _data(),
+        options=_options(iters=1000, save_every=100),
+        workdir=tmp_path,
+    )
     with pytest.raises(TrainingStopped, match="stopped before"):
-        train_lora(
-            "base-model",
-            _data(),
-            options=_options(iters=1000, save_every=100),
-            on_metric=on_metric,
-            stop_requested=reported.is_set,
-            workdir=tmp_path,
-        )
+        # The stop lands after the first report, before any checkpoint was saved.
+        for event in training:
+            if isinstance(event, TrainReport):
+                training.stop()
 
 
 def test_a_nonzero_exit_reports_the_tail(fake_mlx_lm, tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_MLX_LM_EXIT", "1")
     with pytest.raises(RuntimeError, match=r"failed \(3\)") as excinfo:
-        train_lora("base-model", _data(), options=_options(), workdir=tmp_path)
+        list(train_lora("base-model", _data(), options=_options(), workdir=tmp_path))
     assert "simulated failure" in str(excinfo.value)
 
 
@@ -313,7 +313,7 @@ def test_a_nonzero_exit_reports_the_tail(fake_mlx_lm, tmp_path, monkeypatch):
 
 
 def test_a_run_without_a_workdir_lands_in_the_temp_root(fake_mlx_lm):
-    adapter = train_lora("base-model", _data(), options=_options(iters=3))
+    _events, adapter = _run(base_model="base-model", data=_data(), options=_options(iters=3))
     run_dir = Path(adapter.training["run_dir"])
     try:
         assert run_dir.parent.resolve() == Path(tempfile.gettempdir()).resolve()
@@ -327,9 +327,13 @@ def test_a_run_without_a_workdir_lands_in_the_temp_root(fake_mlx_lm):
 
 def test_a_workdir_gets_a_fresh_child_per_run(fake_mlx_lm, tmp_path):
     workdir = tmp_path / "runs"
-    first = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
-    second = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
-    dirs = [Path(a.training["run_dir"]) for a in (first, second)]
+
+    def one():
+        return _run(
+            base_model="base-model", data=_data(), options=_options(iters=1), workdir=workdir
+        )[1]
+
+    dirs = [Path(adapter.training["run_dir"]) for adapter in (one(), one())]
     assert all(run_dir.parent.resolve() == workdir.resolve() for run_dir in dirs)
     assert dirs[0] != dirs[1]  # never a re-run into the previous run's files
     # inside a directory the caller named, a run directory is just a run
@@ -340,12 +344,16 @@ def test_a_workdir_gets_a_fresh_child_per_run(fake_mlx_lm, tmp_path):
 
 
 def test_a_workdir_is_created_if_it_is_missing(fake_mlx_lm, tmp_path):
+    # Asked for, then started: the directory is made on the first event, so a run
+    # that is never iterated leaves nothing behind.
     workdir = tmp_path / "runs" / "today"
-    adapter = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
-    assert Path(adapter.training["run_dir"]).parent == workdir
+    training = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
+    assert not workdir.exists()
+    list(training)
+    assert Path(training.adapter.training["run_dir"]).parent == workdir
 
 
-def test_a_workdir_that_is_a_file_is_refused(fake_mlx_lm, tmp_path):
+def test_a_workdir_that_is_a_file_is_refused_when_the_run_is_asked_for(fake_mlx_lm, tmp_path):
     not_a_directory = tmp_path / "file"
     not_a_directory.write_text("not a directory")
     with pytest.raises(ValueError, match="workdir must be a directory"):
@@ -355,14 +363,65 @@ def test_a_workdir_that_is_a_file_is_refused(fake_mlx_lm, tmp_path):
 def test_the_artifact_name_is_the_callers(fake_mlx_lm, tmp_path):
     # A generated directory name is not a name to show a person, so the caller
     # supplies it - and it travels into the artifact the run returns.
-    adapter = train_lora(
-        "base-model", _data(), options=_options(iters=1), workdir=tmp_path, name="shakespeare"
+    _events, adapter = _run(
+        base_model="base-model",
+        data=_data(),
+        options=_options(iters=1),
+        workdir=tmp_path,
+        name="shakespeare",
     )
     assert adapter.name == "shakespeare"
     assert LoRAAdapter.load(adapter.save(tmp_path / "artifact")).name == "shakespeare"
 
 
 def test_an_unnamed_run_is_not_named_after_its_directory(fake_mlx_lm, tmp_path):
-    adapter = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
+    _events, adapter = _run(
+        base_model="base-model", data=_data(), options=_options(iters=1), workdir=tmp_path
+    )
     assert adapter.name == ""
     assert adapter.name != Path(adapter.training["run_dir"]).name
+
+
+# ---- the run as an object: stop, close, and iterating once -----------------
+
+
+def test_asking_for_a_run_starts_nothing(fake_mlx_lm, tmp_path):
+    # Lazy until iterated, so a caller that changes its mind costs nothing.
+    workdir = tmp_path / "runs"
+    training = train_lora("base-model", _data(), options=_options(iters=1), workdir=workdir)
+    assert list(workdir.iterdir() if workdir.exists() else []) == []
+    assert training.adapter is None
+
+
+def test_a_stop_before_iteration_starts_nothing_and_says_so(fake_mlx_lm, tmp_path):
+    training = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
+    training.stop()
+    with pytest.raises(TrainingStopped, match="stopped before it started"):
+        list(training)
+    # neither a child nor a run directory: nothing was asked of mlx-lm at all
+    assert not list(tmp_path.glob("run-*"))
+
+
+def test_leaving_the_loop_early_stops_and_reaps_the_child(fake_mlx_lm, tmp_path):
+    # A consumer that breaks out must not leave a training process behind: the
+    # run's `with` terminates it and waits, rather than hoping for a GC.
+    training = train_lora(
+        "base-model",
+        _data(),
+        options=_options(iters=1000, save_every=1),
+        workdir=tmp_path,
+    )
+    with training:
+        for event in training:
+            if isinstance(event, TrainReport):
+                pid = int((Path(training._run.spec.adapter_path) / "child.pid").read_text())
+                break
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+def test_a_run_reports_its_events_once(fake_mlx_lm, tmp_path):
+    training = train_lora("base-model", _data(), options=_options(iters=1), workdir=tmp_path)
+    list(training)
+    with pytest.raises(RuntimeError, match="once"):
+        list(training)

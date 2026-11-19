@@ -164,7 +164,7 @@ def test_the_mlx_boundary_is_a_package_with_a_facade():
     # contract rather than a directory of internals.
     from orangecontrib.ai_suite.kernel.lora import mlx
 
-    assert {"run_training", "TrainingSpec", "load_model", "stream_text"} <= set(mlx.__all__)
+    assert {"Run", "TrainingSpec", "Event", "load_model", "stream_text"} <= set(mlx.__all__)
     for name in mlx.__all__:
         assert hasattr(mlx, name), name
     assert {p.name for p in LORA_MLX.glob("*.py")} == {

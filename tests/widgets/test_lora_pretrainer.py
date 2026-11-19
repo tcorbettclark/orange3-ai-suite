@@ -74,12 +74,24 @@ def test_stop_before_adapter_routes_to_information(qapp):
     assert not w.Information.training.is_shown()
 
 
-def test_trainable_parameter_note_is_reported(qapp):
+def test_progress_events_drive_the_note_and_the_curves(qapp):
+    # The worker emits the kernel's typed events; the widget matches on the type.
+    from orangecontrib.ai_suite.kernel.lora import Params, TrainReport, ValReport
+
     w = OWLoRAPretrainer()
     w.show()
-    w._on_metric({"kind": "params", "pct": 0.233, "detail": "6.210M/2667.000M"})
+    w._on_event(Params(fraction=0.233, detail="6.210M/2667.000M"))
     assert "0.233%" in w.status_label.text()
     assert "6.210M/2667.000M" in w.status_label.text()
+
+    w._on_event(TrainReport(iteration=3, loss=0.5, tokens_per_second=184))
+    assert "iter 3" in w.status_label.text()
+    assert "184 tok/s" in w.status_label.text()
+    assert len(w._train_curve.getData()[0]) == 1
+
+    w._on_event(ValReport(iteration=3, loss=0.75))
+    assert "val loss 0.750" in w.status_label.text()
+    assert len(w._val_curve.getData()[0]) == 1
 
 
 def test_lora_without_a_base_model_warns(qapp, text_table, monkeypatch):
