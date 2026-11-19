@@ -1,10 +1,10 @@
 # orange3-ai-suite
 
 Teaching neural networks and language models inside
-[Orange](https://orangedatamining.com/). The add-on provides interpretable
-image features, tiny Keras language models, and MLX LoRA fine-tuning across
-three toolbox categories: **Language Models**, **Image Analytics** and
-**Visualize**.
+[Orange](https://orangedatamining.com/). Ten widgets over edu-ai-suite's
+interpretable image features, tiny Keras language models and MLX LoRA
+fine-tuning, across three toolbox categories: **Language Models**, **Image
+Analytics** and **Visualize**.
 
 Everything that can be inspected is inspectable: feature values are ordinary
 Table columns, training curves are live, tokenizers travel with their models,
@@ -12,35 +12,39 @@ and generations come back as corpora that Orange's text widgets can analyse.
 
 ## What is in the box
 
-- **`orangecontrib/ai_suite/kernel/`** - the substance. Pure Python, with no
-  Orange or Qt imports: image features, tokenizers and pairs, the architectures,
-  the model that trains and generates, and MLX LoRA wrappers. The same code runs in
-  the widgets or in a plain Python session.
-- **`orangecontrib/ai_suite/`** - the Orange add-on. Ten widgets and the signal
-  adapters that convert between Orange objects and kernel types. The widgets
-  are thin shells: options, thumbnail grids, live plots and Orange signals.
-- **`demo/`** - reproducible corpora, data fetchers and generated `.ows`
-  workflows.
-- **`GLOSSARY.md`** - the words the text and model code uses, one definition
-  each: tokenizer, token, context, pair, model, sampler.
+- **`orangecontrib/ai_suite/`** - the add-on. `__init__.py` is the package
+  docstring; `adapters.py` converts between Orange objects and edu-ai-suite's
+  types; `widgets/` holds the ten widgets - thin shells of options, thumbnail
+  grids, live plots and Orange signals - with their shared LoRA base and their
+  icons.
+- **`demo/`** - two ready-made `.ows` canvases and the script that writes them.
+- **`tutorials/`** - nine walk-throughs and their index.
+- **`tests/`** - the documentation sweep and the offscreen widget tests.
 
-One wheel, one install, three toolbox categories.
+The catalogue, the models and the assets are **edu-ai-suite**, an installed
+plain-Python dependency: the image feature catalogue with its groups and its
+guide, the tokenizers and architectures, the model that trains and generates,
+the MLX LoRA wrappers, and the Hugging Face asset fetchers. It imports neither
+Orange nor Qt, so the same code runs in the widgets or in a plain Python
+session, and it runs its own test suite in its own repository.
 
 ## Installation
 
 Requirements: Python 3.11+, Orange 3.39+ for the widget layer, and macOS on
 Apple Silicon for LoRA training.
 
-Everything except LoRA is a plain dependency: OpenCV for the image widgets,
-Keras on a TensorFlow backend for the from-scratch language models. Only LoRA is
-an extra, because MLX runs on Apple Silicon alone:
+`pip install orange3-ai-suite` pulls edu-ai-suite, which brings OpenCV for the
+image widgets and Keras on a TensorFlow backend for the from-scratch language
+models. Only LoRA is an extra, because MLX runs on Apple Silicon alone; the
+`[lora]` extra forwards to edu-ai-suite's own:
 
 ```bash
 pip install orange3-ai-suite            # everything but LoRA
-pip install "orange3-ai-suite[lora]"    # plus LoRA (Apple Silicon)
+pip install "orange3-ai-suite[lora]"    # plus LoRA, via edu-ai-suite[lora]
 ```
 
-Development (kernel tests run without Orange):
+Development (a plain Python environment runs the documentation sweep; the
+widget tests need the Orange interpreter):
 
 ```bash
 uv sync
@@ -104,8 +108,7 @@ the selected image's feature values, grouped A-G, and a class-split histogram
 for the selected feature. Disabled groups stay visible but greyed out. The
 `Selected image` output carries the selected row as a one-row table, so it can
 drive a data table's subset input. The peak-prominence and edge-density
-thresholds are available as `FeatureOptions` fields in the kernel, not as
-widget controls.
+thresholds are edu-ai-suite's `FeatureOptions` defaults, not widget controls.
 
 The output feeds any Orange learner. Test & Score, Confusion Matrix, Column
 Statistics and Scatter Plot then make every stage of the pipeline auditable.
@@ -158,11 +161,11 @@ moving to dedicated Load LM/Save LM widgets.
 
 ### LM Generator
 
-Generates text from any model that exposes the kernel convention
-`stream(prompt, temperature, max_new_tokens, seed)` — and `generate`, which is
-that text stream joined up. This covers Keras `LanguageModel` objects and MLX
-`LoRAModel` objects, so the same widget serves from-scratch models and fine-tuned
-base models.
+Generates text from any model that exposes the
+`stream(prompt, temperature, max_new_tokens, seed)` convention — and
+`generate`, which is that text stream joined up. This covers Keras
+`LanguageModel` objects and MLX `LoRAModel` objects, so the same widget serves
+from-scratch models and fine-tuned base models.
 
 The prompt, temperature, maximum new tokens, number of generations and seed are
 all controls. Low temperature is repetitive; high temperature dissolves into
@@ -306,221 +309,94 @@ Experiments that the widgets make easy:
   decision tree and logistic regression. If all three land within a couple of
   points, the features carried the intelligence, not the model.
 - **Stability** - small shifts, jitter and denoising should not flip category
-  features. The kernel has dedicated stability tests.
+  features. edu-ai-suite has dedicated stability tests.
 
 ## Image feature groups
 
-Each feature is a class in `orangecontrib.ai_suite.kernel.images.features.catalogue`,
-carrying its own name, description sentence and computation. Groups are a
-set of membership lists over that flat catalogue
-(`orangecontrib.ai_suite.kernel.images.features.groups`): membership lists used for
-ablation and display, so a feature can belong to more than one group and the
-grouping never touches the feature itself.
-
-| Group | Count | What it describes |
-|---|---|---|
-| A | 6 | Global photometry: brightness, contrast, skewness, kurtosis, bright fraction |
-| B | 10 | Row/column/diagonal profile summaries: trend, roughness, peaks, crossings |
-| C | 6 | Spatial mass: centre of mass, spread, elongation, radial gradient |
-| D | 6 | Texture: gradient, edge density, fine/coarse texture, autocorrelation width |
-| E | 3 | Topology: hole count, foreground area, stroke crossings |
-| F | 3 | Symmetry: left-right, top-bottom, quadrant similarity |
-| G | 4 | Colour (opt-in): bluish fraction, the blue-red balance, colourfulness, greenery |
-
-Groups A-F run on a preprocessed luminance image. Group G reads colour
-directly and is off by default.
-
-```python
-import orangecontrib.ai_suite.kernel.images.features as features
-
-vec = features.extract_features(rgb_image, groups="ABCDEF")
-vec["hole_count"]  # a feature value
-vec.to_array()  # one float per selected feature
-features.get_feature("hole_count").description  # title, sentence, intuition, mechanics
-features.all_features()  # the full catalogue, in stable column order
-```
+Groups A to F select photometry, the row and column profiles, spatial mass,
+texture, topology and symmetry; group G selects colour. A-F are measured on one
+preprocessed luminance image, while G reads colour directly and is off by
+default. The letters, their titles and the features inside them are
+edu-ai-suite's feature catalogue, where each feature is one class carrying its
+own computation.
 
 ### The feature guide
 
 Every feature carries four descriptions: a title, a one-sentence summary, a
 plain-language account of which pictures move it and which leave it cold, and a
-technical account of how it is computed with links for further reading. The
-whole guide is generated from the catalogue when it is asked for, so it cannot
-drift from the code:
+technical account of how it is computed with links for further reading. The page
+is generated from edu-ai-suite's catalogue when it is asked for.
 
-```python
-import orangecontrib.ai_suite.kernel.images.features as features
-
-print(features.feature_guide_markdown())
-```
-
-In the widget, **Feature guide…** opens the same page, the selected feature's
-title, sentence and intuition are shown beside its values, and **Technical
-details…** opens the mechanics for that one feature.
-
-A runnable script lives in `examples/image_features.py`
-(`uv run python examples/image_features.py`). It reads three real cloud
-photographs from `examples/` (credits in `examples/CREDITS.md`) and shows the
-catalogue and its descriptions, the extraction and ablation selections, fine
-texture on wispy cirrus against coarse texture on a roll cloud, and the colour
-shortcut separating a blue sky from ground vegetation.
-
-## Kernel API
-
-### Language models
-
-A runnable end-to-end script lives in `examples/lm_from_scratch.py`
-(`uv run python examples/lm_from_scratch.py`); the essentials are:
-
-```python
-import orangecontrib.ai_suite.kernel.lm as lm
-
-text = "\n".join(texts)  # join documents outside the kernel
-tokenizer = lm.tokenizer_from_text(text, "char")
-tokenizer = tokenizer.keep_top(2000)  # or .drop_rare(min_count=3); pure, chainable
-stream = tokenizer.encode(text)  # every sentence ends with <eos>
-pairs = lm.make_pairs(stream, context_width=16)
-train, valid = pairs.split(validation_fraction=0.1, seed=0)
-
-# An architecture is the recipe; a model is that recipe fitted.
-architecture = lm.MLP(context_width=16, embedding_dim=32, hidden_units=128)
-model = lm.LanguageModel(architecture, tokenizer).fit(
-    text,
-    lm.TrainingOptions(epochs=15, validation_fraction=0.1, seed=0),
-)
-
-model.generate("the ", temperature=0.8, max_new_tokens=64)
-model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}; perplexity = e^loss
-model.save("my-model")  # weights + tokenizer + metadata
-```
-
-`fit` returns the model, so the call can be chained; it builds pairs at
-`architecture.context_width`, so the data and the weights cannot disagree.
-`LanguageModel.load(path)` reads the directory back as one object. The training
-hook (`on_epoch`) and the stop callback (`stop_requested`) are plain Python
-callables; the kernel never imports Qt.
-
-### LoRA
-
-```python
-import tempfile
-from pathlib import Path
-
-import orangecontrib.ai_suite.kernel.assets as assets
-import orangecontrib.ai_suite.kernel.lora as lora
-
-base = assets.get_britllm()  # pinned 4-bit MLX weights, cached on first use
-data = lora.LoRAData.from_texts(corpus)  # or lora.LoRAData.from_pairs(pairs)
-with tempfile.TemporaryDirectory() as scratch:  # this run's scratch, deleted on exit
-    run = lora.train_lora(
-        base,
-        data,
-        options=lora.LoRAOptions(iters=300, num_layers=16),
-        workdir=scratch,  # each run gets a fresh child of it
-        name="my-adapter",  # the artifact's name is the caller's to choose
-    )
-    for event in run:  # lora.Params, then TrainReport and ValReport as they arrive
-        print(event)
-    # keep the artifact somewhere you own; the scratch can then be discarded
-    artifact = run.adapter.save(Path("adapters") / run.adapter.name)
-model = lora.LoRAModel.from_artifact(artifact)
-model.generate("In the second century", temperature=0)
-model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}
-model.adapter_enabled = False  # the same base model, before adaptation
-```
-
-`train_lora` returns a run rather than doing the work: nothing starts until you
-iterate it, each report arrives as a typed event, and `run.adapter` is the
-artifact once the iteration ends. `run.stop()` may be called from any thread -
-a widget's Stop button does exactly that - and it returns at once; the stop itself
-happens in the iteration, which also waits for the training process to be gone
-before anything reads its directory. mlx-lm writes a checkpoint every
-`save_every` iterations, so a stop adopts the newest and `iters_completed` records
-how far the run got, while a stop before the first one raises `TrainingStopped`
-and produces no model. The training runs in its own process - a module whose name
-begins `mlx_` hides that, along with mlx-lm's API and file conventions, so the rest of
-`lora/` never sees a subprocess.
-
-Three runnable scripts use that façade in the order a run happens.
-`examples/lora_train.py` builds the rows and the settings, prints the events as they
-arrive, and hands back the artifact - `--save DIR` keeps it and `--stop` ends the run
-early, which adopts the newest checkpoint. `examples/lora_generate.py` loads that
-artifact and compares the base model with its adapter, text and perplexity both.
-`examples/lora_inspect.py` reads an artifact and summarises it - the base model, the
-rank and the blocks the adapter reached, how many values it holds, how far the run got
-- and it needs no MLX and no model to do that, because all of it is in the files. Point
-it at a plain model directory and it says so.
-
-`examples/lora_walkthrough.sh` runs all three in order, printing each command as it
-goes: `bash examples/lora_walkthrough.sh`. It fetches the pinned model itself and
-takes about twenty seconds once the 1.50 GB is cached.
+In the widget, **Feature guide…** opens that page, the selected feature's title,
+sentence and intuition are shown beside its values, and **Technical details…**
+opens the mechanics for that one feature.
 
 ## Datasets and workflows
 
-```python
-import orangecontrib.ai_suite.kernel.assets as assets
+Three assets are pinned by edu-ai-suite's asset catalogue; each is downloaded,
+prepared and verified on first use, and the prepared tree is cached, so repeated
+fetches are offline.
 
-mnist = assets.get_mnist()  # <root>/train, <root>/val: 28x28, 500/100 per digit
-clouds = assets.get_clouds()  # <root>/ac, sc, cu, cb, ci + CREDITS.md
-```
+- **MNIST digits** - [ylecun/mnist](https://huggingface.co/datasets/ylecun/mnist)
+  (MIT), kept at 500/100 images per digit at the source 28x28 resolution in the
+  folder-per-label layout **Import Images** expects: `train/` and `val/`.
+- **CCSN clouds** - [aduuuuuu/CCSN](https://huggingface.co/datasets/aduuuuuu/CCSN)
+  (MIT mirror; the CCSN database itself is CC0), the five genera Ac, Sc, Cu, Cb
+  and Ci at 256x256, one folder each, with `CREDITS.md`. Cite Zhang et al.
+  (2018), *CloudNet*.
+- **BritLLM 4-bit** - the pinned MLX conversion of `britllm/britllm-3b-v0.1`
+  (2.67B parameters, 1.4 GB) that the LoRA tutorials start from, fetched into the
+  standard Hugging Face hub cache.
 
-Both functions download, prepare and verify a pinned Hub dataset. The source
-and the prepared tree are cached; repeated calls are offline.
-
-- `MNIST_DIGITS` - [ylecun/mnist](https://huggingface.co/datasets/ylecun/mnist)
-  (MIT), 60k/10k parquet; `get_mnist()` keeps 500/100 per digit at the source
-  28x28 resolution in the folder-per-label layout Import Images expects.
-- `CCSN_CLOUDS` - [aduuuuuu/CCSN](https://huggingface.co/datasets/aduuuuuu/CCSN)
-  (MIT mirror; the CCSN database itself is CC0), the five genera Ac, Sc, Cu,
-  Cb and Ci at 256x256, with `CREDITS.md`. Cite Zhang et al. (2018), *CloudNet*.
-- `data/text/` - optional downloaded plain-text corpora. No text corpus is
-  committed; use **LM Text Loader** to load any UTF-8 `.txt` file.
-- `examples/build_britllm_4bit.py` - maintainer script that downloads the fp16
-  source, converts it, adds the chat template and (optionally) uploads the
-  artifact. It builds in a temporary directory unless `--target` is given, so
-  the repository is not written to.
-- `demo/mnist_features.ows`, `demo/cloud_features.ows` - ready-made canvas
-  workflows generated by `demo/make_workflows.py` from the prepared asset
-  paths. The Import Images paths inside are machine-local; re-point the File
-  widget if the cache moved.
-
-`orange-ai-assets list` shows each asset's type, size, cache status and repo;
-`fetch` is idempotent and prints the usable path.
+`assets list` shows each asset's type, size, cache status and repo; `fetch` is
+idempotent and prints the usable path - the prepared root that **Import Images**
+reads, or BritLLM's snapshot directory for **Base model**.
 
 ```bash
-orange-ai-assets list
-orange-ai-assets fetch mnist-digits
-orange-ai-assets fetch ccsn-clouds
-orange-ai-assets fetch britllm-4bit
-uv run python demo/make_workflows.py
+assets list
+assets fetch mnist-digits
+assets fetch ccsn-clouds
+assets fetch britllm-4bit
 ```
+
+Two ready-made canvases ship in `demo/`: `demo/mnist_features.ows` and
+`demo/cloud_features.ows`. `demo/make_workflows.py` writes both from the
+prepared asset paths, and it needs Orange:
+
+```bash
+/Applications/Orange.app/Contents/MacOS/python demo/make_workflows.py
+```
+
+The Import Images paths inside are machine-local; re-point the File widget if
+the cache moved.
 
 ## Verification
 
-- Kernel tests run in plain Python, with no Orange and no Qt. They are the
-  proof that `orangecontrib.ai_suite.kernel` stays independent.
+- `uv run pytest` in a plain Python environment runs `tests/test_docs.py`, the
+  sweep that checks every name the prose puts in backticks against the source.
 - Widget tests run in the Orange interpreter with Qt offscreen and cover the
   signal adapters, widget state, model persistence and the viewer's rendering.
 - End-to-end model loads are marked `slow` and excluded by default.
 - Lint and formatting are checked with ruff (configuration in
   `pyproject.toml`).
 
-Run the full verification from the repository root:
+edu-ai-suite runs its own suite in its own repository.
+
+Run the verification from the repository root:
 
 ```bash
 uvx ruff check orangecontrib demo tests conftest.py
 uvx ruff format --check orangecontrib demo tests conftest.py
 
-uv run pytest -q
-uv run pytest -q -m slow            # kernel, including slow model round trips
+uv run pytest -q                     # the documentation sweep
 
 QT_QPA_PLATFORM=offscreen \
-    /Applications/Orange.app/Contents/MacOS/python -m pytest -q   # + widgets
+    /Applications/Orange.app/Contents/MacOS/python -m pytest -q   # the widgets
 ```
 
-The kernel suite must pass in a plain Python environment; the widget suite must
-pass in the Orange interpreter. One slow test is skipped in the default widget
-run unless the pinned 4-bit model is already in the Hugging Face cache.
+The widget suite must pass in the Orange interpreter; the documentation sweep
+needs neither Orange nor Qt. One slow test is skipped in the default widget run
+unless the pinned 4-bit model is already in the Hugging Face cache.
 
 ## Working on the code
 
@@ -533,38 +409,14 @@ before choosing a shape as well as before merging one.
 ```
 orangecontrib/
   ai_suite/
-    __init__.py
-    adapters.py Orange <-> kernel conversion
-    kernel/
-      images/     image data: decoded, resampled, then measured
-        decode.py    RGB/luma, alpha and [0,1] conventions (shared)
-        resize.py    one resampling policy: area shrinking, bilinear growing
-        flatten.py   a grid as one row, with a coordinate name per cell
-        features/    the feature package
-          catalogue/   one module and one class per feature, plus the index
-          description.py  the four descriptions, checked when a feature is created
-          feature.py   the feature contract, checked at import
-          guide.py     the whole catalogue as one generated Markdown page
-          groups.py    groups as membership lists over the catalogue
-          extraction.py  extract_features and FeatureVector
-          options.py   FeatureOptions
-          _preprocessing.py  the pipeline (support code)
-          _conventions.py  numeric rules (zero, flat, net change)
-          _measurements.py  measurements shared by more than one feature
-      lm/         tokenizer (with its stats), pairs, architectures,
-                  training options/results, LanguageModel with embedded tokenizer
-      lora/       LoRA options, data, split, the run, and the artifact/model objects
-        mlx_*       the boundary, marked by the prefix: mlx-lm's files, its wire
-                    format, its child process and its in-process runtime
-      assets/     Hugging Face assets: download cache policy, prepare, asset registry
-      text/       plain text into training rows, behind one facade
-        _clean.py    raw text -> clean text (Gutenberg, page numbers, reflow)
-        _split.py    clean text -> table rows (whole file, paragraph, sentence)
-        _qa.py       clean text -> Q/A prompt/completion pairs
-    widgets/      the ten Orange widgets and their icons
-demo/             generated .ows workflows and their generator
-examples/         runnable kernel examples
-tests/            kernel tests + offscreen widget tests
+    __init__.py   the package docstring
+    adapters.py   Orange objects and edu-ai-suite types, converted both ways
+    widgets/      the ten Orange widgets, the LoRA base they share, and their icons
+demo/             the two .ows canvases and the generator that writes them
+tests/
+  test_docs.py    the prose sweep: backticked names against the source
+  widgets/        offscreen tests for the widgets, the adapters and the viewer
+tutorials/        the walk-throughs and their index
 ```
 
 ## License

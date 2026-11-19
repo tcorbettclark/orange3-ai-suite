@@ -75,8 +75,8 @@ def test_every_code_name_the_prose_uses_exists_in_the_source():
 
 def test_the_prose_sweep_finds_the_names_it_is_meant_to_check():
     # Guard the guard: if the pattern or the file list stopped matching, the test
-    # above would pass by finding nothing at all. The prose holds 13 tokens today.
+    # above would pass by finding nothing at all. The prose holds 8 tokens today.
     tokens = _prose_tokens()
-    assert len(tokens) >= 12, sorted(tokens)
+    assert len(tokens) >= 8, sorted(tokens)
     assert "blue_minus_red_mean" in tokens  # a feature name tutorial 02 uses
     assert "created_by" in tokens  # a key the load/save note names
