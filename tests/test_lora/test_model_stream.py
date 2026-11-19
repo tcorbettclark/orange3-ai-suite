@@ -10,7 +10,7 @@ import pytest
 pytest.importorskip("mlx_lm", reason="the lora extra (mlx-lm) is not installed")
 
 from orangecontrib.ai_suite.kernel.lora import LoRAModel
-from orangecontrib.ai_suite.kernel.lora import mlx as lora_mlx
+from orangecontrib.ai_suite.kernel.lora import mlx_runtime as lora_mlx
 
 
 @pytest.fixture

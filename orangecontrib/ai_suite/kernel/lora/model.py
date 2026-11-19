@@ -1,21 +1,17 @@
-"""The LoRA model object, and the adapter artifact that travels with its base model.
+"""The base model with an optional LoRA adapter, each variant loaded on first use.
 
-A :class:`LoRAAdapter` is a directory holding the adapter weights, its config and a
-``lora_meta.json`` with the base-model identity and the run that produced it;
-:class:`LoRAModel` is that base model with the adapter fitted, or without it.
+:class:`LoRAModel` follows the kernel's generation convention, shared with the Keras
+``LanguageModel``: ``generate`` is ``stream`` joined up, and ``evaluate`` returns a loss
+and a perplexity.
 """
 
 from __future__ import annotations
 
-import json
-import shutil
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from . import mlx
-
-_META_FILE = "lora_meta.json"
+from . import mlx_runtime
+from .artifact import LoRAAdapter
 
 
 def _echo(prompt: str, completion: str) -> str:
@@ -30,67 +26,6 @@ def _echo(prompt: str, completion: str) -> str:
         else ""
     )
     return prompt + sep + completion
-
-
-@dataclass
-class LoRAAdapter:
-    """The fine-tuning artifact: the adapter files, with the base model they fit."""
-
-    base_model: str  # path or HF repo id of the base model
-    adapter_path: str | None  # None = the raw base model itself (no adapter)
-    training: dict[str, Any]  # options, mlx-lm adapter config, iterations reached
-    name: str = ""
-
-    def save(self, dest: str | Path) -> Path:
-        """Write the artifact directory and return its path.
-
-        No MLX import: metadata and file copying are plain Python. An ``adapter_path``
-        with no weights file in it raises before anything is written.
-        """
-        src = Path(self.adapter_path) if self.adapter_path is not None else None
-        if src is not None and not (src / mlx.ADAPTER_WEIGHTS).is_file():
-            raise FileNotFoundError(f"no {mlx.ADAPTER_WEIGHTS} in {src}")
-        out = Path(dest)
-        out.mkdir(parents=True, exist_ok=True)
-        if src is not None:
-            for fname in (mlx.ADAPTER_WEIGHTS, mlx.ADAPTER_CONFIG):
-                if (src / fname).exists():
-                    shutil.copy2(src / fname, out / fname)
-        (out / _META_FILE).write_text(
-            json.dumps(
-                {
-                    "base_model": self.base_model,
-                    "training": self.training,
-                    "name": self.name,
-                },
-                indent=1,
-            )
-        )
-        return out
-
-    @classmethod
-    def load(cls, path: str | Path) -> LoRAAdapter:
-        """Read an adapter directory, or a raw model directory as the base model.
-
-        An artifact carries ``lora_meta.json``; a directory without it is a plain
-        MLX model directory, loaded with the adapter off.
-        """
-        src = Path(path)
-        if (src / _META_FILE).exists():
-            meta = json.loads((src / _META_FILE).read_text())
-            has_weights = (src / mlx.ADAPTER_WEIGHTS).exists()
-            return cls(
-                base_model=meta["base_model"],
-                adapter_path=str(src) if has_weights else None,
-                training=meta["training"],
-                name=meta.get("name", ""),
-            )
-        return cls(base_model=str(src), adapter_path=None, training={})
-
-    def __repr__(self):  # pragma: no cover - cosmetic
-        return (
-            f"LoRAAdapter(base={self.base_model}, adapter={'yes' if self.adapter_path else 'off'})"
-        )
 
 
 class LoRAModel:
@@ -108,7 +43,7 @@ class LoRAModel:
         training: dict[str, Any] | None = None,
         name: str = "",
     ):
-        mlx.require()
+        mlx_runtime.require()
         self.base_model = base_model
         self.adapter_path = adapter_path
         self.adapter_enabled = adapter_path is not None
@@ -118,7 +53,7 @@ class LoRAModel:
 
     def _variant(self, with_adapter: bool) -> tuple[Any, Any]:
         if with_adapter not in self._models:
-            self._models[with_adapter] = mlx.load_model(
+            self._models[with_adapter] = mlx_runtime.load_model(
                 self.base_model, self.adapter_path if with_adapter else None
             )
         return self._models[with_adapter]
@@ -144,7 +79,7 @@ class LoRAModel:
         if temperature < 0:
             raise ValueError("temperature must be >= 0 (0 = greedy)")
         model, tokenizer = self._variant(self.adapter_enabled)
-        chunks = mlx.stream_text(
+        chunks = mlx_runtime.stream_text(
             model,
             tokenizer,
             prompt,
@@ -179,7 +114,7 @@ class LoRAModel:
         ``adapter_enabled`` applies here too, so it can score the raw base model.
         """
         model, tokenizer = self._variant(self.adapter_enabled)
-        return mlx.evaluate_text(model, tokenizer, text, max_tokens=max_tokens)
+        return mlx_runtime.evaluate_text(model, tokenizer, text, max_tokens=max_tokens)
 
     def artifact(self) -> LoRAAdapter:
         """The model's adapter as a standalone artifact, ready to save."""

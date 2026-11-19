@@ -107,7 +107,11 @@ def test_the_text_facade_exports_every_public_name_and_nothing_private():
 # ---- the MLX boundary ------------------------------------------------------
 
 LORA = KERNEL / "lora"
-LORA_MLX = LORA / "mlx"
+
+#: The boundary is the modules whose names begin with this: mlx-lm's files, its child
+#: process, its wire format and its in-process runtime, in the same package as the
+#: domain so that one predicate answers "is this the boundary?".
+BOUNDARY_PREFIX = "mlx_"
 
 
 def _imports(path: pathlib.Path) -> list[tuple[str, int]]:
@@ -121,76 +125,85 @@ def _imports(path: pathlib.Path) -> list[tuple[str, int]]:
     return found
 
 
-def test_only_the_mlx_boundary_names_mlx():
+def _boundary() -> set[pathlib.Path]:
+    return {p for p in LORA.glob("*.py") if p.stem.startswith(BOUNDARY_PREFIX)}
+
+
+def test_only_the_boundary_modules_name_mlx():
     # mlx is Apple-Silicon-only, so a stray import above the boundary would make
     # the whole kernel unimportable elsewhere - and would hide the coupling from
-    # the one module that is supposed to own it.
+    # the modules that are supposed to own it.
+    boundary = _boundary()
     offenders = []
     for path in (ROOT / "orangecontrib").rglob("*.py"):
-        if LORA_MLX in path.parents or "__pycache__" in path.parts:
+        if path in boundary or "__pycache__" in path.parts:
             continue
         for module, level in _imports(path):
-            # relative imports name our own subpackage; only the library itself
+            # relative imports name our own package; only the library itself
             # (an absolute import) is forbidden out here
             if level == 0 and (module == "mlx" or module.startswith(("mlx.", "mlx_lm"))):
                 offenders.append(f"{path.relative_to(ROOT)}: {module}")
     assert offenders == []
 
 
-def test_the_mlx_boundary_never_reaches_back_up_into_lora():
-    # A leaf importing its parent is an arrow pointing the wrong way: the domain
-    # package may know the boundary, never the reverse.
+def test_the_boundary_modules_never_import_the_rest_of_lora():
+    # A boundary module may import its siblings and nothing else: the domain may know
+    # the boundary, never the reverse.
+    boundary = _boundary()
+    siblings = {path.stem for path in boundary}
     offenders = []
-    for path in LORA_MLX.rglob("*.py"):
-        if "__pycache__" in path.parts:
-            continue
+    for path in boundary:
         for module, level in _imports(path):
-            if level > 1:
-                offenders.append(f"{path.relative_to(ROOT)}: {'.' * level}{module}")
-            elif module.startswith("orangecontrib.ai_suite.kernel.lora.") and not module.startswith(
-                "orangecontrib.ai_suite.kernel.lora.mlx"
-            ):
-                offenders.append(f"{path.relative_to(ROOT)}: {module}")
+            # `from .mlx_protocol import ...` is a sibling; `from .data import ...` is not
+            if level == 1 and module and module not in siblings:
+                offenders.append(f"{path.name}: .{module}")
+            # a deeper relative hop leaves the package; an absolute one names it
+            elif level > 1:
+                offenders.append(f"{path.name}: {'.' * level}{module}")
+            elif module.startswith("orangecontrib.ai_suite.kernel.lora."):
+                tail = module.rsplit(".", 1)[-1]
+                if tail not in siblings:
+                    offenders.append(f"{path.name}: {module}")
     assert offenders == []
 
 
-def _names_taken_from_the_boundary() -> set[str]:
-    """Every name production code takes from ``lora.mlx``, by import or attribute."""
-    taken: set[str] = set()
+def test_the_child_is_a_program_and_nothing_imports_it():
+    # `mlx_child` runs as ``python -m ...lora.mlx_child``; the parent starts it by
+    # name and must not import it, or the child's imports become the package's.
+    import importlib.util
+
+    from orangecontrib.ai_suite.kernel.lora import mlx_process
+
+    found = importlib.util.find_spec(mlx_process._CHILD)
+    assert found is not None and found.origin.endswith("/mlx_child.py")  # the name resolves
+
+    offenders = []
     for path in (ROOT / "orangecontrib").rglob("*.py"):
-        if LORA_MLX in path.parents or "__pycache__" in path.parts:
+        if path.name == "mlx_child.py" or "__pycache__" in path.parts:
             continue
         for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-                if node.value.id == "mlx":
-                    taken.add(node.attr)
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
-                module = node.module or ""
-                # the package itself, not a module inside it: `from . import mlx`
-                # then `mlx.thing`, or `from .mlx import thing`
-                if module == "mlx" and node.level == 1:
-                    taken.update(alias.name for alias in node.names)
-                elif module.endswith("lora.mlx"):
-                    taken.update(alias.name for alias in node.names)
-    return taken
+                names = [node.module or "", *(alias.name for alias in node.names)]
+            else:
+                continue
+            if any(name.rsplit(".", 1)[-1] == "mlx_child" for name in names):
+                offenders.append(f"{path.relative_to(ROOT)}: {ast.unparse(node)}")
+    assert offenders == []
 
 
-def test_the_boundary_exports_exactly_what_production_takes_from_it():
-    # The façade is a contract in both directions: a name here has a caller
-    # outside, and a name used outside is here. Both halves catch the same drift -
-    # an export nobody needs (this found `generate_text`, which had no caller at
-    # all) and an import that reaches into the boundary's modules instead.
-    from orangecontrib.ai_suite.kernel.lora import mlx
-
-    assert set(mlx.__all__) == _names_taken_from_the_boundary()
-    assert list(mlx.__all__) == sorted(mlx.__all__)
-    for name in mlx.__all__:
-        assert hasattr(mlx, name), name
-    assert {p.name for p in LORA_MLX.glob("*.py")} == {
-        "__init__.py",
-        "child.py",
-        "layout.py",
-        "protocol.py",
-        "runtime.py",
-        "train.py",
+def test_the_boundary_is_these_modules():
+    # The list is the decision: a new boundary module is a new row, and a module that
+    # stops naming mlx-lm belongs on the other side of the prefix.
+    assert {path.stem for path in _boundary()} == {
+        "mlx_child",
+        "mlx_layout",
+        "mlx_process",
+        "mlx_protocol",
+        "mlx_runtime",
+        "mlx_spec",
     }
+    assert {
+        path.stem for path in LORA.glob("*.py") if not path.stem.startswith(BOUNDARY_PREFIX)
+    } == {"__init__", "artifact", "data", "model", "run"}

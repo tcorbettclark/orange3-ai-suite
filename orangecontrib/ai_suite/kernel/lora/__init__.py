@@ -1,30 +1,24 @@
 """LoRA fine-tuning of an MLX base model, with the adapter stored beside it.
 
 Options, data, the train/validation split, the run and the artifact live here.
-:func:`train_lora` returns a run: iterate it for :class:`Params`,
-:class:`TrainReport` and :class:`ValReport` events, and read ``run.adapter`` when
-the iteration ends.
-everything that has to know mlx-lm is behind :mod:`~.lora.mlx`. MLX is
-Apple-Silicon-only, so its imports are local and :func:`available` answers before one
-is attempted.
+:func:`train_lora` returns a run: iterate it for :class:`Params`, :class:`TrainReport`
+and :class:`ValReport` events, and read ``run.adapter`` when the iteration ends. The
+modules whose names begin ``mlx_`` are the boundary: mlx-lm's files, its child process,
+its wire format and its in-process runtime. MLX is Apple-Silicon-only, so those imports
+are local and :func:`available` answers before one is attempted.
 """
 
-from . import mlx
-from .mlx import Params, TrainReport, ValReport
-from .model import LoRAAdapter, LoRAModel
-from .training import (
-    LoRAData,
-    LoRAOptions,
-    TrainingRun,
-    TrainingStopped,
-    split_for_training,
-    train_lora,
-)
+from .artifact import LoRAAdapter
+from .data import LoRAData, LoRAOptions, split_for_training
+from .mlx_protocol import Params, TrainReport, ValReport
+from .mlx_runtime import available as _mlx_available
+from .model import LoRAModel
+from .run import TrainingRun, TrainingStopped, train_lora
 
 
 def available() -> bool:
     """Whether this machine can run LoRA at all: MLX is Apple-Silicon-only."""
-    return mlx.available()
+    return _mlx_available()
 
 
 __all__ = [

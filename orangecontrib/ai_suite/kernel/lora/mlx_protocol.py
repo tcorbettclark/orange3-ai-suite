@@ -1,9 +1,9 @@
 """The training child's wire format: one typed event per marked stdout line.
 
-:mod:`child` writes a line with :func:`encode` and :mod:`train` reads it with
-:func:`decode`; a line the child does not mark is mlx-lm's own human log, which the run
-keeps for the tail a failure message quotes. The reader and the writer import this
-module and never each other.
+:mod:`mlx_child` writes a line with :func:`encode` and :mod:`mlx_process` reads it
+with :func:`decode`; a line the child does not mark is mlx-lm's own human log, which
+the run keeps for the tail a failure message quotes. The reader and the writer import
+this module and never each other.
 """
 
 from __future__ import annotations

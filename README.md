@@ -452,9 +452,9 @@ happens in the iteration, which also waits for the training process to be gone
 before anything reads its directory. mlx-lm writes a checkpoint every
 `save_every` iterations, so a stop adopts the newest and `iters_completed` records
 how far the run got, while a stop before the first one raises `TrainingStopped`
-and produces no model. The training runs in its own process - `lora.mlx` hides
-that, along with mlx-lm's API and file conventions, so the rest of `lora/` never
-sees a subprocess.
+and produces no model. The training runs in its own process - a module whose name
+begins `mlx_` hides that, along with mlx-lm's API and file conventions, so the rest of
+`lora/` never sees a subprocess.
 
 ## Datasets and workflows
 
@@ -554,8 +554,9 @@ orangecontrib/
           _measurements.py  measurements shared by more than one feature
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
-      lora/       LoRA data formats, split, run directory, artifact/model objects
-        mlx/         the boundary: mlx-lm's API, its files, and the training child
+      lora/       LoRA options, data, split, the run, and the artifact/model objects
+        mlx_*       the boundary, marked by the prefix: mlx-lm's files, its wire
+                    format, its child process and its in-process runtime
       assets/     Hugging Face assets: download cache policy, prepare, asset registry
       text/       plain text into training rows, behind one facade
         _clean.py    raw text -> clean text (Gutenberg, page numbers, reflow)

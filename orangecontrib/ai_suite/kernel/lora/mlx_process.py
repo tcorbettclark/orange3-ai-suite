@@ -1,4 +1,4 @@
-"""Training as an iterator, with the child process and the stop hidden behind it.
+"""The training child as an object: an iterator of events, and a stop that reaches it.
 
 A :class:`Run` is iterated for progress events, stopped from any thread with
 ``stop()``, and read for ``outcome`` once the iteration ends. Iteration does not end,
@@ -18,34 +18,16 @@ from collections import deque
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 
-from .protocol import Event, decode
+from .mlx_protocol import Event, decode
+from .mlx_spec import TrainingSpec
 
-_CHILD = "orangecontrib.ai_suite.kernel.lora.mlx.child"
+_CHILD = "orangecontrib.ai_suite.kernel.lora.mlx_child"
 
 #: How long a terminated child may take to die before it is killed outright.
 STOP_TIMEOUT = 10.0
 
 #: How much of the child's human log is kept for a failure message.
 _TAIL_LINES = 200
-
-
-@dataclass(frozen=True)
-class TrainingSpec:
-    """One run, as mlx-lm describes it: every setting a training call takes."""
-
-    model: str
-    data: str
-    adapter_path: str
-    iters: int
-    learning_rate: float
-    num_layers: int
-    batch_size: int
-    max_seq_length: int
-    steps_per_report: int
-    steps_per_eval: int
-    save_every: int
-    seed: int
-    mask_prompt: bool
 
 
 @dataclass(frozen=True)

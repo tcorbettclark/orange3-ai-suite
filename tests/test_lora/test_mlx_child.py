@@ -11,15 +11,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.lora.mlx import child as _child
-from orangecontrib.ai_suite.kernel.lora.mlx.protocol import (
+from orangecontrib.ai_suite.kernel.lora import mlx_child as _child
+from orangecontrib.ai_suite.kernel.lora.mlx_protocol import (
     MARKER,
     Params,
     TrainReport,
     ValReport,
     decode,
 )
-from orangecontrib.ai_suite.kernel.lora.mlx.train import TrainingSpec
+from orangecontrib.ai_suite.kernel.lora.mlx_spec import TrainingSpec
 
 SPEC = TrainingSpec(
     model="the-base",

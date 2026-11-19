@@ -1,7 +1,7 @@
-"""The training child: the process mlx-lm trains in, reporting through :mod:`protocol`.
+"""The training child: the process mlx-lm trains in, reporting through :mod:`mlx_protocol`.
 
-It runs as ``python -m ...mlx.child <json spec>``: the parent passes a JSON
-:class:`~train.TrainingSpec` and the child rebuilds it by name, so a field one side
+It runs as ``python -m ...lora.mlx_child <json spec>``: the parent passes a JSON
+:class:`~mlx_spec.TrainingSpec` and the child rebuilds it by name, so a field one side
 does not know fails here. Every line on stdout that is not a marked event is mlx-lm's
 human log, which the parent keeps for a failure message.
 """
@@ -13,8 +13,8 @@ import sys
 from dataclasses import fields
 from typing import Any
 
-from .protocol import Params, TrainReport, ValReport, encode
-from .train import TrainingSpec
+from .mlx_protocol import Params, TrainReport, ValReport, encode
+from .mlx_spec import TrainingSpec
 
 
 def emit(event: Params | TrainReport | ValReport) -> None:

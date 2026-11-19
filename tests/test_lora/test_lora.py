@@ -20,22 +20,22 @@ from orangecontrib.ai_suite.kernel.lora import (
     LoRAData,
     LoRAModel,
     LoRAOptions,
-    mlx,
-    split_for_training,
-    train_lora,
-)
-from orangecontrib.ai_suite.kernel.lora.mlx.protocol import (
-    MARKER,
     Params,
     TrainReport,
     ValReport,
+    mlx_layout,
+    split_for_training,
+    train_lora,
+)
+from orangecontrib.ai_suite.kernel.lora.mlx_process import command as child_command
+from orangecontrib.ai_suite.kernel.lora.mlx_protocol import (
+    MARKER,
     decode,
     encode,
 )
-from orangecontrib.ai_suite.kernel.lora.mlx.runtime import segments as _segments
-from orangecontrib.ai_suite.kernel.lora.mlx.train import command as child_command
+from orangecontrib.ai_suite.kernel.lora.mlx_runtime import segments as _segments
 from orangecontrib.ai_suite.kernel.lora.model import _echo
-from orangecontrib.ai_suite.kernel.lora.training import _run_spec
+from orangecontrib.ai_suite.kernel.lora.run import _run_spec
 
 _NO_MODEL = (
     "pinned 4-bit model not cached — use the BritLLM Models widget or "
@@ -54,7 +54,7 @@ def test_text_corpus_staging(tmp_path):
     assert len(data.rows) == 20
     train, valid = data.split(valid_fraction=0.1, seed=0)
     assert len(train) == 18 and len(valid) == 2  # 10% -> val
-    staged = mlx.write_dataset(tmp_path / "data", data.format, train, valid)
+    staged = mlx_layout.write_dataset(tmp_path / "data", data.format, train, valid)
     train_rows = [json.loads(line) for line in (staged / "train.jsonl").read_text().splitlines()]
     valid_rows = [json.loads(line) for line in (staged / "valid.jsonl").read_text().splitlines()]
     assert len(train_rows) + len(valid_rows) == 20
@@ -66,7 +66,7 @@ def test_pair_corpus_staging_is_sft(tmp_path):
     data = LoRAData.from_pairs(pairs)
     assert data.format == "pairs"
     train, valid = data.split(valid_fraction=0.1, seed=0)
-    staged = mlx.write_dataset(tmp_path / "data", data.format, train, valid)
+    staged = mlx_layout.write_dataset(tmp_path / "data", data.format, train, valid)
     rows = [
         json.loads(line)
         for name in ("train", "valid")
@@ -136,12 +136,12 @@ def test_split_for_training_refuses_a_small_validation_set():
 
 def test_no_validation_split_omits_valid_file(tmp_path):
     # mlx-lm treats a missing valid.jsonl as no validation, but fails on an empty one
-    staged = mlx.write_dataset(tmp_path / "data", "text", ["one", "two"], [])
+    staged = mlx_layout.write_dataset(tmp_path / "data", "text", ["one", "two"], [])
     assert (staged / "train.jsonl").exists()
     assert not (staged / "valid.jsonl").exists()
     # a stale file from an earlier run must not be picked up
     (staged / "valid.jsonl").write_text("stale\n")
-    mlx.write_dataset(staged, "text", ["one", "two"], [])
+    mlx_layout.write_dataset(staged, "text", ["one", "two"], [])
     assert not (staged / "valid.jsonl").exists()
 
 
@@ -180,7 +180,7 @@ def test_an_event_round_trips_through_the_wire_format(event):
 
 
 def test_every_event_type_has_a_wire_name():
-    from orangecontrib.ai_suite.kernel.lora.mlx.protocol import _BY_KIND, _KINDS
+    from orangecontrib.ai_suite.kernel.lora.mlx_protocol import _BY_KIND, _KINDS
 
     assert set(_KINDS) == {Params, TrainReport, ValReport}
     assert set(_BY_KIND) == {"params", "train", "val"}
@@ -259,7 +259,7 @@ def test_the_command_runs_the_boundary_child_with_the_spec_as_one_argument():
     # to know that training is a process at all.
     spec = _run_spec("base", "/data", "/adapter", LoRAOptions(iters=1), "text")
     cmd = child_command(spec)
-    assert cmd[:3] == [sys.executable, "-m", "orangecontrib.ai_suite.kernel.lora.mlx.child"]
+    assert cmd[:3] == [sys.executable, "-m", "orangecontrib.ai_suite.kernel.lora.mlx_child"]
     payload = json.loads(cmd[3])
     assert payload["iters"] == 1
     assert set(payload) == {field.name for field in dataclasses.fields(spec)}
