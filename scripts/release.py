@@ -210,16 +210,19 @@ def cmd_release(kind, publish, dry_run):
         print("dry run: nothing was committed, tagged or published", flush=True)
         return
     run(["uv", "version", "--bump", kind, "--no-sync"])
+    written = current_version()
+    if written != following:
+        fail(f"uv version wrote {written}, expected {following}")
     run_tests()
     wheel = build()
     smoke(wheel)
     say("the commit and the tag")
     run(["git", "add", "pyproject.toml", "uv.lock"])
-    run(["git", "commit", "-m", f"release: {following}"])
-    run(["git", "tag", "-a", f"v{following}", "-m", f"{CONFIG['package']} {following}"])
-    run(["git", "push", "origin", "main", f"v{following}"])
+    run(["git", "commit", "-m", f"release: {written}"])
+    run(["git", "tag", "-a", f"v{written}", "-m", f"{CONFIG['package']} {written}"])
+    run(["git", "push", "origin", "main", f"v{written}"])
     if publish:
-        publish_version(following)
+        publish_version(written)
 
 
 def cmd_verify():
