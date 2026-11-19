@@ -63,22 +63,26 @@ def load_config():
     settings = project.get("tool", {}).get("release")
     if settings is None:
         fail("add [tool.release] to pyproject.toml")
-    unknown = set(settings) - {"smoke", "tests", "test_env", "dependency"}
+    unknown = set(settings) - {"smoke", "tests", "slow", "test_env", "dependency"}
     if unknown:
         fail(f"unknown [tool.release] keys: {', '.join(sorted(unknown))}")
-    for key in ("smoke", "tests"):
-        if key not in settings:
-            fail(f"[tool.release] needs {key}")
-    if not isinstance(settings["smoke"], str):
-        fail("[tool.release] smoke must be a Python one-liner")
-    tests = settings["tests"]
-    if not isinstance(tests, list) or not tests:
-        fail("[tool.release] tests must be a non-empty list of command arrays")
-    for command in tests:
-        if not isinstance(command, list) or not command:
-            fail("[tool.release] tests must be a non-empty list of command arrays")
-        if not all(isinstance(part, str) for part in command):
-            fail("[tool.release] tests: every part of a command must be a string")
+    if not isinstance(settings.get("smoke"), str):
+        fail("[tool.release] needs a smoke string")
+
+    def commands(key):
+        value = settings.get(key, [])
+        if not isinstance(value, list):
+            fail(f"[tool.release] {key} must be a list of command arrays")
+        for command in value:
+            if not isinstance(command, list) or not command:
+                fail(f"[tool.release] {key} must be a list of command arrays")
+            if not all(isinstance(part, str) for part in command):
+                fail(f"[tool.release] {key}: every part of a command must be a string")
+        return [[expand(part) for part in command] for command in value]
+
+    tests = commands("tests")
+    if not tests:
+        fail("[tool.release] needs tests")
     test_env = settings.get("test_env", {})
     if not isinstance(test_env, dict) or not all(
         isinstance(item, str) for item in test_env.values()
@@ -87,7 +91,8 @@ def load_config():
     return {
         "package": project["project"]["name"],
         "smoke": settings["smoke"],
-        "tests": [[expand(part) for part in command] for command in tests],
+        "tests": tests,
+        "slow": commands("slow"),
         "test_env": {name: expand(value) for name, value in test_env.items()},
         "dependency": settings.get("dependency"),
     }
@@ -175,7 +180,7 @@ def check_tag(version):
 def run_tests():
     say("the tests")
     env = {**os.environ, **CONFIG["test_env"]}
-    for command in CONFIG["tests"]:
+    for command in CONFIG["tests"] + CONFIG["slow"]:
         if command[0].startswith("/") and not pathlib.Path(command[0]).exists():
             fail(f"{command[0]} does not exist")
         run(command, env=env)

@@ -69,6 +69,7 @@ tests = [
     ["${ORANGE_PYTHON:-/Applications/Orange.app/Contents/MacOS/python}", "-m", "pytest", "tests/widgets"],
 ]
 test_env = { QT_QPA_PLATFORM = "offscreen" }
+slow = [["${ORANGE_PYTHON:-/Applications/Orange.app/Contents/MacOS/python}", "-m", "pytest", "-m", "slow", "tests/widgets"]]
 
 [tool.ruff]
 target-version = "py311"
