@@ -1154,8 +1154,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "edu-ai-suite", specifier = ">=0.0.1" },
-    { name = "edu-ai-suite", extras = ["lora"], marker = "extra == 'lora'", specifier = ">=0.0.1" },
+    { name = "edu-ai-suite", specifier = ">=0.0.1,<0.1.0" },
+    { name = "edu-ai-suite", extras = ["lora"], marker = "extra == 'lora'", specifier = ">=0.0.1,<0.1.0" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "opencv-python-headless", specifier = ">=4.12,<5" },
 ]
