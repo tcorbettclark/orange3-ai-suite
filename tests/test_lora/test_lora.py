@@ -86,7 +86,7 @@ def test_the_split_reads_positions_not_content():
     assert first_train == [row for i, row in enumerate(texts) if i % 4 != 3]
 
     # Reordering the corpus moves rows across the split, and identical rows are
-    # no exception: the contract is about where a row sits, not what it says.
+    # no exception: the contract is about where a row sits, not what it contains.
     _reversed_train, reversed_valid = LoRAData.from_texts(list(reversed(texts))).split(
         valid_fraction=0.25, seed=3
     )
@@ -299,7 +299,7 @@ def test_adapter_artifact_round_trip(tmp_path):
 
 def test_the_record_names_the_package_that_wrote_it(tmp_path):
     # One `meta.json` name is shared with the Keras model's directory, so the record has
-    # to say which package wrote it - and it says it as the qualified package name.
+    # to name it - and it does so as the qualified package name.
     import orangecontrib.ai_suite.kernel.lora as lora
 
     saved = LoRAAdapter(base_model="b", adapter_path=None, training={}).save(tmp_path / "a")
@@ -308,7 +308,7 @@ def test_the_record_names_the_package_that_wrote_it(tmp_path):
 
 
 def test_another_packages_record_is_refused(tmp_path):
-    # Pointing an artifact reader at a Keras model directory must say so, rather than
+    # Pointing an artifact reader at a Keras model directory must fail, rather than
     # read whichever of its keys happen to match.
     saved = tmp_path / "not-an-artifact"
     saved.mkdir()

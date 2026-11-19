@@ -91,7 +91,7 @@ class LoRAModel:
         if first is None:
             yield prompt
             return
-        # mlx-lm returns the completion only, and does not say whether it starts
+        # mlx-lm returns the completion only, and does not report whether it starts
         # with a space, so the separator is decided once, against the first chunk.
         yield _echo(prompt, first)
         yield from chunks

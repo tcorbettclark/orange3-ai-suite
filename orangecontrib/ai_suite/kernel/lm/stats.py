@@ -1,4 +1,4 @@
-"""What one epoch of training reports: the record's fields, and their order.
+"""The record one training epoch produces: its fields, and their order.
 
 It pulls in nothing heavier than ``typing``, so a widget can read the key order without
 the ML stack. ``EpochStats`` is a plain dict's schema: an ``on_epoch`` hook may add keys

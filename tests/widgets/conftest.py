@@ -76,7 +76,7 @@ def make_model():
 
 
 class _DummyHoverEvent:
-    """A stand-in for QGraphicsSceneHoverEvent, which PyQt6 refuses to instantiate.
+    """A stand-in for QGraphicsSceneHoverEvent, which PyQt6 cannot instantiate.
 
     A handler that forwards it to ``super()`` raises TypeError there, and
     ``fire_hover`` swallows that one.

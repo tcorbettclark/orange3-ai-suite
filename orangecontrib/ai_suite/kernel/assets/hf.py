@@ -7,7 +7,7 @@ module names the assets, verifies them and returns the usable directory.
 The Hub cache is ``HF_HUB_CACHE``, else ``$HF_HOME/hub``, else
 ``~/.cache/huggingface/hub``; prepared datasets live under the ``datasets`` cache's
 ``prepared`` subdirectory. Transfers take the classic LFS path, which
-:func:`prefer_classic_lfs` asks for once per process.
+:func:`prefer_classic_lfs` sets once per process.
 """
 
 from __future__ import annotations

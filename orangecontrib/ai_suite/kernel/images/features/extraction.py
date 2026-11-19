@@ -1,4 +1,4 @@
-"""The feature extraction front door: one image in, a :class:`FeatureVector` out."""
+"""Feature extraction: one image in, a :class:`FeatureVector` out."""
 
 from __future__ import annotations
 

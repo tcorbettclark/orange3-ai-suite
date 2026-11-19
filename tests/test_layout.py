@@ -1,4 +1,4 @@
-"""Where kernel code lives, and which modules are support code.
+"""The kernel's modules, and which of them are support code.
 
 ``images`` holds the image pipeline (``decode``, ``resize``, ``flatten`` and ``pixels``
 composing them) and the ``features`` package built on it, and a leading underscore

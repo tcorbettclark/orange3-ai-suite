@@ -2,7 +2,7 @@
 
 :func:`load_model`, :func:`stream_text` and :func:`evaluate_text` import mlx inside the
 function, so importing this module costs nothing on a machine without it, and
-:func:`available` answers before any import is tried. ``stream_text`` returns the
+:func:`available` checks the platform before any import is tried. ``stream_text`` returns the
 completion without the prompt, in mlx-lm's own chunks.
 """
 

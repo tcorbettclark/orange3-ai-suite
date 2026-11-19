@@ -29,11 +29,22 @@ before merging, so the shape is checked rather than assumed.
 - Does the module docstring say what the module *is* — one sentence naming what
   comes out, then at most two sentences of what it holds — in the vocabulary of its
   own names? A docstring arguing for the module's shape has taken the commit
-  message's job.
+  message's job. A module of definitions is a noun; a script is a verb, so its first
+  line is what it does: "Inspect and print information about a LoRA adapter", not
+  "What a directory is, as far as LoRA is concerned".
 - Does the first line of a function or class docstring say what the call returns or
   does? A second paragraph is only for what the body cannot be read for: a
   precondition, an invariant, a unit or range, ownership of a file or directory, or
   what `None` means.
+- Has a subject been turned into a `what ...` clause? "What the artifact records",
+  "what it leaves", "what the config says" put the actor in a noun; write "the
+  artifact records the run", or "the run is recorded by the artifact".
+- Does a file, a record or a number speak? An artifact records, names, holds; it does
+  not say, tell, know, want, agree or refuse. Name the thing and give it its own verb:
+  the record names the package, the config holds the rank, the loader rejects the
+  other package's file.
+- Is a metaphor standing in for the noun — a "front door", a module that "lives" in a
+  directory, a group that "owns" a feature? Say function, directory, field.
 - Does it tell the reader what things were like before it existed? "Before this one
   existed", "used to", "no longer", "was spread over", "previously", "originally",
   "this replaces". The reader has no past: say what is.

@@ -1,7 +1,7 @@
 """Row granularity: how much text one row of the table holds.
 
 The units the model trains on are sentences whatever a row holds: :func:`split_sentences`
-cuts them and ``Tokenizer.encode`` closes each with EOS. This module only decides where
+cuts them and ``Tokenizer.encode`` closes each with EOS. This module only sets where
 table rows end.
 """
 

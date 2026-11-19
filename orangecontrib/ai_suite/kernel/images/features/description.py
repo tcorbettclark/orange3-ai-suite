@@ -1,9 +1,9 @@
 """A feature described in words: title, summary, intuition, technical and references.
 
 ``title`` names the table column, ``summary`` is the one-sentence tooltip,
-``intuition`` says in plain words which pictures move the number, ``technical``
-says how this implementation computes it, and ``references`` holds Markdown links
-to further reading.
+``intuition`` gives the plain-words reading of which pictures move the number,
+``technical`` gives how this implementation computes it, and ``references`` holds
+Markdown links to further reading.
 """
 
 from __future__ import annotations

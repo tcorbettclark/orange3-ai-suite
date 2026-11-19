@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# A LoRA walkthrough: the model, a short run, a run worth keeping, what the artifact
-# says about itself, that adapter in use, and a stop. About twenty seconds on an
+# A LoRA walkthrough: the model, a short run, a run worth keeping, the artifact that
+# records it, that adapter in use, and a stop. About twenty seconds on an
 # Apple-silicon laptop once the 1.50 GB model is cached; the first run adds the
 # download.
 #
@@ -60,9 +60,9 @@ if [ ! -d "$model" ]; then
 fi
 printf 'model: %s\n' "$model"
 
-# Point the viewer at the model directory and it says so: no meta.json, so
+# Point the viewer at the model directory and it reports that: no meta.json, so
 # nothing that claims to be a trained artifact.
-run_step "what a model directory looks like to LoRA" \
+run_step "the base model directory is not an artifact" \
     "${PY[@]}" examples/lora_inspect.py "$model"
 
 # The smallest run that can go wrong: ten iterations, a few seconds, no artifact kept.
@@ -76,7 +76,7 @@ run_step "forty iterations, saved" \
 
 # And now it is an artifact: base model, rank, which blocks it reached, how many
 # values it holds, and how far the run got - all read from the files, no MLX.
-run_step "what the artifact says about itself" \
+run_step "the artifact records the run" \
     "${PY[@]}" examples/lora_inspect.py "$scratch/adapter"
 
 # The adapter in use: one `LoRAModel`, the base model with it off and on, then a save
@@ -87,5 +87,5 @@ run_step "the adapter in use" \
 # A stop. The trainer reports an iteration before it saves it, so the checkpoint
 # adopted is whichever save had finished - here iteration 5 of 60, not the 10 the stop
 # landed on. Without `--save` the artifact goes with the scratch.
-run_step "a stop, and what it leaves" \
+run_step "a stop, and the files it leaves" \
     "${PY[@]}" examples/lora_train.py "$model" --stop

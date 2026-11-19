@@ -58,8 +58,8 @@ def encode(event: Event) -> str:
 def decode(line: str) -> Event | None:
     """The event on this line, or None when the line is mlx-lm's human log.
 
-    A malformed line, or a kind this version does not know, raises: both are bugs in our
-    own child rather than noise to skip.
+    A malformed line, or a kind this version does not recognise, raises: both are bugs in
+    our own child rather than noise to skip.
     """
     if not line.startswith(MARKER):
         return None

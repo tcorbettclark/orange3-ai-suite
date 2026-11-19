@@ -15,7 +15,7 @@ class RowProfileRoughness(Feature):
             "How much the average brightness jumps up and down as you move down the picture. "
             "A sky with two distinct cloud layers, or a striped shirt, scores high; a smooth "
             "gradient from top to bottom scores low. Random speckle also scores high, so on "
-            "its own it does not say whether the bands are organised or just noisy."
+            "its own it cannot distinguish organised bands from plain noise."
         ),
         technical=(
             "Sum of absolute differences of the row-mean profile, divided by the profile "

@@ -1,4 +1,4 @@
-"""One LoRA fine-tuning run: the rows, the settings, the events, and the adapter.
+"""Run one LoRA fine-tuning job: the rows, the settings, the events, and the adapter.
 
 Run it from the repository root with ``uv run --extra lora python examples/lora_train.py
 <model-dir>``, adding ``--stop`` to end the run early and ``--save DIR`` to keep the
@@ -12,7 +12,7 @@ import tempfile
 import orangecontrib.ai_suite.kernel.lora as lora
 
 #: Sentences of one subject. Continued pre-training has no labels: every token in a
-#: row is a target, which is what a text corpus means to the trainer.
+#: row is a target, because the corpus itself is the supervision.
 CORPUS = [
     "Cirrus clouds are thin and wispy, and they sit high in the troposphere.",
     "Cirrus are made of ice crystals rather than water droplets.",
@@ -103,7 +103,7 @@ with tempfile.TemporaryDirectory(prefix="lora-example-") as scratch:
         raise SystemExit(f"nothing was adopted: {exc}") from exc
 
     # 4. The artifact. `run.adapter` is set once the iteration ends, however it ended,
-    #    and its `training` record says how far the run got and whether a stop cut it
+    #    and its `training` record gives how far the run got and whether a stop cut it
     #    short - a stopped run adopts its newest checkpoint rather than nothing. The
     #    trainer reports an iteration before it saves it, so the checkpoint a stop
     #    adopts is whichever save had already finished, not the iteration the stop

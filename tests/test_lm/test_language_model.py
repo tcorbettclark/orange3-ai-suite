@@ -339,7 +339,7 @@ def test_save_load_round_trip(mlp_model, tmp_path):
 
 def test_the_record_names_the_package_that_wrote_it(mlp_model, tmp_path):
     # `meta.json` is the name a saved model directory carries, for this model and for the
-    # LoRA artifact alike, so the record says which package wrote it.
+    # LoRA artifact alike, so the record names the package that wrote it.
     import orangecontrib.ai_suite.kernel.lm as lm
 
     path = mlp_model.save(tmp_path / "named.nnlm")

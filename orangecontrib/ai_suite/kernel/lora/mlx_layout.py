@@ -62,7 +62,7 @@ def checkpoints(adapter_dir: str | Path) -> list[tuple[int, Path]]:
     """The numbered checkpoints a run leaves behind, oldest first: ``(iteration, path)``.
 
     mlx-lm writes the unnumbered adapter on every save as well as the numbered file,
-    so a run that is still going has both; only these say how far it got.
+    so a run that is still going has both; only these record how far the run got.
     """
     found: list[tuple[int, Path]] = []
     for path in Path(adapter_dir).glob(f"*_{ADAPTER_WEIGHTS}"):

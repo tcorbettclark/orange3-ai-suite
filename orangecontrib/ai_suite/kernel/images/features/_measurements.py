@@ -1,8 +1,8 @@
 """Image measurements shared by more than one feature.
 
 Every function is pure and stateless, recomputing what it returns, and a
-measurement lives here only when more than one feature needs it. The numeric
-rules it builds on live in :mod:`_conventions`.
+measurement belongs here only when more than one feature needs it. The numeric
+rules it builds on are in :mod:`_conventions`.
 """
 
 from __future__ import annotations

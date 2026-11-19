@@ -32,7 +32,7 @@ _TAIL_LINES = 200
 
 @dataclass(frozen=True)
 class Outcome:
-    """What a finished run reports: whether a stop cut it short."""
+    """How a run ended: whether a stop cut it short."""
 
     stopped: bool
 
@@ -55,7 +55,7 @@ class Run:
     """One training run: iterate it for events, and ``stop()`` it from any thread.
 
     Iteration spawns the child, so a run constructed and never iterated costs nothing.
-    When the iteration ends, however it ends, the child is gone and ``outcome`` says
+    When the iteration ends, however it ends, the child is gone and ``outcome`` record
     whether a stop cut the run short.
     """
 
@@ -176,7 +176,7 @@ def _terminate(process: subprocess.Popen) -> None:
 
 
 def _kill(process: subprocess.Popen) -> None:
-    """Stop the child's process group whether it agrees or not."""
+    """Kill the child's process group, whether it has stopped or not."""
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):

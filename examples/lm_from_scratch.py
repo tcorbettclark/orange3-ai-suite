@@ -1,4 +1,4 @@
-"""A tiny character-level language model trained, sampled and scored on a six-line corpus.
+"""Train, sample and score a tiny character-level language model on a six-line corpus.
 
 Run it from the repository root with ``uv run python examples/lm_from_scratch.py``. The
 script takes one object at a time: a tokenizer, an MLP architecture, the

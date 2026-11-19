@@ -20,7 +20,7 @@ class FineTexture(Feature):
         technical=(
             "Mean over the image of the local standard deviation in 5x5 windows, computed as "
             "E[x^2] - E[x]^2 with two box filters. Because the window is a fixed number of "
-            "pixels, the feature means what it says only at a fixed working size: with "
+            "pixels, the feature means what its description says only at a fixed size: with "
             "working_size=None a 64-pixel and a 1024-pixel image of the same scene score "
             "differently. Companion to `coarse_texture`."
         ),

@@ -1,6 +1,6 @@
 """One run's settings and its results, with the optimizer, loss and epoch callback.
 
-The Keras loop itself lives on :class:`~.language_model.LanguageModel`, which owns the
+The Keras loop itself is in :class:`~.language_model.LanguageModel`, which holds the
 weights. Sampling during training happens in the caller's ``on_epoch`` hook, not here.
 """
 
@@ -44,7 +44,7 @@ class TrainingOptions:
 
 @dataclass(frozen=True)
 class TrainingResults:
-    """What one run produced, beyond the weights: the counts and the final losses.
+    """The counts and final losses of one run, beyond the weights.
 
     Perplexity is ``e^loss``, derived from the loss rather than stored.
     """

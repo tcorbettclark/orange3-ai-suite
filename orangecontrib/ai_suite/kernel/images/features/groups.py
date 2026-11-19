@@ -1,6 +1,6 @@
 """Feature groups: membership lists over the catalogue.
 
-A group owns no feature and computes nothing; it is a membership list plus the
+A group holds no feature and computes nothing; it is a membership list plus the
 words describing it, so a feature can appear in several groups. Every name is
 checked against the catalogue at import, and a feature is reported under the first
 group that lists it.

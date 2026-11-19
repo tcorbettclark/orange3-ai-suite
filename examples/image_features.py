@@ -1,4 +1,4 @@
-"""The kernel's image features and their catalogue, printed for three cloud photographs.
+"""Print the kernel's image features, and their catalogue, for three cloud photographs.
 
 Run it from the repository root with ``uv run python examples/image_features.py``. The
 photographs are real skies from the CCSN database (CC0), credited in

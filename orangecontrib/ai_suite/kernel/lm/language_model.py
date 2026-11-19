@@ -28,8 +28,8 @@ from .training import (
 )
 
 #: The model directory's own record. The name is shared with the LoRA artifact's, so the
-#: record says which package wrote it - and :meth:`LanguageModel.load` refuses one that
-#: says anything else.
+#: record names the package that wrote it - and :meth:`LanguageModel.load` rejects one
+#: that names anything else.
 _META_FILE = "meta.json"
 _CREATED_BY = "orangecontrib.ai_suite.kernel.lm"
 _MODEL_FILE = "model.keras"
@@ -233,10 +233,10 @@ class LanguageModel:
 
     @classmethod
     def load(cls, path: str | Path) -> LanguageModel:
-        """Load a model directory saved by :meth:`save`; another package's raises.
+        """Load a model directory written by :meth:`save`.
 
-        A ``meta.json`` written by anything other than this package is refused rather than
-        read for whatever of its keys happen to match.
+        A ``meta.json`` written by any other package raises, rather than being read for
+        whatever of its keys happen to match.
         """
         src = Path(path)
         meta = json.loads((src / _META_FILE).read_text())

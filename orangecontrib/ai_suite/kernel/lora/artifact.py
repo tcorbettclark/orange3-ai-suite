@@ -17,8 +17,8 @@ from typing import Any
 from . import mlx_layout
 
 #: The artifact's own record, and the one file that makes a directory an artifact. The
-#: name is shared with the Keras model's directory, so the record says which package
-#: wrote it - and :meth:`LoRAAdapter.load` refuses one that says anything else.
+#: name is shared with the Keras model's directory, so the record names the package that
+#: wrote it - and :meth:`LoRAAdapter.load` rejects one that names anything else.
 _META_FILE = "meta.json"
 _CREATED_BY = "orangecontrib.ai_suite.kernel.lora"
 
@@ -62,7 +62,7 @@ class LoRAAdapter:
 
     @classmethod
     def load(cls, path: str | Path) -> LoRAAdapter:
-        """Read an adapter directory, or a raw model directory as the base model.
+        """Load an adapter directory, or a raw MLX model directory as the base model.
 
         A directory carrying ``meta.json`` is an artifact, and a ``meta.json`` written by
         another package raises; one with no record at all is a plain MLX model directory,

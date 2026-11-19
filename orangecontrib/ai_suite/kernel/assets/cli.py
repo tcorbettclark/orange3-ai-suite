@@ -51,7 +51,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     # Before anything can import the Hub: this process chooses its own transfer
-    # path, and says so, rather than inheriting whatever a helper decided.
+    # path and prints it, rather than inheriting whatever a helper decided.
     print(f"transfer: {prefer_classic_lfs()}", file=sys.stderr)
     args = _parser().parse_args(argv)
     cache = Path(args.cache) if args.cache else None

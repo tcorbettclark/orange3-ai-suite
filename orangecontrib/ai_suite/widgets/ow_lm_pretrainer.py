@@ -50,7 +50,7 @@ class TrainingWorker(QThread):
         self.request_stop = False
 
     def _on_epoch(self, stats):
-        """Stream one epoch's numbers, plus a sample if the widget asked for one."""
+        """Stream one epoch's numbers, plus a sample if the widget requested one."""
         if self.sample is not None:
             stats["sample"] = self.sample(self.model)
         self.epoch_signal.emit(stats)  # thread-safe queued signal

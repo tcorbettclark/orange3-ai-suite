@@ -1,4 +1,4 @@
-"""The adapter in use: the same weights with it off and on, then saved and reloaded.
+"""Use a trained adapter: the same weights with it off and on, then saved and reloaded.
 
 Run it from the repository root with ``uv run --extra lora python
 examples/lora_generate.py <artifact-dir>``, where the artifact is what

@@ -163,6 +163,6 @@ def test_the_parameter_counts_are_mlx_lm_arithmetic(monkeypatch, capsys):
 
 def test_a_moved_printer_fails_loudly():
     # If mlx-lm stops going through that module global, the metric would vanish;
-    # the child says so instead, at the start of the run.
+    # the child prints it instead, at the start of the run.
     with pytest.raises(RuntimeError, match="print_trainable_parameters"):
         _child.install_params_hook(SimpleNamespace())

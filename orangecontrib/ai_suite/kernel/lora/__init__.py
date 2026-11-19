@@ -1,11 +1,11 @@
 """LoRA fine-tuning of an MLX base model, with the adapter stored beside it.
 
-Options, data, the train/validation split, the run and the artifact live here.
+Options, data, the train/validation split, the run and the artifact are here.
 :func:`train_lora` returns a run: iterate it for :class:`Params`, :class:`TrainReport`
 and :class:`ValReport` events, and read ``run.adapter`` when the iteration ends. The
 modules whose names begin ``mlx_`` are the boundary: mlx-lm's files, its child process,
 its wire format and its in-process runtime. MLX is Apple-Silicon-only, so those imports
-are local and :func:`available` answers before one is attempted.
+are local and :func:`available` checks the platform before one is tried.
 """
 
 from .artifact import LoRAAdapter

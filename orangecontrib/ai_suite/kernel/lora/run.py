@@ -1,4 +1,4 @@
-"""One run: its specification, its scratch directory, and what a stop leaves behind.
+"""One run: its specification, its scratch directory, and the files it leaves behind.
 
 The run is :class:`~.mlx_process.Run`'s: this module builds its
 :class:`~.mlx_spec.TrainingSpec` from the caller's options, stages the rows into a
@@ -19,9 +19,9 @@ from . import mlx_layout, mlx_process, mlx_protocol, mlx_spec
 from .artifact import LoRAAdapter
 from .data import Format, LoRAData, LoRAOptions, split_for_training
 
-#: Name of one run's directory. In the shared temp root the name also says whose
-#: directory it is; inside a directory the caller named, only uniqueness is left
-#: to say, so the run directory is just a run.
+#: Name of one run's directory. In the shared temp root the name also shows whose
+#: directory it is; inside a directory the caller named, it serves only to be unique,
+#: so the run directory is just a run.
 _SHARED_PREFIX = "orange-ai-lora-"
 _RUN_PREFIX = "run-"
 
@@ -185,8 +185,8 @@ class TrainingRun:
                 f"the run directory {run_dir} holds the log tail"
             )
         # mlx-lm writes the unnumbered adapter on every save as well as at the end, so
-        # its presence says nothing about whether the run finished: the numbered
-        # checkpoints are what say how far a stopped one got.
+        # its presence does not show whether the run finished: the numbered checkpoints
+        # give how far a stopped one got.
         weights = reached[-1][1] if stopped else mlx_layout.adapter_weights(adapter_dir)
         if weights is None:
             raise RuntimeError(f"training ended without adapter files; see {run_dir}")

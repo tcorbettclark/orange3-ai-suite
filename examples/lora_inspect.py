@@ -1,14 +1,15 @@
-"""What a directory is, as far as LoRA is concerned: an artifact, and what it says.
+"""Inspect and print information about a LoRA adapter.
 
 Run it from the repository root with ``uv run python examples/lora_inspect.py <dir>``,
-pointing at what ``examples/lora_train.py --save`` wrote - or at a plain MLX model
-directory, which it will tell you is not an artifact. No MLX and no base model are
-needed: everything below is read from the artifact's own files.
+pointing at what ``examples/lora_train.py --save`` wrote. A plain MLX model directory
+has no ``meta.json``, and the script reports that instead of an artifact. No MLX and no
+base model are needed: every number below comes from the artifact's own files.
 
-The three are ``meta.json`` (which package wrote the artifact, the base model, the run's
-settings, how far it got), ``adapter_config.json`` (mlx-lm's description of the adapter)
-and ``adapters.safetensors``, whose layout is eight bytes of header length, then that
-many bytes of JSON naming each tensor, its dtype and its shape, then the weights.
+An artifact is three files: ``meta.json`` (which package wrote it, the base model, the
+run's settings, how far it got), ``adapter_config.json`` (mlx-lm's description of the
+adapter) and ``adapters.safetensors``, whose layout is eight bytes of header length,
+then that many bytes of JSON naming each tensor, its dtype and its shape, then the
+weights.
 """
 
 import argparse
@@ -116,12 +117,13 @@ if record:
         f" {options.get('steps_per_eval')}, checkpoint every {options.get('save_every')}"
     )
     # The paths the run recorded point into the scratch the caller owned, so they
-    # outlive it or not: this is what says whether the artifact is self-contained.
+    # outlive it or not: whether they are still there decides whether the artifact
+    # stands on its own.
     for key, where in (("run_dir", record.get("run_dir")), ("data", config.get("data"))):
         if where:
             print(f"  {key:11s} {where}  ({'present' if Path(where).exists() else 'gone'})")
 else:
-    print("\nrun         no record in meta.json: nothing says how this was made")
+    print("\nrun         no record in meta.json: how this was made is not recorded")
 
 if adapter.adapter_path is None:
     print("\nadapter     none: this artifact names a base model and no adapter")
@@ -139,9 +141,8 @@ if not weights.is_file():
     print(f"  refused     no {weights.name} here, so nothing can be loaded from it")
     raise SystemExit(1)
 
-# What the tensors say, rather than what the config says they should: the narrow
-# dimension of a factor is the rank it was trained at, and the digits in the names are
-# the blocks it reached.
+# The tensors, not the config: the narrow dimension of a factor is the rank it was
+# trained at, and the digits in the names are the blocks it reached.
 header = tensor_header(weights)
 values = sum(math.prod(tensor["shape"]) for tensor in header.values())
 ranks = sorted({min(tensor["shape"]) for tensor in header.values()})
@@ -155,7 +156,7 @@ span = f"{blocks[0]}-{blocks[-1]}" if blocks else "none"
 print(f"  blocks      {len(blocks)} ({span})")
 print(f"  modules     {', '.join(modules)}")
 print(
-    f"  check       config says {config.get('num_layers')} layers at rank"
-    f" {lora_parameters.get('rank')}; the file holds {len(blocks)} blocks at rank"
+    f"  check       config has {config.get('num_layers')} layers at rank"
+    f" {lora_parameters.get('rank')}; the weights have {len(blocks)} blocks at rank"
     f" {', '.join(map(str, ranks))}"
 )

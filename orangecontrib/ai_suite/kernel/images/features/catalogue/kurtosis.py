@@ -22,7 +22,7 @@ class Kurtosis(Feature):
         technical=(
             "Excess kurtosis of the preprocessed luminance, E[(x-mu)^4] / sigma^4 - 3, so 0 "
             "is the Gaussian reference and -2 the uniform distribution. A shape statistic: "
-            "invariant to translation and to pixel order, so it says nothing about where "
+            "invariant to translation and to pixel order, so it reports nothing about where "
             "anything is. The fourth moment makes it more sensitive to a few extreme pixels "
             "than `skewness`; `robust_contrast` is the resistant alternative. "
             "A flat image returns 0.0."

@@ -108,7 +108,7 @@ class LoRAData:
 
 
 def split_for_training(data: LoRAData, options: LoRAOptions) -> tuple[Rows, Rows]:
-    """The train and validation rows, refusing a validation split mlx-lm cannot use.
+    """The train and validation rows; raises on a split mlx-lm cannot use.
 
     A non-empty validation split holds at least ``batch_size`` rows: mlx-lm fails on
     anything less. An empty one is allowed, and mlx-lm then trains without validation.
