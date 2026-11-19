@@ -49,10 +49,12 @@ def fail(message):
     raise SystemExit(f"release: {message}")
 
 
-def run(command, env=None, show=True, capture=False):
+def run(command, env=None, show=True, capture=False, cwd=None):
     if show:
         print(f"$ {' '.join(command)}", flush=True)
-    result = subprocess.run(command, cwd=ROOT, env=env, text=True, capture_output=capture)
+    result = subprocess.run(
+        command, cwd=cwd or ROOT, env=env, text=True, capture_output=capture
+    )
     if result.returncode != 0:
         if capture:
             print(result.stdout, result.stderr)
@@ -126,7 +128,7 @@ def smoke(install):
         run(["uv", "venv", "--quiet", str(venv)])
         python = venv / "bin" / "python"
         run(["uv", "pip", "install", "--quiet", "--python", str(python), str(install)])
-        run([str(python), "-c", CONFIG["smoke"]])
+        run([str(python), "-c", CONFIG["smoke"]], cwd=directory)
 
 
 def dependency_specs():
@@ -151,7 +153,9 @@ def check_dependency():
         match = pattern.fullmatch(spec)
         if not match:
             fail(f"{spec} is not a >=X.Y.Z,<X.Y.Z bracket")
-        bounds.add(tuple(int(part) for part in match.groups()))
+        bounds.add(
+            tuple(tuple(int(number) for number in group.split(".")) for group in match.groups())
+        )
     if not bounds:
         fail(f"no {dependency} requirement found")
     if len(bounds) != 1:
