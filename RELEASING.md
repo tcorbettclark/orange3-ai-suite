@@ -39,8 +39,10 @@ not on PyPI.
 
 `release` bumps the version and the lock, re-runs both suites, rebuilds, commits
 `release: X.Y.Z`, tags `vX.Y.Z`, and pushes `main` with the tag. `--publish`
-uploads both artifacts, waits for the version to appear on PyPI, and installs it
-in a fresh environment.
+uploads both artifacts, then checks that the files PyPI serves are the ones just
+built: it compares the SHA-256 PyPI records with `dist/`. `verify` does the same
+comparison later, so it proves the published artifact is the built one, not just
+that the version numbers agree.
 
 `release` without `--publish` stops after the push, so a release can be tagged
 now and uploaded later:
@@ -83,5 +85,6 @@ PyPI.
 ## If a publish fails
 
 If the tag is pushed and the upload failed, fix the cause and run `publish` again
-for the same version — it was never published, so it is not being reused. If the
-uploaded wheel itself is wrong, do not re-upload it: bump to the next patch.
+for the same version; files that did arrive are skipped, and the version is not
+being reused because it was never fully published. If the uploaded wheel itself
+is wrong, do not re-upload it: bump to the next patch.

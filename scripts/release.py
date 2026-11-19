@@ -6,12 +6,13 @@ uv.lock, commits release: X.Y.Z, creates the annotated tag vX.Y.Z, pushes main a
 the tag, and with --publish uploads the artifacts and verifies them on PyPI.
 publish uploads the version already tagged at HEAD, so a tagged release can reach
 PyPI later without a second bump. verify compares the project, the tag at HEAD,
-PyPI and dist/.
+and the digests PyPI records for the artifacts in dist/.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -83,6 +84,34 @@ def pypi_releases():
         if error.code == 404:
             return set()
         raise
+
+
+def pypi_digests(version):
+    url = f"https://pypi.org/pypi/{CONFIG['package']}/{version}/json"
+    with urllib.request.urlopen(url, timeout=15) as response:
+        return {item["filename"]: item["digests"]["sha256"] for item in json.load(response)["urls"]}
+
+
+def check_published(version):
+    """PyPI serves the artifacts in dist/ for this version."""
+    say(f"the published artifacts {version}")
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        if version in pypi_releases():
+            break
+        time.sleep(3)
+    else:
+        fail(f"{version} did not appear on PyPI within 120 seconds")
+    normalized = CONFIG["package"].replace("-", "_")
+    artifacts = sorted((ROOT / "dist").glob(f"{normalized}-{version}*"))
+    if not artifacts:
+        fail(f"dist/ holds no {version} artifacts; run the build")
+    served = pypi_digests(version)
+    for artifact in artifacts:
+        if artifact.name not in served:
+            fail(f"PyPI does not serve {artifact.name}")
+        if served[artifact.name] != hashlib.sha256(artifact.read_bytes()).hexdigest():
+            fail(f"PyPI serves a different {artifact.name}")
 
 
 def check_tree():
@@ -187,15 +216,8 @@ def cmd_check():
 
 def publish_version(version):
     say(f"publish {version}")
-    run(["uv", "publish"])
-    deadline = time.time() + 120
-    while time.time() < deadline:
-        if version in pypi_releases():
-            break
-        time.sleep(3)
-    else:
-        fail("the version did not appear on PyPI within 120 seconds")
-    smoke(f"{CONFIG['package']}=={version}")
+    run(["uv", "publish", "--check-url", "https://pypi.org/simple/"])
+    check_published(version)
     say(f"published {CONFIG['package']} {version}")
 
 
@@ -248,11 +270,10 @@ def cmd_verify():
     say(f"verify {CONFIG['package']} {version}")
     if f"v{version}" not in git_read("tag", "--points-at", "HEAD").split():
         fail(f"HEAD is not tagged v{version}")
-    if version not in pypi_releases():
-        fail(f"{version} is not on PyPI")
     normalized = CONFIG["package"].replace("-", "_")
     if not list((ROOT / "dist").glob(f"{normalized}-{version}-*.whl")):
         fail(f"dist/ holds no {version} wheel; run the build")
+    check_published(version)
     say(f"verified: {CONFIG['package']} {version}")
 
 
