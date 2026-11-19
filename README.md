@@ -445,9 +445,11 @@ Three runnable scripts use that façade in the order a run happens.
 `examples/lora_train.py` builds the rows and the settings, prints the events as they
 arrive, and hands back the artifact - `--save DIR` keeps it and `--stop` ends the run
 early, which adopts the newest checkpoint. `examples/lora_generate.py` loads that
-artifact and compares the base model with its adapter, text and perplexity both. And
-`examples/lora_artifact.py` needs no MLX at all: it shows what the artifact directory
-carries and what it refuses to write.
+artifact and compares the base model with its adapter, text and perplexity both.
+`examples/lora_artifact.py` reads an artifact and summarises it - the base model, the
+rank and the blocks the adapter reached, how many values it holds, how far the run got
+- and it needs no MLX and no model to do that, because all of it is in the files. Point
+it at a plain model directory and it says so.
 
 `examples/lora_walkthrough.sh` runs all three in order, printing each command as it
 goes: `bash examples/lora_walkthrough.sh`. It fetches the pinned model itself and
