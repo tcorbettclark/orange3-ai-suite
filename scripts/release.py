@@ -182,7 +182,11 @@ def print_gate(version, wheel):
 def cmd_check():
     check_tree()
     version = current_version()
-    check_tag(version)
+    tagged = f"v{version}" in git_read("tag", "--list").split()
+    published = version in pypi_releases()
+    if tagged and not published:
+        fail(f"{version} is tagged but not on PyPI; publish it rather than bumping")
+    say(f"version: {version} (tagged: {tagged}, on PyPI: {published})")
     say("the lock")
     run(["uv", "lock", "--check"])
     run_tests()
@@ -213,6 +217,7 @@ def cmd_release(kind, publish, gate_confirmed, dry_run):
     following = run(
         ["uv", "version", "--bump", kind, "--dry-run", "--short"], show=False, capture=True
     )
+    check_tag(following)
     say(f"bump: {version} -> {following}")
     if publish and CONFIG["publish_gate"] and not gate_confirmed:
         fail("--publish needs --gate-confirmed for this package")
