@@ -88,6 +88,17 @@ class _Parser:
         return _Args()
 
 
+#: `mlx_lm.lora.CONFIG_DEFAULTS` - applied by mlx-lm's `main`, not by the parser, so a
+#: namespace just built lacks the three it declares no flag for and carries the rest
+#: as None. Both shapes are read by `train_model`, and both are in here.
+CONFIG_DEFAULTS = {
+    "lora_parameters": {"rank": 8, "dropout": 0.0, "scale": 20.0},
+    "optimizer_config": {"adam": {}},
+    "lr_schedule": None,
+    "val_batches": 25,
+}
+
+
 def build_parser():
     return _Parser()
 
@@ -101,6 +112,11 @@ def print_trainable_parameters(model):
 
 
 def train_model(args, model, train_set, valid_set, training_callback=None):
+    # What the real train_model reads first: a setting its parser has no attribute for,
+    # and one the parser leaves as None. A child that skips CONFIG_DEFAULTS dies here.
+    print(f"lora rank {args.lora_parameters['rank']}", flush=True)
+    if args.val_batches is None:
+        raise SystemExit("mlx_lm.train_model needs args.val_batches")
     if os.environ.get("FAKE_MLX_LM_EXIT"):
         print("mlx_lm: simulated failure", flush=True)
         sys.exit(3)
@@ -212,6 +228,10 @@ def test_a_completed_run_reports_its_events_and_yields_the_artifact(fake_mlx_lm,
     assert asked["iters"] == 3
     assert asked["save_every"] == 50
     assert asked["fine_tune_type"] == "lora"
+    # mlx-lm's own defaults too, which its parser does not carry: run's spec first,
+    # then whatever the run did not ask about.
+    assert asked["lora_parameters"]["rank"] == 8
+    assert asked["val_batches"] == 25
 
     # One event per report, in the order they happened, typed rather than
     # tagged: the params report arrives once, before any loss.

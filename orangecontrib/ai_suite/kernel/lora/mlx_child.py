@@ -23,6 +23,18 @@ def emit(event: Params | TrainReport | ValReport) -> None:
     sys.stdout.flush()
 
 
+def apply_defaults(args: Any, defaults: dict[str, Any]) -> None:
+    """Give ``args`` a value for every name in ``defaults``, unless it already has one.
+
+    mlx-lm applies its ``CONFIG_DEFAULTS`` in ``main()``, not in ``build_parser``, so a
+    namespace straight from the parser has no attribute at all for a setting that has
+    no flag - and ``train_model`` reads several of those.
+    """
+    for name, value in defaults.items():
+        if getattr(args, name, None) is None:
+            setattr(args, name, value)
+
+
 def apply_spec(args: Any, spec: TrainingSpec) -> None:
     """Overwrite the fields of an mlx-lm argument namespace with the run's specification.
 
@@ -111,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     # mlx-lm's own defaults: a field it adds tomorrow arrives with its default
     # rather than as an AttributeError halfway through a run.
     args = lora.build_parser().parse_args([])
+    apply_defaults(args, lora.CONFIG_DEFAULTS)
     apply_spec(args, spec)
     install_params_hook(lora)
 

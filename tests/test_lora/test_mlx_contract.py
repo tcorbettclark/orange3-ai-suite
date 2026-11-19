@@ -45,12 +45,30 @@ def test_the_spec_fills_that_namespace_into_a_lora_run():
     import mlx_lm.lora as lora
 
     args = lora.build_parser().parse_args([])
+    _child.apply_defaults(args, lora.CONFIG_DEFAULTS)
     _child.apply_spec(args, SPEC)
     assert args.train is True and args.test is False
     assert args.fine_tune_type == "lora"
     assert args.iters == 7
     assert args.save_every == 3
     assert args.mask_prompt is False
+
+
+def test_the_parser_alone_does_not_hold_the_defaults_train_model_reads():
+    # mlx-lm applies CONFIG_DEFAULTS in main(), which the child does not go through.
+    # So the child has to apply them itself, and this is the inventory of names a
+    # parser namespace is missing: a new one is a new field the child must fill.
+    import mlx_lm.lora as lora
+
+    bare = lora.build_parser().parse_args([])
+    absent = {name for name in lora.CONFIG_DEFAULTS if not hasattr(bare, name)}
+    assert absent == {"lora_parameters", "optimizer_config", "lr_schedule"}
+
+    filled = lora.build_parser().parse_args([])
+    _child.apply_defaults(filled, lora.CONFIG_DEFAULTS)
+    for name in lora.CONFIG_DEFAULTS:
+        assert hasattr(filled, name), name
+    assert filled.lora_parameters == lora.CONFIG_DEFAULTS["lora_parameters"]
 
 
 def test_the_printer_the_params_hook_replaces_is_still_a_module_global():
