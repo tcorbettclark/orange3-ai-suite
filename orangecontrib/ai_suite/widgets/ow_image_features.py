@@ -33,13 +33,13 @@ from AnyQt.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
 )
+from edu_ai_suite.images import features
 from Orange.data import ContinuousVariable, Domain, Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import image_paths
-from edu_ai_suite.images import features
 
 # Group letters, titles and help text come from edu_ai_suite's group table.
 GROUP_LABELS = tuple(

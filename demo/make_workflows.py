@@ -11,14 +11,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from edu_ai_suite.assets import get_clouds, get_mnist
 from orangecanvas.registry.description import (
     InputSignal,
     OutputSignal,
     WidgetDescription,
 )
 from orangecanvas.scheme import Scheme, SchemeLink, SchemeNode
-
-from edu_ai_suite.assets import get_clouds, get_mnist
 
 BASE = Path(__file__).resolve().parent
 

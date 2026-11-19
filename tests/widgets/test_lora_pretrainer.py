@@ -43,7 +43,7 @@ def test_real_training_path(qapp, capture):
     if model_dir is None:
         pytest.skip(
             "pinned 4-bit model not cached — use the BritLLM Models widget "
-            "or `orange-ai-assets fetch britllm-4bit`"
+            "or `assets fetch britllm-4bit`"
         )
 
     w = OWLoRAPretrainer()
@@ -75,7 +75,7 @@ def test_stop_before_adapter_routes_to_information(qapp):
 
 
 def test_progress_events_drive_the_note_and_the_curves(qapp):
-    # The worker emits the kernel's typed events; the widget matches on the type.
+    # The worker emits edu_ai_suite's typed events; the widget matches on the type.
     from edu_ai_suite.lora import Params, TrainReport, ValReport
 
     w = OWLoRAPretrainer()
@@ -148,7 +148,7 @@ def test_base_model_input_sets_the_line_edit_and_the_request(
 
 
 def test_each_run_gets_a_fresh_scratch_and_drops_the_previous(qapp):
-    # One directory for the widget, not one per run: the kernel gives every run
+    # One directory for the widget, not one per run: edu_ai_suite gives every run
     # a fresh child of it, so the parent can be reused - and dropping the parent
     # is how the previous run's adapter stops taking up space.
     w = OWLoRAPretrainer()

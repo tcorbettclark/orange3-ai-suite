@@ -1,4 +1,4 @@
-"""Adapters: the conversion between Orange tables and the kernel's arguments and results."""
+"""Adapters: the conversion between Orange tables and edu_ai_suite's arguments and results."""
 
 import numpy as np
 from Orange.data import Domain, StringVariable, Table
@@ -64,7 +64,7 @@ def test_checkpoint_table_columns_and_sample():
         },
     ]
     table = checkpoint_table(rows)
-    # Structural tie: the columns are the kernel's own epoch-stats key order,
+    # Structural tie: the columns are edu_ai_suite's own epoch-stats key order,
     # taken from the leaf module that names them - not a copy spelled here, and
     # not an import that would drag Keras into the widget layer.
     from edu_ai_suite.lm.stats import EPOCH_STATS_KEYS

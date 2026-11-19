@@ -21,9 +21,6 @@ from AnyQt.QtWidgets import (
     QProgressBar,
     QPushButton,
 )
-from Orange.widgets import gui
-from Orange.widgets.widget import Msg, Output, OWWidget
-
 from edu_ai_suite.assets.catalogue import MODEL_ASSETS
 from edu_ai_suite.assets.hf import (
     Asset,
@@ -33,6 +30,8 @@ from edu_ai_suite.assets.hf import (
     hub_cache,
     verify,
 )
+from Orange.widgets import gui
+from Orange.widgets.widget import Msg, Output, OWWidget
 
 _NAMES = tuple(MODEL_ASSETS)
 

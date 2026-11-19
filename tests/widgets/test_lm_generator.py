@@ -6,7 +6,7 @@ from orangecontrib.ai_suite.widgets.ow_lm_generator import OWLMGenerator
 
 
 class StubModel:
-    """A duck-typed stand-in for the kernel's ``stream`` convention.
+    """A duck-typed stand-in for edu_ai_suite's ``stream`` convention.
 
     It yields word-sized pieces, which is all the widget may assume: a real stream
     chunks wherever the library does.
@@ -26,7 +26,7 @@ class StubModel:
                 self.on_chunk()
 
 
-def test_generate_passes_the_kernel_convention_positionally(qapp, capture):
+def test_generate_passes_the_stream_convention_positionally(qapp, capture):
     w = OWLMGenerator()
     w.show()
     model = StubModel()

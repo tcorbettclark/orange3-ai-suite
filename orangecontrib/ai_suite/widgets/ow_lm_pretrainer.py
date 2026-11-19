@@ -10,12 +10,6 @@ import traceback
 
 import numpy as np
 from AnyQt.QtCore import QThread, pyqtSignal
-from Orange.data import Table
-from Orange.widgets import gui
-from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Input, Msg, Output, OWWidget
-
-from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
 from edu_ai_suite.lm import (
     LanguageModel,
     TrainingOptions,
@@ -23,6 +17,12 @@ from edu_ai_suite.lm import (
     tokenizer_from_text,
     tokenizers,
 )
+from Orange.data import Table
+from Orange.widgets import gui
+from Orange.widgets.settings import Setting
+from Orange.widgets.widget import Input, Msg, Output, OWWidget
+
+from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
 
 # Names and labels come from edu_ai_suite's own discovery, so neither dropdown can
 # drift from the classes it offers; only the label formatting is decided here.

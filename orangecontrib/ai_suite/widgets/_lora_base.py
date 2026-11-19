@@ -15,11 +15,6 @@ from pathlib import Path
 
 from AnyQt.QtCore import QThread, pyqtSignal
 from AnyQt.QtWidgets import QLabel
-from Orange.data import Table
-from Orange.widgets import gui
-from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Input, Msg, Output, OWWidget
-
 from edu_ai_suite.lora import (
     LoRAModel,
     LoRAOptions,
@@ -34,6 +29,10 @@ from edu_ai_suite.lora import (
 from edu_ai_suite.lora import (
     available as lora_available,
 )
+from Orange.data import Table
+from Orange.widgets import gui
+from Orange.widgets.settings import Setting
+from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 _OPTION_DEFAULTS = LoRAOptions()
 

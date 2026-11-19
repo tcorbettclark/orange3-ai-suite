@@ -136,7 +136,7 @@ def test_gutenberg_cleaning_is_applied(qapp, capture, tmp_path):
     assert table_texts(sent[-1]) == ["Body text."]
 
 
-def test_split_menu_is_the_kernel_vocabulary(qapp):
+def test_split_menu_shows_the_row_granularity_vocabulary(qapp):
     from edu_ai_suite.text import RowGranularity
 
     w = OWLMTextLoader()

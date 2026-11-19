@@ -24,11 +24,6 @@ from AnyQt.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
 )
-from Orange.data import Domain, StringVariable, Table
-from Orange.widgets import gui
-from Orange.widgets.settings import Setting
-from Orange.widgets.widget import Msg, Output, OWWidget
-
 from edu_ai_suite.text import (
     CleanOptions,
     RowGranularity,
@@ -37,6 +32,10 @@ from edu_ai_suite.text import (
     reflow_qa_pair,
     split_text,
 )
+from Orange.data import Domain, StringVariable, Table
+from Orange.widgets import gui
+from Orange.widgets.settings import Setting
+from Orange.widgets.widget import Msg, Output, OWWidget
 
 # The menu order is the enum's declaration order; there is no second list to keep
 # in step with it.

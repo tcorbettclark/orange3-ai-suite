@@ -51,9 +51,12 @@ uv sync
 uv run pytest
 ```
 
-Install into the Orange environment. On macOS with the Orange.app bundle:
+Install into the Orange environment. edu-ai-suite comes with its own
+dependencies; the add-on is installed with `--no-deps` so the bundle's packages
+are left alone. On macOS with the Orange.app bundle:
 
 ```bash
+uv pip install --python /Applications/Orange.app/Contents/MacOS/python edu-ai-suite
 uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
     --no-deps -e . --no-build-isolation
 /Applications/Orange.app/Contents/MacOS/python -m Orange.canvas
@@ -69,6 +72,7 @@ Build and install a wheel:
 
 ```bash
 uv build
+uv pip install --python /Applications/Orange.app/Contents/MacOS/python edu-ai-suite
 uv pip install --python /Applications/Orange.app/Contents/MacOS/python \
     --no-deps dist/orange3_ai_suite-*.whl
 ```
@@ -395,8 +399,9 @@ QT_QPA_PLATFORM=offscreen \
 ```
 
 The widget suite must pass in the Orange interpreter; the documentation sweep
-needs neither Orange nor Qt. One slow test is skipped in the default widget run
-unless the pinned 4-bit model is already in the Hugging Face cache.
+needs neither Orange nor Qt. One slow test is deselected by default
+(`-m 'not slow'`); select it with `-m slow` when the pinned 4-bit model is
+already in the Hugging Face cache.
 
 ## Working on the code
 

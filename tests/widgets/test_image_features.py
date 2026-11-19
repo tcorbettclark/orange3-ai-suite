@@ -250,7 +250,7 @@ def test_working_size_line_edit_applies_on_enter(qapp, capture, images_table):
     assert w._working_size_edit.text() == "128"
     assert not hasattr(w, "_apply_button")
     assert not hasattr(w, "_auto_check")
-    assert not hasattr(w, "denoise_ksize")  # fixed at the kernel default
+    assert not hasattr(w, "denoise_ksize")  # fixed at the edu_ai_suite default
 
     sent = capture(w.Outputs.features)
     w.set_data(images_table)
@@ -267,7 +267,7 @@ def test_working_size_line_edit_applies_on_enter(qapp, capture, images_table):
     assert sent[-1] is not None
 
 
-def test_widget_keeps_kernel_feature_parameter_defaults(qapp):
+def test_widget_keeps_feature_parameter_defaults(qapp):
     w = OWImageFeatures()
     w.show()
     opts = w._feature_options()
