@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Release this package: check the tree, bump the version, tag, push and publish.
 
-``check`` writes no tracked file; it rebuilds ``dist/``. ``release`` writes
-``pyproject.toml`` and ``uv.lock``, commits ``release: X.Y.Z``, creates the
-annotated tag ``vX.Y.Z``, pushes ``main`` and the tag, and with ``--publish``
-uploads the artifacts and verifies them on PyPI. ``verify`` compares the project,
-the tag at HEAD, PyPI and ``dist/``.
+check writes no tracked file; it rebuilds dist/. release writes pyproject.toml and
+uv.lock, commits release: X.Y.Z, creates the annotated tag vX.Y.Z, pushes main and
+the tag, and with --publish uploads the artifacts and verifies them on PyPI.
+publish uploads the version already tagged at HEAD, so a tagged release can reach
+PyPI later without a second bump. verify compares the project, the tag at HEAD,
+PyPI and dist/.
 """
 
 from __future__ import annotations
@@ -173,7 +174,7 @@ def cmd_check():
     tagged = f"v{version}" in git_read("tag", "--list").split()
     published = version in pypi_releases()
     if tagged and not published:
-        fail(f"{version} is tagged but not on PyPI; publish it rather than bumping")
+        fail(f"{version} is tagged but not on PyPI; run publish, do not bump")
     say(f"version: {version} (tagged: {tagged}, on PyPI: {published})")
     say("the lock")
     run(["uv", "lock", "--check"])
@@ -223,6 +224,23 @@ def cmd_release(kind, publish, dry_run):
     run(["git", "push", "origin", "main", f"v{written}"])
     if publish:
         publish_version(written)
+    else:
+        say(f"tagged {written}; run publish when you want it on PyPI")
+
+
+def cmd_publish():
+    version = current_version()
+    say(f"publish {CONFIG['package']} {version}")
+    check_tree()
+    if f"v{version}" not in git_read("tag", "--points-at", "HEAD").split():
+        fail(f"HEAD is not tagged v{version}; publish from the release commit")
+    if not git_read("ls-remote", "--tags", "origin", f"v{version}"):
+        fail(f"tag v{version} is not on origin; push it before publishing")
+    if version in pypi_releases():
+        fail(f"{version} is already on PyPI")
+    wheel = build()
+    smoke(wheel)
+    publish_version(version)
 
 
 def cmd_verify():
@@ -250,12 +268,15 @@ def main():
     release.add_argument(
         "--dry-run", action="store_true", help="print the next version; write nothing"
     )
+    commands.add_parser("publish", help="upload the version already tagged at HEAD")
     commands.add_parser("verify", help="compare the project, the tag, PyPI and dist/")
     arguments = parser.parse_args()
     if arguments.command == "check":
         cmd_check()
     elif arguments.command == "release":
         cmd_release(arguments.kind, arguments.publish, arguments.dry_run)
+    elif arguments.command == "publish":
+        cmd_publish()
     else:
         cmd_verify()
 

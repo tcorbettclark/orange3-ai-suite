@@ -42,6 +42,20 @@ not on PyPI.
 uploads both artifacts, waits for the version to appear on PyPI, and installs it
 in a fresh environment.
 
+`release` without `--publish` stops after the push, so a release can be tagged
+now and uploaded later:
+
+```bash
+uv run python scripts/release.py release patch     # bump, tag, push
+uv run python scripts/release.py publish           # later, from the same commit
+```
+
+`publish` uploads the version in `pyproject.toml` and refuses unless HEAD is the
+release commit, the tag is on origin, and the version is not already on PyPI. A
+tagged but unpublished version also makes `check` refuse to bump, so it cannot be
+stepped over by accident. Publish before your next commit; if you have already
+moved on, `git switch --detach vX.Y.Z`, publish, then switch back.
+
 ## Raising the floor
 
 `check` proves the bracket is well formed and that the lower bound exists on
@@ -68,7 +82,6 @@ PyPI.
 
 ## If a publish fails
 
-If the tag is pushed and the upload failed, fix the cause and run `uv publish`
-again for the same version — it was never published, so it is not being reused.
-If the uploaded wheel itself is wrong, do not re-upload it: bump to the next
-patch.
+If the tag is pushed and the upload failed, fix the cause and run `publish` again
+for the same version — it was never published, so it is not being reused. If the
+uploaded wheel itself is wrong, do not re-upload it: bump to the next patch.
