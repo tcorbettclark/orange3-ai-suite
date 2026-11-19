@@ -25,9 +25,7 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-ORANGE_PYTHON = os.environ.get(
-    "ORANGE_PYTHON", "/Applications/Orange.app/Contents/MacOS/python"
-)
+ORANGE_PYTHON = os.environ.get("ORANGE_PYTHON", "/Applications/Orange.app/Contents/MacOS/python")
 
 CONFIG = {
     "package": "orange3-ai-suite",
@@ -53,9 +51,7 @@ def fail(message):
 def run(command, env=None, show=True, capture=False, cwd=None):
     if show:
         print(f"$ {' '.join(command)}", flush=True)
-    result = subprocess.run(
-        command, cwd=cwd or ROOT, env=env, text=True, capture_output=capture
-    )
+    result = subprocess.run(command, cwd=cwd or ROOT, env=env, text=True, capture_output=capture)
     if result.returncode != 0:
         if capture:
             print(result.stdout, result.stderr)
@@ -256,7 +252,9 @@ def cmd_verify():
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("check", help="run every pre-release check; write no tracked file")
     release = commands.add_parser("release", help="bump, test, commit, tag and push")
@@ -273,9 +271,7 @@ def main():
     if arguments.command == "check":
         cmd_check()
     elif arguments.command == "release":
-        cmd_release(
-            arguments.kind, arguments.publish, arguments.gate_confirmed, arguments.dry_run
-        )
+        cmd_release(arguments.kind, arguments.publish, arguments.gate_confirmed, arguments.dry_run)
     else:
         cmd_verify()
 
