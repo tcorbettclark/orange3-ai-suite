@@ -159,12 +159,40 @@ def test_the_mlx_boundary_never_reaches_back_up_into_lora():
     assert offenders == []
 
 
-def test_the_mlx_boundary_is_a_package_with_a_facade():
-    # What the domain may use is the subpackage's __all__, so the boundary has a
-    # contract rather than a directory of internals.
+def _names_taken_from_the_boundary() -> set[str]:
+    """Every name production code takes from ``lora.mlx``, by import or attribute.
+
+    Deliberately only production: a name nobody outside the boundary needs is not
+    part of the contract, even if a test finds it convenient.
+    """
+    taken: set[str] = set()
+    for path in (ROOT / "orangecontrib").rglob("*.py"):
+        if LORA_MLX in path.parents or "__pycache__" in path.parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+                if node.value.id == "mlx":
+                    taken.add(node.attr)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                # the package itself, not a module inside it: `from . import mlx`
+                # then `mlx.thing`, or `from .mlx import thing`
+                if module == "mlx" and node.level == 1:
+                    taken.update(alias.name for alias in node.names)
+                elif module.endswith("lora.mlx"):
+                    taken.update(alias.name for alias in node.names)
+    return taken
+
+
+def test_the_boundary_exports_exactly_what_production_takes_from_it():
+    # The façade is a contract in both directions: a name here has a caller
+    # outside, and a name used outside is here. Both halves catch the same drift -
+    # an export nobody needs (this found `generate_text`, which had no caller at
+    # all) and an import that reaches into the boundary's modules instead.
     from orangecontrib.ai_suite.kernel.lora import mlx
 
-    assert {"Run", "TrainingSpec", "Event", "load_model", "stream_text"} <= set(mlx.__all__)
+    assert set(mlx.__all__) == _names_taken_from_the_boundary()
+    assert list(mlx.__all__) == sorted(mlx.__all__)
     for name in mlx.__all__:
         assert hasattr(mlx, name), name
     assert {p.name for p in LORA_MLX.glob("*.py")} == {

@@ -33,7 +33,6 @@ from typing import Literal
 
 from .._holdout import held_out_positions
 from . import mlx
-from .mlx import TrainingSpec
 from .model import LoRAAdapter
 
 Format = Literal["text", "pairs"]
@@ -172,14 +171,14 @@ def _run_spec(
     adapter_dir: str | Path,
     options: LoRAOptions,
     format: Format,
-) -> TrainingSpec:
+) -> mlx.TrainingSpec:
     """This run in mlx-lm's vocabulary: the one place the two sets of names meet.
 
     Paths are resolved here, and prompt masking follows the data format rather
     than a caller's flag: SFT masks the prompt because the prompt is the caller's
     text, not a target.
     """
-    return TrainingSpec(
+    return mlx.TrainingSpec(
         model=str(base_model),
         data=str(data_dir),
         adapter_path=str(adapter_dir),

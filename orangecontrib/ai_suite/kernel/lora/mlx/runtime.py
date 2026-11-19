@@ -84,28 +84,6 @@ def stream_text(
         yield response.text
 
 
-def generate_text(
-    model: Any,
-    tokenizer: Any,
-    prompt: str,
-    *,
-    temperature: float,
-    max_new_tokens: int,
-    seed: int | None = None,
-) -> str:
-    """:func:`stream_text` joined up: one spelling of the sampling call."""
-    return "".join(
-        stream_text(
-            model,
-            tokenizer,
-            prompt,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            seed=seed,
-        )
-    )
-
-
 def segments(ids: list[int], max_tokens: int, window: int) -> list[list[int]]:
     """Windows of at most ``window`` inputs, plus the target that follows each.
 

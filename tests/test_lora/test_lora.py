@@ -33,6 +33,7 @@ from orangecontrib.ai_suite.kernel.lora.mlx.protocol import (
     encode,
 )
 from orangecontrib.ai_suite.kernel.lora.mlx.runtime import segments as _segments
+from orangecontrib.ai_suite.kernel.lora.mlx.train import command as child_command
 from orangecontrib.ai_suite.kernel.lora.model import _echo
 from orangecontrib.ai_suite.kernel.lora.training import _run_spec
 
@@ -257,7 +258,7 @@ def test_the_command_runs_the_boundary_child_with_the_spec_as_one_argument():
     # The child module lives inside the boundary package: nothing above it needs
     # to know that training is a process at all.
     spec = _run_spec("base", "/data", "/adapter", LoRAOptions(iters=1), "text")
-    cmd = mlx.command(spec)
+    cmd = child_command(spec)
     assert cmd[:3] == [sys.executable, "-m", "orangecontrib.ai_suite.kernel.lora.mlx.child"]
     payload = json.loads(cmd[3])
     assert payload["iters"] == 1
