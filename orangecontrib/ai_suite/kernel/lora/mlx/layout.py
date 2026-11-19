@@ -1,12 +1,9 @@
-"""mlx-lm's file conventions, in one place.
+"""The files mlx-lm reads and writes.
 
-The library's API is one thing to track; its *files* are another, and they were
-spread over three modules of the lora package before this one existed: the jsonl
-shapes mlx-lm reads, the name it gives the final adapter, and the numbered
-checkpoints it leaves behind when a run is stopped.
+The jsonl shapes it reads, the name it gives the final adapter, and the numbered
+checkpoints a run leaves behind when it is stopped.
 
-Nothing here imports mlx or mlx_lm: these are names and formats, which is why
-they can be tested without a model, a machine with Apple silicon, or a run.
+Nothing here imports mlx or mlx_lm: these are names and formats.
 """
 
 from __future__ import annotations

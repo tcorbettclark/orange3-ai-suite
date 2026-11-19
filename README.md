@@ -523,12 +523,11 @@ The kernel suite must pass in a plain Python environment; the widget suite must
 pass in the Orange interpreter. One slow test is skipped in the default widget
 run unless the pinned 4-bit model is already in the Hugging Face cache.
 
-## Reviewing a change
+## Working on the code
 
-Structural changes - new modules, moved code, renames, splits - have a checklist
-in [REVIEW.md](REVIEW.md): words, steps and boundaries, layout, evidence, and how
-to finish. It is worth reading before choosing a shape as well as before merging
-one.
+How changes are made here - words, docstrings, steps and boundaries, layout,
+evidence, and how to finish - is in [AGENTS.md](AGENTS.md). It is worth reading
+before choosing a shape as well as before merging one.
 
 ## Layout
 

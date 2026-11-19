@@ -1,11 +1,12 @@
-# Reviewing a change
+# Working on this codebase
 
-A checklist for structural changes: new modules, moved code, renamed things, split
-or merged classes. Use it twice — before starting, so the shape is chosen rather
-than discovered, and before merging, so the shape is checked rather than assumed.
+How a change is made here: its words, its layers, its prose, its evidence. The
+questions are written as questions because each one is answered with a fact about
+the code. "I think so" is not an answer, and a question you cannot answer is the
+finding.
 
-Every question is meant to be answered with a fact about the code. "I think so" is
-not an answer; if you cannot answer one, that is the finding.
+Use it twice — before starting, so the shape is chosen rather than discovered, and
+before merging, so the shape is checked rather than assumed.
 
 ## Words
 
@@ -22,6 +23,27 @@ not an answer; if you cannot answer one, that is the finding.
   use the same word, including units and qualifiers.
 - Does the same concept appear under two names? Synonyms are as costly as
   homonyms, and harder to notice.
+
+## Docstrings
+
+- Does the module docstring say what the module *is* — one sentence naming what
+  comes out, then at most two sentences of what it holds — in the vocabulary of its
+  own names? A docstring arguing for the module's shape has taken the commit
+  message's job.
+- Does the first line of a function or class docstring say what the call returns or
+  does? A second paragraph is only for what the body cannot be read for: a
+  precondition, an invariant, a unit or range, ownership of a file or directory, or
+  what `None` means.
+- Does it tell the reader what things were like before it existed? "Before this one
+  existed", "used to", "no longer", "was spread over", "previously", "originally",
+  "this replaces". The reader has no past: say what is.
+- Does it defend the design? "so the widget and the example cannot drift", "the point
+  is", "one spelling", "which is why it can be tested". That is a commit message, and
+  it goes stale on a different clock from the code.
+- Does it retell the body? A docstring that walks the statements one by one is a
+  comment that aged into prose. Order the caller must know (brightness before
+  resampling) is an invariant and belongs; order only the implementation cares about
+  does not.
 
 ## Steps and boundaries
 
