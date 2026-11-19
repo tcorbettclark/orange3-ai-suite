@@ -1,10 +1,9 @@
-"""Orange Tables built from kernel results, and kernel arguments read out of Tables.
+"""The conversion between Orange objects and edu_ai_suite.
 
-The one place Orange types are converted: Table, Corpus and meta-column inputs
-become kernel arguments, and a list of generations or of epoch stats becomes a
-Table.
+Table, Corpus and meta-column inputs become edu_ai_suite arguments, and a list of
+generations or of epoch stats becomes a Table.
 
-The kernel never imports Orange, and this module never imports Qt.
+edu_ai_suite never imports Orange, and this module never imports Qt.
 """
 
 from __future__ import annotations
@@ -73,9 +72,9 @@ def table_texts(table: Table) -> list[str]:
 
 
 def corpus_text(table: Table) -> str:
-    """All documents of a table as the one text the kernel takes.
+    """All documents of a table as the one text edu_ai_suite takes.
 
-    Rows are separated by a newline, a hard break for the kernel's sentence
+    Rows are separated by a newline, a hard break for edu_ai_suite's sentence
     splitting.
     """
     return "\n".join(table_texts(table))
@@ -123,8 +122,8 @@ def generations_table(generations: list[str]) -> Table:
 def checkpoint_table(stats: list[dict]) -> Table:
     """One row per epoch of loss, perplexity and sample text.
 
-    The columns follow the kernel's epoch-stats key order, taken from the module
-    that produces them; ``sample`` is the widget's addition, not the kernel's, and
+    The columns follow edu_ai_suite's epoch-stats key order, taken from the module
+    that produces them; ``sample`` is the widget's addition, not edu_ai_suite's, and
     an epoch without one gets an empty string. The import stays inside this
     function: the epoch-stats module imports Keras, and the image widgets import
     this module.

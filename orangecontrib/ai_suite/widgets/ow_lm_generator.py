@@ -1,7 +1,7 @@
-"""LM Generator: a table of generated text from any kernel-convention model.
+"""LM Generator: a table of generated text from any model that streams tokens.
 
 Any object exposing ``stream(prompt, temperature, max_new_tokens, seed)`` is an
-input: the kernel's Keras ``LanguageModel``, a ``LoRAModel``, or a saved artifact
+input: edu_ai_suite's Keras ``LanguageModel``, a ``LoRAModel``, or a saved artifact
 loaded from disk. The text appears as the model writes it, Stop takes effect at the
 next chunk, and the Generations output is a one-column Table.
 """
@@ -62,7 +62,7 @@ class _GenerationWorker(QThread):
 
 
 class OWLMGenerator(OWWidget):
-    """Generate text from a trained kernel-convention model.
+    """Generate text from a trained model that streams tokens.
 
     Input is a model object (Keras, MLX/LoRA, or compatible); the controls set the
     prompt, temperature, maximum new tokens, number of generations and seed, and the

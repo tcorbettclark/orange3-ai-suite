@@ -24,7 +24,7 @@ from edu_ai_suite.lm import (
     tokenizers,
 )
 
-# Names and labels come from the kernel's own discovery, so neither dropdown can
+# Names and labels come from edu_ai_suite's own discovery, so neither dropdown can
 # drift from the classes it offers; only the label formatting is decided here.
 ARCHITECTURES = architectures()
 ARCHITECTURE_VALUES = [cls.architecture_name() for cls, _ in ARCHITECTURES]
@@ -35,7 +35,7 @@ TOKENIZER_LABELS = [cls.__name__.removesuffix("Tokenizer") for cls, _ in TOKENIZ
 
 
 class TrainingWorker(QThread):
-    """Runs kernel training off the GUI thread; stats stream via signals."""
+    """Runs edu_ai_suite training off the GUI thread; stats stream via signals."""
 
     epoch_signal = pyqtSignal(dict)
     finished_ok = pyqtSignal(object)
@@ -237,7 +237,7 @@ class OWLMPretrainer(OWWidget):
         return cls(**values)
 
     def _training_options(self) -> TrainingOptions:
-        """The run's settings, as the kernel's record of a run."""
+        """The run's settings, as edu_ai_suite's record of a run."""
         return TrainingOptions(
             epochs=self.epochs,
             batch_size=self.batch_size,

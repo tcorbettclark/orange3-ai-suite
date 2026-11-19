@@ -36,9 +36,9 @@ Do **not** promise support for:
 - arbitrary unquantised models
 
 Both kinds carry the same `meta.json`, and it starts with `created_by`, the qualified
-name of the package that wrote it (`orangecontrib.ai_suite.kernel.lm` or
-`...kernel.lora`), so the two are told apart by the record rather than by the file names
-around it. Each loader refuses the other's.
+name of the package that wrote it (`edu_ai_suite.lm` or `edu_ai_suite.lora`), so the two
+are told apart by the record rather than by the file names around it. Each loader
+refuses the other's.
 
 State the supported backends in the widget.
 

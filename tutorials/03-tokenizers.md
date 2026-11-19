@@ -40,8 +40,8 @@ The physician's satchel held herbs, a knife and a tincture.
 ```
 
 Load it with **LM Text Loader** and press **Reload** and inspect again. With the word tokenizer, `king's` should stay one token;
-quote marks are separate tokens. This is the dependency-free tokenizer the
-kernel uses, not a pretrained subword tokenizer.
+quote marks are separate tokens. This is the dependency-free tokenizer
+edu-ai-suite uses, not a pretrained subword tokenizer.
 
 ## 4. Inspect a trained model
 

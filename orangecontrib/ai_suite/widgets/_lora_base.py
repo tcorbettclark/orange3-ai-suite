@@ -1,7 +1,7 @@
 """The LoRA training UI that LoRA Pre-trainer and LoRA SFT share.
 
-The QThread that runs kernel training, the live loss curve and base-model selector,
-the hyperparameters, and the Model output both widgets send.
+The QThread that runs edu_ai_suite LoRA training, the live loss curve and
+base-model selector, the hyperparameters, and the Model output both widgets send.
 
 Training needs MLX (macOS on Apple Silicon); elsewhere the widget reports the
 missing dependency.
@@ -39,7 +39,7 @@ _OPTION_DEFAULTS = LoRAOptions()
 
 
 class LoraWorker(QThread):
-    """Runs kernel LoRA training off the GUI thread; each event goes out as a signal."""
+    """Runs edu_ai_suite LoRA training off the GUI thread; each event goes out as a signal."""
 
     event_signal = pyqtSignal(object)
     finished_ok = pyqtSignal(object)
@@ -48,7 +48,7 @@ class LoraWorker(QThread):
 
     def __init__(self, request, parent=None):
         super().__init__(parent)
-        self.request = request  # kwargs for the kernel's train_lora
+        self.request = request  # kwargs for edu_ai_suite's train_lora
         self._run: TrainingRun | None = None
         self._stop_requested = False
 
@@ -216,7 +216,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
     # ---- lifecycle ---------------------------------------------------------
 
     def _make_lora_data(self):
-        """Build the kernel's ``LoRAData`` from the connected Table."""
+        """Build edu_ai_suite's ``LoRAData`` from the connected Table."""
         raise NotImplementedError
 
     def _collect_request(self, data_obj) -> dict:
@@ -299,10 +299,10 @@ class LoRATrainerBase(OWWidget, openclass=True):
     def _fresh_workdir(self):
         """This run's scratch parent, deleting the previous run's.
 
-        One directory per widget, not one per run: the kernel gives each run a
-        fresh child of it. It owns the previous run's adapter, and it outlives
-        training, because a ``LoRAModel`` on the Model output keeps reading the
-        adapter directory after the run.
+        One directory per widget, not one per run: edu_ai_suite's run creates a
+        fresh child of it for every run. It owns the previous run's adapter, and it
+        outlives training, because a ``LoRAModel`` on the Model output keeps reading
+        the adapter directory after the run.
         """
         if self._scratch is not None:
             self._scratch.cleanup()
