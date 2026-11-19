@@ -213,6 +213,8 @@ def publish_version(version):
 
 
 def cmd_release(kind, publish, gate_confirmed, dry_run):
+    if publish and CONFIG["publish_gate"] and kind != "patch" and not gate_confirmed:
+        fail("--publish needs --gate-confirmed for a minor or major")
     cmd_check()
     version = current_version()
     following = run(
@@ -220,8 +222,6 @@ def cmd_release(kind, publish, gate_confirmed, dry_run):
     )
     check_tag(following)
     say(f"bump: {version} -> {following}")
-    if publish and CONFIG["publish_gate"] and not gate_confirmed:
-        fail("--publish needs --gate-confirmed for this package")
     if dry_run:
         print("dry run: nothing was committed, tagged or published", flush=True)
         return
