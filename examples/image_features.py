@@ -10,14 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.images.features import (
-    FeatureOptions,
-    all_count_feature_names,
-    all_feature_names,
-    all_groups,
-    extract_features,
-    get_feature,
-)
+import orangecontrib.ai_suite.kernel.images.features as features
 
 HERE = Path(__file__).parent
 
@@ -39,22 +32,24 @@ LOW_CLOUD = load("low_cloud.jpg")  # a low cumulus layer
 
 # 1. The catalogue is the whole feature set: one class per feature, in column
 #    order, each carrying the sentence a person reads to understand the number.
-print(f"catalogue   {len(all_feature_names())} features in {len(all_groups())} groups")
-for group in all_groups():
+print(
+    f"catalogue   {len(features.all_feature_names())} features in {len(features.all_groups())} groups"
+)
+for group in features.all_groups():
     print(f"  {group.letter}  {len(group.members):2d}  {group.title}")
 
 print("\n  every feature is a class, and its description is the documentation:")
 for name in ("hole_count", "edge_density", "bluish_fraction"):
     print(f"  {name}")
-    print(f"      {get_feature(name).description.summary}")
-print(f"\n  count features: {', '.join(all_count_feature_names())}")
+    print(f"      {features.get_feature(name).description.summary}")
+print(f"\n  count features: {', '.join(features.all_count_feature_names())}")
 
 # 2. Extraction returns a FeatureVector: name -> value, plus by-group views.
 #    The default selection is every group except the colour shortcut.
-vec = extract_features(CIRRUS)
+vec = features.extract_features(CIRRUS)
 print(f"\ncirrus      {len(vec)} values by default (colour is opt-in)")
 
-for group in all_groups()[:4]:
+for group in features.all_groups()[:4]:
     values = vec.by_group(group.letter)[group.letter]
     shown = "  ".join(f"{name}={value:.3f}" for name, value in list(values.items())[:3])
     print(f"  {group.letter}  {group.title:18s} {shown}  ...")
@@ -72,16 +67,18 @@ print(
 # 3. Groups select features, and nothing stops a selection being one group or
 #    one feature. This is the ablation experiment the widget offers.
 print("\nablation")
-print(f"  groups='ABCDEFG'          {len(extract_features(CIRRUS, groups='ABCDEFG'))} columns")
-print(f"  groups='D'                {len(extract_features(CIRRUS, groups='D'))} columns")
 print(
-    f"  exclude={{'fine_texture'}}   {len(extract_features(CIRRUS, exclude={'fine_texture'}))} columns"
+    f"  groups='ABCDEFG'          {len(features.extract_features(CIRRUS, groups='ABCDEFG'))} columns"
+)
+print(f"  groups='D'                {len(features.extract_features(CIRRUS, groups='D'))} columns")
+print(
+    f"  exclude={{'fine_texture'}}   {len(features.extract_features(CIRRUS, exclude={'fine_texture'}))} columns"
 )
 print(
-    f"  options: working_size={FeatureOptions().working_size} "
+    f"  options: working_size={features.FeatureOptions().working_size} "
     "(every image is resized to it, which is what makes values comparable)"
 )
-row = extract_features(CIRRUS, groups="E")
+row = features.extract_features(CIRRUS, groups="E")
 print("  to_array() gives one Table row, in catalogue order:")
 print(
     f"    { {name: round(float(value), 3) for name, value in zip(row.names(), row.to_array(), strict=True)} }"
@@ -92,7 +89,7 @@ print(
 print("\ntexture     where the detail lives, 0.5 = scale-neutral")
 print(f"  {'':10s} {'fine':>6s} {'coarse':>7s} {'ratio':>6s} {'size px':>8s}")
 for label, image in (("cirrus", CIRRUS), ("volutus", VOLUTUS), ("low", LOW_CLOUD)):
-    texture = extract_features(image)
+    texture = features.extract_features(image)
     ratio = texture["coarse_to_fine_texture_ratio"]
     leaning = (
         "coarse-grained" if ratio >= 0.55 else "fine-grained" if ratio <= 0.45 else "scale-neutral"
@@ -106,8 +103,8 @@ for label, image in (("cirrus", CIRRUS), ("volutus", VOLUTUS), ("low", LOW_CLOUD
 #    separates wispy high cloud from thick low cloud, which is why the colour
 #    group is off by default.
 print("\nshortcut    colour features alone, off by default")
-high = extract_features(CIRRUS, groups="G")
-low = extract_features(LOW_CLOUD, groups="G")
+high = features.extract_features(CIRRUS, groups="G")
+low = features.extract_features(LOW_CLOUD, groups="G")
 for name in high.names():
     print(f"  {name:18s} high {high[name]:6.3f}   low {low[name]:6.3f}")
-print(f"  -> {get_feature('bluish_fraction').description.summary}")
+print(f"  -> {features.get_feature('bluish_fraction').description.summary}")

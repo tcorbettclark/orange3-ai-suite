@@ -8,12 +8,7 @@ script takes one object at a time: a tokenizer, an MLP architecture, the
 
 import math
 
-from orangecontrib.ai_suite.kernel.lm import (
-    MLP,
-    LanguageModel,
-    TrainingOptions,
-    tokenizer_from_text,
-)
+import orangecontrib.ai_suite.kernel.lm as lm
 
 CORPUS = """the cat sat on the mat.
 the cat saw the dog.
@@ -23,7 +18,7 @@ a dog and a cat sat on the mat.
 the mat sat on the dog."""
 
 # 1. A tokenizer owns the vocabulary and the ids; it travels with the model.
-tokenizer = tokenizer_from_text(CORPUS, "char")
+tokenizer = lm.tokenizer_from_text(CORPUS, "char")
 print(
     f"tokenizer   name={tokenizer.tokenizer_name()!r} vocab={tokenizer.vocab_size} "
     f"corpus tokens={tokenizer.total_token_count}"
@@ -32,14 +27,14 @@ print(f"            encode('the cat') -> {tokenizer.encode('the cat')}")
 print(f"            decode back       -> {tokenizer.decode(tokenizer.encode('the cat.'))!r}")
 
 # 2. An architecture owns the graph shape and its own hyperparameters. No weights.
-architecture = MLP(context_width=16, embedding_dim=16, hidden_units=64)
+architecture = lm.MLP(context_width=16, embedding_dim=16, hidden_units=64)
 print(
     f"\narchitecture {architecture.architecture_name()!r} "
     f"context_width={architecture.context_width} params={architecture.get_params()}"
 )
 
 # 3. A model is an architecture plus a tokenizer. Nothing is trained yet.
-model = LanguageModel(architecture, tokenizer)
+model = lm.LanguageModel(architecture, tokenizer)
 print(f"model       keras_model={model.keras_model}  results={model.results}")
 
 # 4. fit() builds pairs at architecture.context_width, splits them by unit,
@@ -53,7 +48,7 @@ def on_epoch(stats):
     stats["sample"] = model.generate("the cat ", temperature=0.5, max_new_tokens=40)
 
 
-model.fit(CORPUS, TrainingOptions(epochs=40, batch_size=16, seed=0), on_epoch=on_epoch)
+model.fit(CORPUS, lm.TrainingOptions(epochs=40, batch_size=16, seed=0), on_epoch=on_epoch)
 
 print(
     f"\nfit         keras_model={type(model.keras_model).__name__} "

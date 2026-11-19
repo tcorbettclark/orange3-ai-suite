@@ -331,17 +331,13 @@ Groups A-F run on a preprocessed luminance image. Group G reads colour
 directly and is off by default.
 
 ```python
-from orangecontrib.ai_suite.kernel.images.features import (
-    all_features,
-    extract_features,
-    get_feature,
-)
+import orangecontrib.ai_suite.kernel.images.features as features
 
-vec = extract_features(rgb_image, groups="ABCDEF")
+vec = features.extract_features(rgb_image, groups="ABCDEF")
 vec["hole_count"]  # a feature value
 vec.to_array()  # one float per selected feature
-get_feature("hole_count").description  # title, sentence, intuition, mechanics
-all_features()  # the full catalogue, in stable column order
+features.get_feature("hole_count").description  # title, sentence, intuition, mechanics
+features.all_features()  # the full catalogue, in stable column order
 ```
 
 ### The feature guide
@@ -353,9 +349,9 @@ whole guide is generated from the catalogue when it is asked for, so it cannot
 drift from the code:
 
 ```python
-from orangecontrib.ai_suite.kernel.images.features import feature_guide_markdown
+import orangecontrib.ai_suite.kernel.images.features as features
 
-print(feature_guide_markdown())
+print(features.feature_guide_markdown())
 ```
 
 In the widget, **Feature guide…** opens the same page, the selected feature's
@@ -377,26 +373,20 @@ A runnable end-to-end script lives in `examples/lm_from_scratch.py`
 (`uv run python examples/lm_from_scratch.py`); the essentials are:
 
 ```python
-from orangecontrib.ai_suite.kernel.lm import (
-    LanguageModel,
-    MLP,
-    TrainingOptions,
-    make_pairs,
-    tokenizer_from_text,
-)
+import orangecontrib.ai_suite.kernel.lm as lm
 
 text = "\n".join(texts)  # join documents outside the kernel
-tokenizer = tokenizer_from_text(text, "char")
+tokenizer = lm.tokenizer_from_text(text, "char")
 tokenizer = tokenizer.keep_top(2000)  # or .drop_rare(min_count=3); pure, chainable
 stream = tokenizer.encode(text)  # every sentence ends with <eos>
-pairs = make_pairs(stream, context_width=16)
+pairs = lm.make_pairs(stream, context_width=16)
 train, valid = pairs.split(validation_fraction=0.1, seed=0)
 
 # An architecture is the recipe; a model is that recipe fitted.
-architecture = MLP(context_width=16, embedding_dim=32, hidden_units=128)
-model = LanguageModel(architecture, tokenizer).fit(
+architecture = lm.MLP(context_width=16, embedding_dim=32, hidden_units=128)
+model = lm.LanguageModel(architecture, tokenizer).fit(
     text,
-    TrainingOptions(epochs=15, validation_fraction=0.1, seed=0),
+    lm.TrainingOptions(epochs=15, validation_fraction=0.1, seed=0),
 )
 
 model.generate("the ", temperature=0.8, max_new_tokens=64)
@@ -416,24 +406,24 @@ callables; the kernel never imports Qt.
 import tempfile
 from pathlib import Path
 
-from orangecontrib.ai_suite.kernel.assets import get_britllm
-from orangecontrib.ai_suite.kernel.lora import LoRAData, LoRAOptions, LoRAModel, train_lora
+import orangecontrib.ai_suite.kernel.assets as assets
+import orangecontrib.ai_suite.kernel.lora as lora
 
-base = get_britllm()  # pinned 4-bit MLX weights, cached on first use
-data = LoRAData.from_texts(corpus)  # or LoRAData.from_pairs(pairs)
+base = assets.get_britllm()  # pinned 4-bit MLX weights, cached on first use
+data = lora.LoRAData.from_texts(corpus)  # or lora.LoRAData.from_pairs(pairs)
 with tempfile.TemporaryDirectory() as scratch:  # this run's scratch, deleted on exit
-    run = train_lora(
+    run = lora.train_lora(
         base,
         data,
-        options=LoRAOptions(iters=300, num_layers=16),
+        options=lora.LoRAOptions(iters=300, num_layers=16),
         workdir=scratch,  # each run gets a fresh child of it
         name="my-adapter",  # the artifact's name is the caller's to choose
     )
-    for event in run:  # Params, then TrainReport and ValReport as reports arrive
+    for event in run:  # lora.Params, then TrainReport and ValReport as they arrive
         print(event)
     # keep the artifact somewhere you own; the scratch can then be discarded
     artifact = run.adapter.save(Path("adapters") / run.adapter.name)
-model = LoRAModel.from_artifact(artifact)
+model = lora.LoRAModel.from_artifact(artifact)
 model.generate("In the second century", temperature=0)
 model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}
 model.adapter_enabled = False  # the same base model, before adaptation
@@ -462,10 +452,10 @@ carries and what it refuses to write.
 ## Datasets and workflows
 
 ```python
-from orangecontrib.ai_suite.kernel.assets import get_clouds, get_mnist
+import orangecontrib.ai_suite.kernel.assets as assets
 
-mnist = get_mnist()  # <root>/train, <root>/val: 28x28, 500/100 per digit
-clouds = get_clouds()  # <root>/ac, sc, cu, cb, ci + CREDITS.md
+mnist = assets.get_mnist()  # <root>/train, <root>/val: 28x28, 500/100 per digit
+clouds = assets.get_clouds()  # <root>/ac, sc, cu, cb, ci + CREDITS.md
 ```
 
 Both functions download, prepare and verify a pinned Hub dataset. The source
