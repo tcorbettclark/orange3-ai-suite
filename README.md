@@ -446,7 +446,7 @@ Three runnable scripts use that façade in the order a run happens.
 arrive, and hands back the artifact - `--save DIR` keeps it and `--stop` ends the run
 early, which adopts the newest checkpoint. `examples/lora_generate.py` loads that
 artifact and compares the base model with its adapter, text and perplexity both.
-`examples/lora_artifact.py` reads an artifact and summarises it - the base model, the
+`examples/lora_inspect.py` reads an artifact and summarises it - the base model, the
 rank and the blocks the adapter reached, how many values it holds, how far the run got
 - and it needs no MLX and no model to do that, because all of it is in the files. Point
 it at a plain model directory and it says so.

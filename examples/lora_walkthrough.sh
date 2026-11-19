@@ -63,7 +63,7 @@ printf 'model: %s\n' "$model"
 # Point the viewer at the model directory and it says so: no lora_meta.json, so
 # nothing that claims to be a trained artifact.
 run_step "what a model directory looks like to LoRA" \
-    "${PY[@]}" examples/lora_artifact.py "$model"
+    "${PY[@]}" examples/lora_inspect.py "$model"
 
 # The smallest run that can go wrong: ten iterations, a few seconds, no artifact kept.
 run_step "ten iterations, nothing kept" \
@@ -77,7 +77,7 @@ run_step "forty iterations, saved" \
 # And now it is an artifact: base model, rank, which blocks it reached, how many
 # values it holds, and how far the run got - all read from the files, no MLX.
 run_step "what the artifact says about itself" \
-    "${PY[@]}" examples/lora_artifact.py "$scratch/adapter"
+    "${PY[@]}" examples/lora_inspect.py "$scratch/adapter"
 
 # The adapter in use: one `LoRAModel`, the base model with it off and on, then a save
 # and reload. The artifact names its own base model, so this needs only the directory.

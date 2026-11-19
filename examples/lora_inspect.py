@@ -1,6 +1,6 @@
 """What a directory is, as far as LoRA is concerned: an artifact, and what it says.
 
-Run it from the repository root with ``uv run python examples/lora_artifact.py <dir>``,
+Run it from the repository root with ``uv run python examples/lora_inspect.py <dir>``,
 pointing at what ``examples/lora_train.py --save`` wrote - or at a plain MLX model
 directory, which it will tell you is not an artifact. No MLX and no base model are
 needed: everything below is read from the artifact's own files.
