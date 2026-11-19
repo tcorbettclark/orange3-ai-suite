@@ -1,10 +1,8 @@
-"""The trained language-model object.
+"""The trained language-model object: an architecture with a tokenizer and weights.
 
-A model is an instance of an architecture: the architecture is the recipe (a
-Keras graph and its hyperparameters), the model is that recipe with a tokenizer and
-weights. It is trained by :meth:`LanguageModel.fit`, and it generates,
-evaluates, saves and loads. The ``generate`` interface is the kernel-wide
-convention, shared with the MLX/LoRA models.
+:class:`LanguageModel` trains on a text, generates a unit, evaluates a text, and
+saves its weights and tokenizer as one directory. Its ``generate`` signature is the
+kernel's convention, shared with the MLX/LoRA models.
 """
 
 from __future__ import annotations
@@ -36,9 +34,7 @@ _MODEL_FILE = "model.keras"
 def _last_unit(stream: Iterable[int]) -> list[int]:
     """The final unit of a stream, without its EOS: an in-distribution prompt.
 
-    Prompting with anything before the last EOS would condition the model on a
-    context it never saw in training, because contexts never cross a unit end.
-    Unit structure is :func:`.tokenizer.stream_units`'s to derive.
+    An empty list when the stream carries no non-empty unit.
     """
     return next((unit for unit in reversed(stream_units(stream)) if unit), [])
 
@@ -46,8 +42,8 @@ def _last_unit(stream: Iterable[int]) -> list[int]:
 def _sample(logits: np.ndarray, temperature: float, rng: np.random.Generator) -> int:
     """Temperature sampling; 0 means greedy (argmax), and negatives are treated alike.
 
-    ``generate`` rejects a negative temperature, so only 0 reaches here from the
-    public path.
+    A negative temperature only reaches this from a direct call: :meth:`LanguageModel.generate`
+    rejects it.
     """
     logits = np.asarray(logits, dtype=np.float64)
     if temperature <= 0.0:
@@ -63,11 +59,8 @@ def _sample(logits: np.ndarray, temperature: float, rng: np.random.Generator) ->
 class LanguageModel:
     """An architecture with a tokenizer and weights: fit it, generate from it.
 
-    Implements the kernel's model convention, ``generate(prompt, temperature)``
-    - the same interface the MLX/LoRA models expose. Nothing is trained until
-    :meth:`fit` is called, and the width, the counts and the final losses all
-    come from the architecture and from :class:`TrainingResults`, so there is no
-    second copy of them here to drift.
+    ``keras_model``, ``training`` and ``results`` are None until :meth:`fit` is
+    called, and generating or scoring before that raises.
     """
 
     architecture: Architecture
@@ -85,7 +78,7 @@ class LanguageModel:
 
     @property
     def _fitted(self) -> keras.Model:
-        """The weights, or a clear error: there is nothing to generate from yet."""
+        """The Keras model holding the fitted weights; raises when there are none yet."""
         if self.keras_model is None:
             raise RuntimeError("the model is not fitted: call fit() first")
         return self.keras_model
@@ -102,13 +95,9 @@ class LanguageModel:
     ) -> LanguageModel:
         """Train on one text and return self, so the call can be chained.
 
-        Pairs are built at the architecture's own context width and split by
-        unit, so the same unit is held out for the whole run whatever the
-        epoch. ``options`` carries everything about the run and nothing about
-        the architecture. The Keras model is assigned
-        before fitting begins, so an ``on_epoch`` hook can generate from the model
-        as it currently stands - that is where a per-epoch sample belongs, not in
-        the training settings.
+        The split is made once, by unit, so the same units are held out in every epoch.
+        ``self.keras_model`` is assigned before the first epoch, so an ``on_epoch`` hook
+        may generate from the model as it stands.
         """
         options = options if options is not None else TrainingOptions()
         pairs = make_pairs(self.tokenizer.encode(text), self.context_width)
@@ -152,18 +141,12 @@ class LanguageModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ) -> str:
-        """Autoregressive sampling of one unit.
+        """Autoregressive sampling of one unit: its prompt echoed, then the completion.
 
-        Training, evaluation and generation share one unit, so this generates a
-        sentence and stops when the model emits EOS. ``max_new_tokens`` is a
-        safety cap: a model that never emits EOS returns a run-on. A sampled
-        ``<bos>`` is not appended - it is never a target - so that step is
-        spent. Asking for more than one unit would mean sampling from contexts
-        that contain EOS - a distribution training never covered, because
-        contexts never cross a unit end.
-
-        The prompt is trimmed to its final unit for the same reason; contexts
-        are the last ``context_width`` ids, left-padded with BOS.
+        Generation stops at EOS, and ``max_new_tokens`` is a safety cap, so a model that
+        never emits EOS returns a run-on. The prompt is trimmed to its final unit, and
+        the returned text starts from that trimmed prompt rather than from ``prompt``.
+        A sampled BOS is skipped and costs one step; a negative temperature raises.
         """
         if temperature < 0:
             raise ValueError("temperature must be >= 0 (0 = greedy)")
@@ -193,23 +176,18 @@ class LanguageModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ):
-        """The text as it is produced - here, all of it at once.
+        """The text as it is produced - here, one chunk holding the whole of it.
 
-        The kernel convention is a stream, so that a widget can show text as it
-        arrives whatever model is connected. This one decodes a unit only when it
-        is finished, so its stream is a single chunk: a caller must concatenate
-        and never depend on where the boundaries fall.
+        A caller concatenates the chunks and must not depend on where the boundaries fall.
         """
         yield self.generate(prompt, temperature, max_new_tokens, seed)
 
     def evaluate(self, text: str, batch_size: int = 256) -> dict[str, float]:
         """Loss and perplexity (e^loss) over the pairs of the given text.
 
-        Perplexity is the loss re-scaled into "how many equally likely tokens the
-        model behaves as if it were choosing between": 1 would be perfect, and the
-        vocabulary size is what a uniform guess scores. Run it on the training
-        corpus and on unrelated text to get the in-domain / out-of-domain pair: a
-        single-domain model looks good only on the domain it was trained on.
+        Perplexity is the loss re-scaled into "how many equally likely tokens the model
+        behaves as if it were choosing between": 1 is perfect, and the vocabulary size
+        is what a uniform guess scores.
         """
         keras_model = self._fitted
         pairs = make_pairs(self.tokenizer.encode(text), self.context_width)
@@ -231,8 +209,8 @@ class LanguageModel:
     def save(self, path: str | Path) -> Path:
         """Write weights, tokenizer and the run's record as one directory.
 
-        The weights are checked for before anything is written, so an unfitted
-        model raises without leaving a half-written directory behind.
+        An unfitted model raises before anything is written, so no half-written
+        directory is left behind.
         """
         keras_model = self._fitted
         out = Path(path)

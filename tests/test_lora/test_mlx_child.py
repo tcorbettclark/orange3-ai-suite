@@ -1,8 +1,7 @@
 """The training child's own logic, without MLX and without a subprocess.
 
-The child is the one place that knows how mlx-lm is called, so it is tested
-directly here: the specification it accepts, the metrics it writes, and the two
-ways it can be lied to by a future mlx-lm.
+The specification it accepts, the metrics it writes, and what it does when mlx-lm
+moves under it.
 """
 
 import dataclasses

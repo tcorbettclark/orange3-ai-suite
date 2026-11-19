@@ -1,16 +1,8 @@
-"""What one epoch of training reports: the record, and its key order.
+"""What one epoch of training reports: the record's fields, and their order.
 
-A leaf module on purpose. The producer (:mod:`training`) and the consumer
-(:mod:`orangecontrib.ai_suite.adapters`, which builds the checkpoint table) both
-need the key order, but the producer imports Keras - so importing the keys must
-not be a way to import the ML stack. The widget layer reads this module, not
-:mod:`training`.
-
-The record stays a plain dict rather than a frozen object, because a caller's
-``on_epoch`` hook adds keys of its own (a sample of the epoch's generation, say)
-and the table carries them alongside. The names are a :class:`TypedDict` so that
-constructing a record is by name, never by position: reordering the annotations
-reorders the columns, and cannot silently move a value to another key.
+It pulls in nothing heavier than ``typing``, so a widget can read the key order without
+the ML stack. ``EpochStats`` is a plain dict's schema: an ``on_epoch`` hook may add keys
+of its own, and reordering the annotations reorders the table's columns.
 """
 
 from __future__ import annotations

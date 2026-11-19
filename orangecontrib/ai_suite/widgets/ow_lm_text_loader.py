@@ -1,10 +1,8 @@
-"""LM Text Loader: read plain-text files into document rows or Q/A pairs.
+"""LM Text Loader: an Orange Table of documents or Q/A pairs from UTF-8 ``.txt`` files.
 
-A source widget for the language-model teaching suite. It reads UTF-8 ``.txt``
-files, applies opt-in cleaning, and emits a plain Orange Table. In document
-mode each row is a whole file, one paragraph or one sentence - which changes what
-the table holds, not the sentences the model trains on. In Q/A mode each
-row is one prompt/completion pair from fixed ``Q:``/``A:`` blocks.
+A document row is a whole file, one paragraph or one sentence; a Q/A row is one
+prompt/completion pair from fixed ``Q:``/``A:`` blocks. The cleaning options are
+opt-in.
 """
 
 from __future__ import annotations

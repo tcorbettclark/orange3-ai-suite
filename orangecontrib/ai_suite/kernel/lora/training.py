@@ -1,23 +1,10 @@
-"""LoRA training: the two data formats, the split, and the streaming run.
+"""LoRA training: the data, the train/validation split, and the streaming run.
 
-Two data formats:
-
-1. **Raw domain corpus -> continued pre-training.** Self-supervised next-token
-   loss; rows are ``{"text": ...}``.
-2. **Prompt-response pairs -> supervised fine-tuning.** A human authored the
-   prompt and the completion. Rows are ``{"prompt": ..., "completion": ...}``;
-   mlx-lm's prompt masking keeps the prompt tokens out of the loss, so only the
-   completion is trained.
-
-The run itself is :func:`.mlx.run_training`'s business: this module builds the
-specification, decides what a stopped run should leave behind, and keeps the run's
-scratch directory. mlx-lm writes a checkpoint every ``save_every`` iterations and
-the final adapter after the last iteration, so a stop adopts the last checkpoint
-and records how far the run got.
-
-The train/validation split is a run setting, not a property of the rows: it
-comes from :class:`LoRAOptions`, with the run's seed, so the two cannot
-disagree.
+Two data formats: rows of raw text for continued pre-training, whose next-token loss
+is self-supervised, and prompt/completion pairs for supervised fine-tuning, where
+mlx-lm's prompt masking keeps the prompt tokens out of the loss. The run itself is :class:`~.mlx.Run`'s: this module
+builds its specification, keeps its scratch directory and decides what a stopped run
+leaves behind.
 """
 
 from __future__ import annotations
@@ -46,7 +33,7 @@ _RUN_PREFIX = "run-"
 
 
 class TrainingStopped(RuntimeError):
-    """Training was stopped before mlx-lm wrote the adapter."""
+    """The run was stopped before there was anything to adopt as an adapter."""
 
 
 @dataclass(frozen=True)
@@ -129,11 +116,11 @@ class LoRAData:
     def split(self, valid_fraction: float, seed: int) -> tuple[Rows, Rows]:
         """Train and validation rows, chosen by position in the corpus.
 
-        The stride is shared with lm's unit split (see :mod:`.._holdout`); this
-        method owns the row-level policy: ``0`` means no validation at all, and
-        at least one row stays on each side. A row's side therefore depends on
-        where it sits in the corpus, not on its content, so identical rows may
-        land on different sides and reordering the rows can move one across.
+        :func:`.._holdout.held_out_positions` picks the position; this method applies
+        it to rows. ``0`` means no validation at all, and a corpus of two or more rows
+        keeps at least one on each side. A row's side depends on where it sits, not on its
+        content, so identical rows may land on different sides and reordering the rows
+        can move one across.
         """
         if not 0.0 <= valid_fraction < 1.0:
             raise ValueError("valid_fraction must be in [0, 1)")
@@ -146,12 +133,10 @@ class LoRAData:
 
 
 def split_for_training(data: LoRAData, options: LoRAOptions) -> tuple[Rows, Rows]:
-    """The train and validation rows, refusing a validation batch mlx-lm cannot use.
+    """The train and validation rows, refusing a validation split mlx-lm cannot use.
 
-    A validation set smaller than one batch makes mlx-lm fail before training;
-    raising here lets a caller reject the setup before starting a worker. An
-    empty validation split (``validation_fraction=0``) is allowed: mlx-lm then
-    trains without validation.
+    A non-empty validation split holds at least ``batch_size`` rows: mlx-lm fails on
+    anything less. An empty one is allowed, and mlx-lm then trains without validation.
     """
     train, valid = data.split(options.validation_fraction, options.seed)
     if valid and len(valid) < options.batch_size:
@@ -172,11 +157,10 @@ def _run_spec(
     options: LoRAOptions,
     format: Format,
 ) -> mlx.TrainingSpec:
-    """This run in mlx-lm's vocabulary: the one place the two sets of names meet.
+    """The run's spec in mlx-lm's names, with prompt masking set from the data format.
 
-    Paths are resolved here, and prompt masking follows the data format rather
-    than a caller's flag: SFT masks the prompt because the prompt is the caller's
-    text, not a target.
+    SFT (``"pairs"``) masks the prompt, because the prompt is the caller's text rather
+    than a target.
     """
     return mlx.TrainingSpec(
         model=str(base_model),
@@ -188,10 +172,9 @@ def _run_spec(
 
 
 def _check_workdir(workdir: Path | None) -> Path | None:
-    """Refuse a workdir that is not a directory; the caller's to create or not.
+    """The workdir as a Path, or None; a path that exists and is not a directory raises.
 
-    Checked when a run is asked for, so a caller learns about a bad path before
-    anything starts - the directory itself is made when the run begins.
+    The caller creates it or does not: the run creates the directory when it begins.
     """
     if workdir is None:
         return None
@@ -202,13 +185,10 @@ def _check_workdir(workdir: Path | None) -> Path | None:
 
 
 def _run_directory(workdir: Path | None) -> Path:
-    """A fresh directory for one run: the caller's to delete, never reused.
+    """A fresh directory for one run, which the caller owns and deletes.
 
-    Each run gets its own child, even inside a workdir, so a re-run can never
-    meet a previous run's checkpoint - the failure this whole scheme exists to
-    prevent. ``workdir`` must be a directory the caller owns exclusively:
-    deleting it is how the caller cleans up, which is only safe if nothing else
-    writes there.
+    ``workdir`` must be a directory nothing else writes in: every child of it is one
+    run's scratch, so deleting it is the whole cleanup.
     """
     if workdir is None:
         return Path(tempfile.mkdtemp(prefix=_SHARED_PREFIX))
@@ -217,32 +197,14 @@ def _run_directory(workdir: Path | None) -> Path:
 
 
 class TrainingRun:
-    """One LoRA run: iterate it for progress, ``stop()`` it from any thread.
+    """One LoRA run: iterate it once for progress, and ``stop()`` it from any thread.
 
-    The split, and the shape of the run, are decided when the run is asked for -
-    a bad setting is an error at the call, not at the first event. What the run
-    *does* happens while it is iterated: the staged rows and the adapter appear
-    in one fresh run-scoped directory (two subdirectories, "data" and "adapter"),
-    so no run can ever meet another run's files and a checkpoint can never be
-    mistaken for a previous result.
-
-    mlx-lm writes a checkpoint every ``options.save_every`` iterations; if the
-    run is stopped, the newest checkpoint is adopted and ``iters_completed``
-    records the iteration it reached. A stop before the first checkpoint adopts
-    nothing and raises :class:`TrainingStopped` from the iteration.
-
-    That directory is the caller's to delete, and where it goes is the caller's
-    choice: ``workdir`` is a directory the caller owns *exclusively* - every child
-    of it is one run's scratch, so deleting the workdir is the whole cleanup - and
-    each run gets a fresh child inside it. Without ``workdir`` the run lands in
-    the system temp root. Either way ``adapter.adapter_path`` points inside that
-    directory and ``training["run_dir"]`` names it, so a caller can find it again.
-    Keep it alive for as long as a :class:`LoRAModel` points into it, and call
-    :meth:`LoRAAdapter.save` to copy the artifact somewhere durable. A failure
-    names the directory, so the log tail can be inspected first.
-
-    ``name`` is the artifact's name, and only the caller can know it: a directory
-    generated here is not a name to show a person.
+    A bad setting raises when the run is asked for, not at the first event. The run
+    writes into a fresh directory with ``data/`` and ``adapter/`` subdirectories, which
+    the caller owns and must delete after the last :class:`LoRAModel` pointing into it:
+    ``adapter.adapter_path`` points inside it and ``training["run_dir"]`` names it. A
+    stop adopts the newest checkpoint and records its iteration in ``iters_completed``;
+    a stop before the first checkpoint raises :class:`TrainingStopped`.
     """
 
     def __init__(
@@ -368,10 +330,10 @@ def train_lora(
     workdir: str | Path | None = None,
     name: str = "",
 ) -> TrainingRun:
-    """A run of LoRA training (QLoRA on a quantised base): iterate it for progress.
+    """A LoRA training run (QLoRA on a quantised base), returned but not started.
 
-    Returned, not started: the child process exists only while the run is being
-    iterated, so a caller that changes its mind costs nothing. See
-    :class:`TrainingRun` for the run's directory, its stop and its artifact.
+    The child process exists only while the run is iterated. ``name`` is the
+    artifact's name, which only the caller can choose. See :class:`TrainingRun` for the
+    run's directory, its stop and its artifact.
     """
     return TrainingRun(base_model, data, options or LoRAOptions(), workdir, name)

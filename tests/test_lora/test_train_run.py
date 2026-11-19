@@ -1,11 +1,10 @@
-"""train_lora against a stand-in mlx_lm: metrics, checkpoints, stop, failure.
+"""``train_lora`` against a stand-in mlx_lm: metrics, checkpoints, stop, failure.
 
 The stand-in is a real subprocess running our child module, so Popen, the reader
-thread, polling and the process-group signal all run; only mlx-lm itself is
-replaced. It stands in for the *Python API* the child calls - `build_parser`,
-`load`, `load_dataset`, `train_model`, `print_trainable_parameters` and
-`TrainingCallback` - so the surface we depend on is written down here, and a
-renamed mlx-lm function fails in this file rather than in a classroom.
+thread, polling and the process-group signal all run; only mlx-lm itself is replaced.
+It stands in for the *Python API* the child calls: ``build_parser``, ``load``,
+``load_dataset``, ``train_model``, ``print_trainable_parameters`` and
+``TrainingCallback``.
 """
 
 import json

@@ -1,23 +1,13 @@
 """Hugging Face assets and their caches.
 
-Every asset is a Hub repository. Models are fetched as snapshots; datasets are
-loaded with ``datasets``, reduced to the folder layout the widgets expect, and
-kept in a derived cache next to the Hub cache. The Hub and ``datasets``
-libraries do the downloading, revision resolution, resume and offline handling;
-this module names the assets and prepares the usable directories.
+Every asset is a Hub repository: models are fetched as snapshots, datasets are
+loaded with ``datasets`` and reduced to the folder layout the widgets expect. This
+module names the assets, verifies them and returns the usable directory.
 
 The Hub cache is ``HF_HUB_CACHE``, else ``$HF_HOME/hub``, else
-``~/.cache/huggingface/hub``. The ``datasets`` cache follows
-``HF_DATASETS_CACHE``/``HF_HOME`` and prepared folders live under its
-``prepared`` subdirectory.
-
-Transfers use the classic Hugging Face LFS path. It leaves a resumable
-``.incomplete`` file under ``blobs`` and is more reliable than Xet for these
-artifacts. There is no per-download switch for that: the Hub reads
-``HF_HUB_DISABLE_XET`` once, when it is imported, so the choice is process-wide
-and belongs to the entry point that owns it - :func:`prefer_classic_lfs`, called
-by the ``orange-ai-assets`` CLI and the BritLLM Models widget. Nothing here
-changes a global on import, and no download decides it on the caller's behalf.
+``~/.cache/huggingface/hub``; prepared datasets live under the ``datasets`` cache's
+``prepared`` subdirectory. Transfers take the classic LFS path, which
+:func:`prefer_classic_lfs` asks for once per process.
 """
 
 from __future__ import annotations
@@ -48,28 +38,14 @@ _OPT_OUT = {"0", "false", "no", "off"}
 
 
 def prefer_classic_lfs() -> str:
-    """Ask the Hub for the classic LFS transfer, once, at a process entry point.
+    """Set the Hub's switch to classic LFS transfer and return a one-line note.
 
-    There is no per-download parameter for this (``snapshot_download`` takes
-    none), so the library's own lever is the one used: ``HF_HUB_DISABLE_XET``,
-    read into ``huggingface_hub.constants`` when that module is *imported* and
-    then consulted by ``is_xet_available()`` on every download. Two consequences,
-    both handled here rather than left to chance:
+    Call it at a process entry point: ``HF_HUB_DISABLE_XET`` is read into
+    ``huggingface_hub.constants`` when that module is imported, so a process whose Hub
+    is already imported needs the constant set too, which this does.
 
-    - setting the variable now covers every import that has not happened yet, so
-      a fresh process gets classic LFS;
-    - inside Orange the Hub is often already imported, in which case the
-      variable alone changes nothing, so the constant - the value the library
-      actually reads - is set too. That is documented library behaviour, not a
-      patch of private state.
-
-    An explicit ``HF_HUB_DISABLE_XET=0`` (and its synonyms) opts back into Xet,
-    and is left alone. Returns a one-line note for a caller that logs it; the
-    function is idempotent, so calling it twice is harmless.
-
-    Re-importing the library instead would be worse than useful: modules that
-    already did ``from huggingface_hub import ...`` keep the old objects, and the
-    process would hold two copies of a library with a native extension.
+    An explicit ``HF_HUB_DISABLE_XET=0`` (or ``false``, ``no``, ``off``) opts back into
+    Xet and is left alone. Idempotent: calling it twice is harmless.
     """
     if os.environ.get(_XET_ENV, "").strip().lower() in _OPT_OUT:
         return f"Xet transfer (as asked by {_XET_ENV}=0)"
@@ -88,11 +64,11 @@ class AssetError(RuntimeError):
 
 @dataclass(frozen=True)
 class Asset:
-    """One Hugging Face artifact.
+    """One Hugging Face repository the suite downloads.
 
-    A model asset is a snapshot, optionally verified against a single weights
-    file. A dataset asset with ``prepare`` is loaded through ``datasets`` and
-    reduced into a normal folder tree; the prepared tree is the usable asset.
+    A model asset is a snapshot, verified against the SHA-256 of its ``weights`` file
+    when one is given. A dataset asset with ``prepare`` is loaded through ``datasets``
+    and reduced into a folder tree, which is the usable asset.
     """
 
     name: str
@@ -224,11 +200,11 @@ def _sha256(path: Path) -> str:
 
 
 def verify(asset: Asset, path: str | Path) -> Path:
-    """Check the usable tree and record what was checked.
+    """Check the usable tree, record the check in it, and return the path.
 
-    A prepared dataset has no single file to hash; its marker and required
-    folders are the check. A model with a pinned SHA-256 is hashed and the
-    result is recorded in the snapshot.
+    A prepared dataset has no single file to hash; its marker and required folders are
+    the check. A model with a pinned SHA-256 is hashed and the digest recorded in the
+    snapshot.
     """
     path = Path(path)
     if not _required_ok(asset, path):
@@ -268,7 +244,7 @@ def _check_space(root: Path, size_bytes: int | None) -> None:
 
 
 def _progress_class(on_progress: Progress | None) -> type | None:
-    """A tqdm subclass that forwards Hugging Face's own download bars."""
+    """A tqdm subclass that forwards the Hub's download bars, or None without a callback."""
     if on_progress is None:
         return None
     from tqdm.auto import tqdm

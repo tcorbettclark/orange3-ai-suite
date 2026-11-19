@@ -1,7 +1,6 @@
 """The package façade: the names a caller needs, and nothing that is not.
 
-Pinned deliberately. Widening the surface should be a decision that breaks a
-test, not something that happens by adding an import.
+``EXPECTED`` is the whole surface, compared against ``lm.__all__``.
 """
 
 import math

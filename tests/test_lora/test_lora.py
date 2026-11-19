@@ -1,8 +1,8 @@
-"""orangecontrib.ai_suite.kernel.lora tests.
+"""``orangecontrib.ai_suite.kernel.lora``: the data, artifact, protocol and training tests.
 
-Data/artifact/protocol tests always run; end-to-end training tests
-require the pinned model (the BritLLM Models widget or
-``orange-ai-assets fetch britllm-4bit``) — skipped elsewhere. They must run in plain Python without Orange/Qt (kernel rule).
+Data, artifact and protocol tests always run; the end-to-end training tests need the
+converted ``britllm-4bit`` model on disk and skip without it. No test here imports
+Orange or Qt.
 """
 
 import dataclasses
@@ -314,7 +314,7 @@ def test_saving_an_adapter_without_weights_raises(tmp_path):
 
 
 def test_model_import_requires_apple(monkeypatch):
-    """Non-Apple machine: clear message, never a stack trace."""
+    """A non-Apple machine gets a clear message, never a stack trace."""
     import builtins
 
     real_import = builtins.__import__
@@ -347,9 +347,7 @@ def test_echo_leaves_empty_sides_and_punctuation_alone():
 
 @slow
 def test_train_lora_tiny_run(tmp_path):
-    """2 iterations on the converted 4-bit model: adapter produced, model
-    generates and evaluates, save/load round trip reproduces identical greedy
-    output."""
+    """Two iterations on the converted 4-bit model, from training to a reloaded artifact."""
     model_dir = cached_path(BRITLLM_4BIT)
     if model_dir is None:
         pytest.skip(_NO_MODEL)
@@ -407,7 +405,7 @@ def test_train_lora_greedy_determinism(tmp_path):
 
 
 def test_negative_temperature_raises():
-    """Same convention as LanguageModel.generate: 0 is greedy, <0 is an error."""
+    """Temperature 0 is greedy and a negative one is an error, as in ``LanguageModel.generate``."""
     model = object.__new__(LoRAModel)
     with pytest.raises(ValueError, match="temperature"):
         model.generate("prompt", temperature=-1.0)

@@ -1,4 +1,4 @@
-"""Synthetic test images — no external data required."""
+"""Synthetic test images built with numpy, needing no external data."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def band_image(
     background: float = 0.0,
     level: float = 1.0,
 ) -> np.ndarray:
-    """Horizontal bright bands as (start_row, end_row) ranges."""
+    """An image with bright horizontal bands, one ``(start_row, end_row)`` range each."""
     img = np.full((size, size), background, dtype=np.float32)
     for start, end in bands:
         img[start:end, :] = level
@@ -36,8 +36,11 @@ def ring_image(
     outer: float = 0.38,
     inner: float = 0.22,
 ) -> np.ndarray:
-    """An annulus (digit "0"-like). Centre fractions map onto the pixel
-    grid, so 0.5 falls on the half-pixel mirror axis for even sizes."""
+    """An annulus, the shape of the digit 0.
+
+    Centre fractions map onto the pixel grid, so 0.5 falls on the half-pixel mirror
+    axis for even sizes.
+    """
     yy, xx = np.mgrid[0:size, 0:size]
     cy, cx = centre[0] * (size - 1), centre[1] * (size - 1)
     r = np.hypot(yy - cy, xx - cx)
@@ -45,7 +48,7 @@ def ring_image(
 
 
 def digit8_image(size: int = 128) -> np.ndarray:
-    """Two stacked annuli -> hole count 2."""
+    """Two stacked annuli, giving a hole count of two."""
     top = ring_image(size, centre=(0.32, 0.5), outer=0.16, inner=0.08)
     bottom = ring_image(size, centre=(0.68, 0.5), outer=0.16, inner=0.08)
     return np.maximum(top, bottom)
@@ -73,7 +76,7 @@ def ellipse_blob_image(
 
 
 def cloud_image(seed: int = 0, size: int = 128) -> np.ndarray:
-    """Smooth random blob (blurred noise clipped and rescaled) — cloud-like."""
+    """A smooth cloud-like blob, the same for a given seed."""
     rng = np.random.default_rng(seed)
     noise = rng.normal(size=(size, size)).astype(np.float32)
     smooth = cv2.GaussianBlur(noise, (0, 0), sigmaX=size / 8)
@@ -83,11 +86,10 @@ def cloud_image(seed: int = 0, size: int = 128) -> np.ndarray:
 
 
 def shift_image(img: np.ndarray, dy: int, dx: int, fill: float = 0.0) -> np.ndarray:
-    """Translate an image by (dy, dx), filling with `fill` (true shift, no wrap).
+    """An image translated by ``(dy, dx)`` without wrapping, the vacated border ``fill``.
 
-    Note: zero fill creates a synthetic border (which genuinely changes
-    texture features); use `crop_shift` for translation-stability tests of
-    texture.
+    The filled border is real pixels, so texture features see it; ``crop_shift`` moves
+    the content without one.
     """
     out = np.full_like(img, fill)
     h, w = img.shape
@@ -98,7 +100,6 @@ def shift_image(img: np.ndarray, dy: int, dx: int, fill: float = 0.0) -> np.ndar
 
 
 def crop_shift(img: np.ndarray, dy: int, dx: int) -> np.ndarray:
-    """Translation by cropping: remove rows/cols from opposite edges, so the
-    content moves without introducing any synthetic border."""
+    """An image translated by cropping opposite edges, with no filled border."""
     h, w = img.shape
     return img[max(dy, 0) : h + min(dy, 0), max(dx, 0) : w + min(dx, 0)].copy()

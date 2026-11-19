@@ -1,12 +1,7 @@
-"""Training settings, results, and the two Keras details that training owns.
+"""One run's settings and its results, with the optimizer, loss and epoch callback.
 
-An architecture describes a Keras graph and its own hyperparameters; training decides
-the optimizer, the loss, how long to fit, when to stop and what counts as a
-result. The loop itself lives on :class:`~.language_model.LanguageModel`, which
-is the object that owns the weights; this module holds the nouns a run is
-described and measured by, the optimizer/loss pair, and the epoch callback.
-
-Sampling during training happens in the caller's ``on_epoch`` hook, not here.
+The Keras loop itself lives on :class:`~.language_model.LanguageModel`, which owns the
+weights. Sampling during training happens in the caller's ``on_epoch`` hook, not here.
 """
 
 from __future__ import annotations
@@ -70,11 +65,9 @@ class TrainingResults:
 
 
 def compile_keras_model(keras_model: keras.Model, learning_rate: float = 1e-3) -> keras.Model:
-    """Attach optimizer and loss to a Keras model. This does not train it.
+    """The same model with an optimizer and a loss attached, and still untrained.
 
-    The weights move for the first time in ``fit``; all this fixes is what that
-    fit minimises. Sparse cross-entropy reads the model's raw logits, so softmax
-    stays out of the Keras graph.
+    Sparse cross-entropy reads the raw logits, so the Keras graph carries no softmax.
     """
     keras_model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
@@ -88,11 +81,9 @@ def epoch_callback(
     on_epoch: Callable[[EpochStats], None] | None = None,
     stop_requested: Callable[[], bool] | None = None,
 ) -> keras.callbacks.Callback:
-    """The two mid-run needs of a caller: stream stats, and stop between epochs.
+    """A Keras callback forwarding one stats dict per epoch and polling the stop flag.
 
-    ``on_epoch`` receives one stats dict per epoch; a hook that wants to add a
-    generated sample can call ``model.generate(...)`` itself, since the model being
-    fitted is the caller's own object. ``stop_requested`` is polled after every
+    ``on_epoch`` receives one dict per epoch. ``stop_requested`` is polled after every
     epoch and ends the Keras loop cleanly rather than raising.
     """
 

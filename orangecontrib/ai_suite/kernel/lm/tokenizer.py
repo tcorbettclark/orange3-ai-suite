@@ -1,54 +1,9 @@
-"""Tokenizers: a fixed vocabulary with corpus frequencies.
+"""Tokenizers: a vocabulary with corpus frequencies, and the ids of its special tokens.
 
-A tokenizer is a constituent part of a model.
-
-Two tokenizers
----------------
-
-There are two, both subclasses of an abstract :class:`Tokenizer`. A tokenizer is
-a string outside the kernel ("char", "word") and the class behind it inside:
-:func:`tokenizers` lists the classes and the names they answer to, and
-:func:`tokenizer_from_text` takes one of those names.
-
-- :class:`CharTokenizer` - every character is a token, including spaces.
-- :class:`WordTokenizer` - every word is a token, identified with a regex.
-  Words with internal apostrophes ("don't", Shakespeare's "o'er", both quote
-  styles) plus every non-word non-space character as its own token. Whitespace
-  is dropped, case is preserved, and rendering a unit re-inserts spaces except
-  around punctuation and before an opening quote. Because straight quotes are
-  symmetric, ``'hello'`` decodes as ``"' hello'"``: the tokeniser cannot tell an
-  opening quote from a closing one.
-
-Use :func:`tokenizer_from_text` to build either one.
-
-Order
------
-
-Vocabulary order is an implementation detail and carries no meaning.
-
-Ids are opaque, stable within one instance, and preserved verbatim by
-``to_dict``/``from_dict`` so weights always index the vocabulary they were
-trained with.
-
-Do not compare ids across tokenizers, and do not read anything
-into the position of a token.
-
-
-Special tokens (ids the same for every tokenizer)
-----------------------------------------
-
-- id 0 = ``<bos>``: the start-of-sequence marker, meaning "nothing came
-  before". ``encode`` never emits it: the pair builder opens a unit's context
-  with it and pads out a context with it when the unit has fewer than the
-  context width of ids before the target, so early positions stay trainable
-  rather than being thrown away.
-- id 1 = ``<unk>``: out-of-vocabulary input (an unknown word for the word
-  tokenizer, an unknown character for the char tokenizer, or a token removed by
-  pruning).
-- id 2 = ``<eos>``: closes every unit, emitted by :meth:`Tokenizer.encode`. It is
-  the one special ``encode`` always adds, and it is a target so generation can
-  learn to stop. ``<unk>`` is the other special that can appear in a stream.
-
+:class:`CharTokenizer` makes every character a token and :class:`WordTokenizer` every
+word, internal apostrophes kept, plus lone punctuation; :func:`tokenizer_from_text`
+builds either one from a name. Ids are opaque and stable within one instance, and
+``<bos>``, ``<unk>`` and ``<eos>`` keep ids 0, 1 and 2 in every vocabulary.
 """
 
 from __future__ import annotations
@@ -74,17 +29,11 @@ SPECIAL_TOKENS = (BOS, UNK, EOS)
 
 
 def stream_units(stream: Iterable[int]) -> list[list[int]]:
-    """Split an id stream into its units at the EOS boundaries.
+    """An id stream split into units at the EOS boundaries, with BOS dropped.
 
-    The kernel's one spelling of unit structure, shared by
-    :meth:`Tokenizer.decode`, :func:`pairs.make_pairs` and the prompt trimming
-    in :mod:`language_model`. A unit may be empty (an empty unit is a doubled
-    EOS); a trailing run of ids after the last EOS comes back as the final
-    unit, so a renderer sees text the stream carries even without a
-    terminator. BOS is dropped from unit content: it opens a context and is
-    never data. A stream without a trailing EOS still yields exactly the units
-    it carries, which is why :func:`pairs.make_pairs` re-checks the terminator
-    itself.
+    A unit may be empty (a doubled EOS), and a trailing run of ids after the last
+    ``<eos>`` comes back as the final unit, so a stream without a terminator still
+    yields the ids it carries.
     """
     units: list[list[int]] = [[]]
     for i in map(int, stream):
@@ -99,8 +48,8 @@ def stream_units(stream: Iterable[int]) -> list[list[int]]:
 class Tokenizer(ABC):
     """A frozen vocabulary with corpus frequencies.
 
-    Abstract: build one with :func:`tokenizer_from_text`, which dispatches on the
-    tokenizer name to :class:`CharTokenizer` or :class:`WordTokenizer`.
+    Build one with :func:`tokenizer_from_text`, which takes a tokenizer name and
+    returns a :class:`CharTokenizer` or a :class:`WordTokenizer`.
     """
 
     tokens: tuple[str, ...]  # id -> token, specials first
@@ -110,12 +59,7 @@ class Tokenizer(ABC):
 
     @classmethod
     def tokenizer_name(cls) -> str:
-        """The name this tokenizer is known by outside the kernel: ``"char"``, ``"word"``.
-
-        Derived from the class name - lower-cased, without the ``Tokenizer``
-        suffix they all share - so it is ready to be passed back in to
-        :func:`tokenizer_from_text`, and cannot drift from the class.
-        """
+        """The name this tokenizer is known by outside the kernel: ``"char"``, ``"word"``."""
         return cls.__name__.removesuffix("Tokenizer").lower()
 
     def __post_init__(self) -> None:
@@ -210,18 +154,11 @@ class Tokenizer(ABC):
     # ---- encoding / decoding ----------------------------------------------
 
     def encode(self, text: str) -> list[int]:
-        """Text -> a token-id stream where every unit ends with EOS.
+        """A token-id stream for the text, with ``<eos>`` closing every unit.
 
-        This is the single text -> token transition. It marks the END of every
-        unit with EOS. Starts (BOS) are not marked in the stream: the pair
-        builder opens a unit's context with BOS, so ends travel as data while
-        starts are context construction.
-
-        A unit is one sentence.
-
-        Out-of-vocabulary items map to ``<unk>``
-
-        :meth:`Tokenizer.decode` drops specials, so ``decode(encode(t))``
+        A unit is one sentence, and the stream never carries ``<bos>``: starts are
+        context construction and ends travel as data. Out-of-vocabulary items become
+        ``<unk>``; :meth:`Tokenizer.decode` drops the specials, so ``decode(encode(t))``
         round-trips up to the normalisation described there.
         """
         stream: list[int] = []
@@ -238,12 +175,10 @@ class Tokenizer(ABC):
         """Split text into token strings, before vocabulary lookup."""
 
     def decode(self, ids: Sequence[int]) -> str:
-        """Token ids -> text: units rendered independently, joined by one space.
+        """Text for the ids: units rendered independently and joined by one space.
 
-        ``<bos>`` and ``<eos>`` are dropped, so ``<eos>`` closes a unit rather than
-        appearing in the text. The separator between units is not a token, so a
-        newline or a run of spaces comes back as a single space. ``<unk>`` is not
-        dropped: it shows literally.
+        ``<bos>`` and ``<eos>`` are dropped and ``<unk>`` shows literally, so a newline
+        or a run of spaces comes back as a single space.
         """
         units: list[list[int]] = stream_units(ids)
         return " ".join(text for text in map(self._decode_unit, units) if text)
@@ -257,7 +192,7 @@ class Tokenizer(ABC):
     # Read-only statistics from the vocabulary frequencies.
 
     def stats(self) -> dict:
-        """Summary of the vocabulary: size, longest tokens, hapax fraction, pruning."""
+        """Summary of the vocabulary: size, longest tokens, single-occurrence fraction, pruning."""
         real = self.counted()
         by_length = sorted(real, key=lambda tc: (-len(tc[0]), -tc[1], tc[0]))
         lengths = [len(t) for t, _ in real]
@@ -284,10 +219,9 @@ class Tokenizer(ABC):
     def zipf_summary(self, top: int = 100) -> dict:
         """Summary of the rank/count relation behind Zipf's law.
 
-        For natural text rank x count is roughly constant. ``zipf_product_mean``
-        is the mean of count*rank over the top ``top`` tokens;
-        ``zipf_product_spread`` is its relative range. Shares are of the whole
-        corpus, not of the retained vocabulary.
+        ``zipf_product_mean`` is the mean of count*rank over the top ``top`` tokens and
+        ``zipf_product_spread`` its relative range; shares are of the whole corpus, not
+        of the retained vocabulary.
         """
         table = self.frequency_table(top)
         if not table:
@@ -307,9 +241,10 @@ class Tokenizer(ABC):
     # ---- serialisation -----------------------------------------------------
 
     def to_dict(self) -> dict:
-        """Plain-Python view for JSON serialisation next to the weights.
+        """The tokenizer as plain Python, for JSON serialisation beside the weights.
 
-        Order is significant *here* even though it is undefined elsewhere.
+        The token order is the vocabulary: :func:`tokenizer_from_dict` rebuilds the ids
+        from it.
         """
         return {
             "tokenizer_name": self.tokenizer_name(),
@@ -331,7 +266,11 @@ class CharTokenizer(Tokenizer):
 
 
 class WordTokenizer(Tokenizer):
-    """Word tokenizer: regex words (internal apostrophes kept) plus lone punctuation."""
+    """Word tokenizer: regex words (internal apostrophes kept) plus lone punctuation.
+
+    Decoding re-inserts the spaces, except around punctuation and before an opening
+    quote; straight quotes are symmetric, so ``'hello'`` decodes as ``"' hello'"``.
+    """
 
     # Words with internal apostrophes, then any single non-word non-space char.
     _PATTERN: ClassVar[re.Pattern] = re.compile(r"\w+(?:['’]\w+)*|[^\w\s]", re.UNICODE)
@@ -368,12 +307,9 @@ class WordTokenizer(Tokenizer):
 def tokenizers() -> tuple[tuple[type[Tokenizer], str], ...]:
     """(tokenizer, one-line description) for each one, in definition order.
 
-    A tokenizer is the class here, as it is everywhere inside the kernel; the name
-    the rest of the program passes in is :meth:`Tokenizer.tokenizer_name`. The
-    descriptions are the classes' own docstring summaries, so a catalogue cannot
-    drift from the classes. Only *direct* subclasses of :class:`Tokenizer` count: a
-    subclass of a subclass would be invisible here, so keep the family one level
-    deep.
+    The item is the class, and its description is the first line of that class's own
+    docstring. Only direct subclasses of :class:`Tokenizer` are listed, so a subclass
+    of a subclass is invisible here.
     """
     return tuple(
         (cls, (inspect.getdoc(cls) or "").partition("\n")[0]) for cls in Tokenizer.__subclasses__()
@@ -381,11 +317,7 @@ def tokenizers() -> tuple[tuple[type[Tokenizer], str], ...]:
 
 
 def _tokenizer(tokenizer_name: str) -> type[Tokenizer]:
-    """The class a tokenizer name refers to.
-
-    Private on purpose: :func:`tokenizer_from_text` and :func:`tokenizer_from_dict`
-    are the way in, so a name never has to be turned into a class by a caller.
-    """
+    """The class a tokenizer name refers to."""
     for cls in Tokenizer.__subclasses__():
         if cls.tokenizer_name() == tokenizer_name:
             return cls
@@ -394,13 +326,11 @@ def _tokenizer(tokenizer_name: str) -> type[Tokenizer]:
 
 
 def tokenizer_from_text(text: str, tokenizer_name: str) -> Tokenizer:
-    """Count tokens over the text and fix the vocabulary.
+    """A tokenizer of the named kind, with the vocabulary counted over the text.
 
-    ``tokenizer_name`` chooses the tokenizer: the names are what
-    ``cls.tokenizer_name()`` reports for the classes :func:`tokenizers` lists. A
-    corpus of several documents arrives as one text joined by newlines (as
-    ``adapters.corpus_text`` does), because the sentence splitter treats a newline
-    as a boundary; joining with spaces would fuse units instead.
+    ``tokenizer_name`` is one of the names :func:`tokenizers` reports. A corpus of
+    several documents arrives as one text joined by newlines, because the sentence
+    splitter treats a newline as a boundary and a space would fuse two units.
     """
     impl = _tokenizer(tokenizer_name)
     # Count what encode will actually tokenize: the sentences, not the raw text,

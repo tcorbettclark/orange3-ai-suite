@@ -1,11 +1,8 @@
-"""The prose cannot invent a name: every code token it names exists in the code.
+"""The test that every name the prose puts in backticks exists in the source tree.
 
-The tutorials, the glossary and the README sit beside the catalogue, the options
-dataclasses and the widget controls, and nothing generates them. A rename is
-exactly the change that leaves prose behind - ``mean_blueness`` survived its own
-rename this way. This test is the sweep: a lower-case ``snake_case`` token in
-backticks has to appear somewhere in the source tree, so naming a thing that
-does not exist fails here instead of in a classroom.
+The prose is the README, the glossary, the load/save page and the tutorials. The
+sweep takes each lower-case ``snake_case`` token in backticks and looks for it in
+``orangecontrib``, ``examples``, ``demo`` and ``tests``.
 """
 
 import ast

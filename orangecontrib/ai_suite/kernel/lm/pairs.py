@@ -1,23 +1,9 @@
 """The training pairs of a corpus: one context and one target each.
 
-A **pair** is one prediction: the ids the model reads (its context) and the
-token it must produce (its target). The input here is an EOS-terminated token
-stream - what ``Tokenizer.encode`` produces - so this module deals in integers
-only: no text, no tokenizer, no vocabulary.
-
-The stream is self-describing: EOS closes every unit, so unit structure travels
-inside the data and a pair cannot straddle a boundary even by accident. Nothing
-here needs a parallel record of pairs per unit; they are derived from the EOS
-targets in :attr:`Pairs.pairs_per_unit`.
-
-The builder walks each unit's ``[BOS, s1..sm, EOS]`` and, for every id in it
-after the BOS, emits a pair: the target is that id, and the context is the w
-ids that precede it, padded out with BOS when the unit has fewer than w ids
-before the target. So the first pair of a unit has an all-BOS context, and the
-last one predicts EOS. The stream's ids are each predicted exactly once, so a
-unit of m tokens yields m+1 pairs and the stream yields exactly
-``len(stream)`` of them. BOS is never a target - it is context construction,
-not data.
+A pair is one prediction: the ``context_width`` ids the model reads, BOS-padded at
+the start of a unit, and the id it must produce, which is never BOS. The input is
+the EOS-terminated stream ``Tokenizer.encode`` produces, so the module deals in
+integers only, and no pair straddles a unit boundary.
 """
 
 from __future__ import annotations
@@ -36,9 +22,8 @@ from .tokenizer import BOS_ID, EOS_ID, stream_units
 class Pairs:
     """All (context, target) pairs of a corpus, one per prediction, unit-disjoint.
 
-    Unit structure is derived, never stored: every unit's last pair predicts EOS,
-    so the boundaries are recoverable from ``targets`` (see
-    :attr:`pairs_per_unit`).
+    ``contexts`` is shaped ``(len(targets), context_width)``, and every unit's last
+    target is ``<eos>``, so unit boundaries are recoverable from ``targets``.
     """
 
     contexts: np.ndarray  # (N, w) int32
@@ -72,12 +57,9 @@ class Pairs:
     def split(self, validation_fraction: float = 0.1, seed: int = 0) -> tuple[Pairs, Pairs]:
         """Unit-level train/validation split: a stride over the units, from the seed.
 
-        Held-out units are chosen by position (see :mod:`.._holdout`), so the
-        split is a function of ``(seed, the order of the corpus)`` and of nothing
-        else. It follows corpus order: reordering or appending units can move a
-        unit from one side to the other, so a reproducible run re-reads the same
-        corpus in the same order. Units with identical ids are no exception -
-        they are positions like any other and may land on different sides.
+        Held-out units are chosen by position, so the split is a function of ``seed`` and
+        of corpus order alone: reordering or appending units can move a unit across, and
+        units with identical ids may land on different sides.
         """
         if not 0.0 < validation_fraction < 1.0:
             raise ValueError("validation_fraction must be strictly between 0 and 1")
@@ -107,16 +89,11 @@ class Pairs:
 
 
 def make_pairs(stream: Sequence[int], context_width: int) -> Pairs:
-    """Build every pair of an EOS-terminated token stream.
+    """Every pair of an EOS-terminated token stream, one per id in it.
 
-    The stream is split on ``EOS_ID``; each piece is one unit and is paired
-    independently, with BOS opening its context and with EOS as its final
-    target. Every id in the stream is predicted exactly once, so the result
-    holds exactly ``len(stream)`` pairs.
-
-    A stream that does not end with EOS, that contains two EOS in a row, or that
-    carries a BOS is rejected: only ``Tokenizer.encode`` produces a stream that
-    carries its own unit structure, and in that stream BOS is never data.
+    The stream must come from ``Tokenizer.encode``: one that does not end with
+    ``<eos>``, that carries two ``<eos>`` in a row, or that carries ``<bos>`` is
+    rejected. The result holds exactly ``len(stream)`` pairs, each id predicted once.
     """
     if int(context_width) != context_width or context_width < 1:
         raise ValueError("context_width must be a whole number >= 1")

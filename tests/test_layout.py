@@ -1,14 +1,9 @@
 """Where kernel code lives, and which modules are support code.
 
-The kernel is organised by domain; ``images`` is the image domain, holding the
-image pipeline (``decode``, ``resize``, ``flatten``, and ``pixels`` composing
-them) and the ``features`` package built on it. A leading underscore marks
-support code that nothing outside ``images`` may import.
-
-``lora`` puts everything that knows MLX behind ``lora/mlx``: the domain package
-above it - options, data, the split, the run's scratch, the artifact - imports
-nothing from ``mlx`` or ``mlx_lm``, and the boundary package never reaches back
-up into its parent.
+``images`` holds the image pipeline (``decode``, ``resize``, ``flatten`` and ``pixels``
+composing them) and the ``features`` package built on it, and a leading underscore
+marks support code that nothing outside ``images`` may import. ``lora`` puts everything
+that knows MLX behind ``lora/mlx``, which never reaches back up into its parent.
 """
 
 import ast
@@ -116,7 +111,7 @@ LORA_MLX = LORA / "mlx"
 
 
 def _imports(path: pathlib.Path) -> list[tuple[str, int]]:
-    """(module, relative level) for every import in a file; level 0 is absolute."""
+    """The ``(module, relative level)`` pairs of every import in a file; level 0 is absolute."""
     found = []
     for node in ast.walk(ast.parse(path.read_text())):
         if isinstance(node, ast.Import):
@@ -160,11 +155,7 @@ def test_the_mlx_boundary_never_reaches_back_up_into_lora():
 
 
 def _names_taken_from_the_boundary() -> set[str]:
-    """Every name production code takes from ``lora.mlx``, by import or attribute.
-
-    Deliberately only production: a name nobody outside the boundary needs is not
-    part of the contract, even if a test finds it convenient.
-    """
+    """Every name production code takes from ``lora.mlx``, by import or attribute."""
     taken: set[str] = set()
     for path in (ROOT / "orangecontrib").rglob("*.py"):
         if LORA_MLX in path.parents or "__pycache__" in path.parts:

@@ -1,9 +1,8 @@
-"""The LoRA model object: an adapter travels with its base model.
+"""The LoRA model object, and the adapter artifact that travels with its base model.
 
-An adapter is meaningless without the exact base model it was trained against,
-so a :class:`LoRAAdapter` is a directory containing the adapter weights, its
-config, and a ``lora_meta.json`` with the base-model identity and the training
-run that produced it. Loading the artifact reproduces the trained setup.
+A :class:`LoRAAdapter` is a directory holding the adapter weights, its config and a
+``lora_meta.json`` with the base-model identity and the run that produced it;
+:class:`LoRAModel` is that base model with the adapter fitted, or without it.
 """
 
 from __future__ import annotations
@@ -22,11 +21,8 @@ _META_FILE = "lora_meta.json"
 def _echo(prompt: str, completion: str) -> str:
     """The prompt with the completion appended, one space between words.
 
-    mlx-lm returns the completion only; the kernel convention is the full text
-    (prompt echoed), matching the Keras ``LanguageModel``. mlx-lm does not say
-    whether the completion begins with a space, so one is inserted only when the
-    prompt ends in a non-space and the completion starts with an alphanumeric
-    character.
+    A space is inserted only when the prompt ends in a non-space and the completion
+    starts with an alphanumeric character.
     """
     sep = (
         " "
@@ -38,7 +34,7 @@ def _echo(prompt: str, completion: str) -> str:
 
 @dataclass
 class LoRAAdapter:
-    """The fine-tuning artifact: adapter files + base-model identity, one unit."""
+    """The fine-tuning artifact: the adapter files, with the base model they fit."""
 
     base_model: str  # path or HF repo id of the base model
     adapter_path: str | None  # None = the raw base model itself (no adapter)
@@ -46,11 +42,10 @@ class LoRAAdapter:
     name: str = ""
 
     def save(self, dest: str | Path) -> Path:
-        """Write the self-contained artifact directory.
+        """Write the artifact directory and return its path.
 
-        Metadata and file copying do not require MLX; only ``LoRAModel`` does.
-        The weights are checked for before anything is written, so an adapter
-        path with no weights raises instead of silently saving a base model.
+        No MLX import: metadata and file copying are plain Python. An ``adapter_path``
+        with no weights file in it raises before anything is written.
         """
         src = Path(self.adapter_path) if self.adapter_path is not None else None
         if src is not None and not (src / mlx.ADAPTER_WEIGHTS).is_file():
@@ -99,13 +94,11 @@ class LoRAAdapter:
 
 
 class LoRAModel:
-    """A base model with an optional LoRA adapter.
+    """A base model with an optional LoRA adapter; each variant loads on first use.
 
-    Exposes the kernel conventions
-    ``generate(prompt, temperature, max_new_tokens, seed)`` and ``evaluate(text)``.
-    The ``adapter_enabled`` switch selects the raw base model or the
-    adapter-fitted one: the identical model, before and after, with no
-    confound. Both variants are loaded lazily and cached.
+    ``adapter_enabled`` selects the raw base model or the adapter-fitted one, on the
+    same weights; ``generate``, ``stream`` and ``evaluate`` follow the kernel's
+    convention, shared with the Keras ``LanguageModel``.
     """
 
     def __init__(
@@ -132,7 +125,7 @@ class LoRAModel:
 
     @property
     def tokenizer(self):
-        """Travels with the model (kernel convention; shared by both variants)."""
+        """The tokenizer of the loaded model, shared by both variants."""
         return self._variant(self.adapter_enabled)[1]
 
     def stream(
@@ -142,13 +135,11 @@ class LoRAModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ):
-        """The text as it is produced: the prompt echoed, then the completion in chunks.
+        """The text as it is produced: the prompt echoed first, then chunks of completion.
 
-        Temperature 0 is greedy and negative raises. The chunks are mlx-lm's, so
-        they are arbitrary slices of text rather than words; concatenating them
-        reproduces :meth:`generate`, which is exactly that concatenation. The
-        first item is the prompt (echoed, per the kernel convention), so a caller
-        can show it before the model has produced anything.
+        Temperature 0 is greedy and a negative raises. The chunks are mlx-lm's, so they
+        are arbitrary slices of text rather than words: join them for the whole text and
+        do not depend on where the boundaries fall.
         """
         if temperature < 0:
             raise ValueError("temperature must be >= 0 (0 = greedy)")
@@ -177,17 +168,15 @@ class LoRAModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ) -> str:
-        """The whole text: :meth:`stream` joined up, so there is one sampling path."""
+        """The whole text: :meth:`stream` joined up."""
         return "".join(self.stream(prompt, temperature, max_new_tokens, seed))
 
     def evaluate(self, text: str, max_tokens: int = 4000) -> dict:
         """Loss and perplexity over ``text``, in fixed 512-token windows.
 
-        Returns ``{'loss', 'perplexity'}`` on the same convention as the Keras
-        ``LanguageModel.evaluate``, for in-domain / out-of-domain tables. Only
-        the first ``max_tokens`` ids are scored; fewer than two ids is undefined
-        and returns NaN. ``adapter_enabled`` applies here too: turn it off to
-        score the raw base model.
+        Returns ``{'loss', 'perplexity'}``, as the Keras ``LanguageModel.evaluate`` does.
+        Only the first ``max_tokens`` ids are scored, and fewer than two ids returns NaN.
+        ``adapter_enabled`` applies here too, so it can score the raw base model.
         """
         model, tokenizer = self._variant(self.adapter_enabled)
         return mlx.evaluate_text(model, tokenizer, text, max_tokens=max_tokens)

@@ -165,7 +165,7 @@ def test_grid_populated_after_apply(qapp, capture, images_table):
 
 
 def test_group_toggle_auto_applies(qapp, capture, images_table):
-    """The controls are wired to the commit, not just to their settings."""
+    """Toggling a group checkbox reaches the commit, so the output gains colour columns."""
     w = OWImageFeatures()
     w.show()
     sent = capture(w.Outputs.features)

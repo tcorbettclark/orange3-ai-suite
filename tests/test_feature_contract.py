@@ -1,8 +1,7 @@
-"""The feature contract: a feature is a class, and the class checks itself.
+"""The feature contract: creating a feature class checks it.
 
-A malformed feature must fail when the class is created (import time), not when
-a user first selects it. That is the whole reason features are classes: the
-required attributes and method are declared once and verified automatically.
+The required attributes and method are verified when the class is created, so a
+malformed feature fails at import time.
 """
 
 import numpy as np

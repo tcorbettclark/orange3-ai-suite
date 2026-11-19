@@ -1,4 +1,4 @@
-"""Resampling: one policy, area when shrinking and bilinear when growing."""
+"""Resampling to a square: area when shrinking, bilinear when growing."""
 
 import cv2
 import numpy as np

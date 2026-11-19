@@ -11,28 +11,23 @@ _MEDIAN_KERNELS = (3, 5)
 class FeatureOptions:
     """Options shared by preprocessing and feature computation.
 
-    Invalid values are rejected on construction, not clamped later: a silently
-    adjusted option is a number the caller cannot see in the values it
-    produced.
+    Invalid values raise ``ValueError`` on construction.
 
     Attributes
     ----------
     working_size:
         Images are centre-cropped to a square and resized to
-        ``working_size x working_size`` before feature computation, so
-        features are comparable across images. ``None`` keeps native
-        resolution - and then the pixel-scale features (``fine_texture``,
-        ``coarse_texture``, ``autocorrelation_half_width``) change meaning
-        with the image size, because their windows are in pixels.
+        ``working_size x working_size`` before feature computation.
+        ``None`` keeps native resolution - and then the pixel-scale features
+        (``fine_texture``, ``coarse_texture``, ``autocorrelation_half_width``)
+        change meaning with the image size, because their windows are in pixels.
     centre_crop:
         Crop to the central square before resizing.
     contrast_normalise:
         Robust percentile normalisation to [0, 1] (p1-p99 clip-and-scale).
         With it off, features read the input's own intensity scale.
     denoise:
-        Median-filter denoising before normalisation. Denoising is off by
-        default and its strength is explicit: it must never silently erase the
-        signal being measured.
+        Median-filter denoising before normalisation, off by default.
     denoise_ksize:
         Median filter kernel size: 3 or 5. A median filter needs an odd kernel,
         and 1 is a no-op.
@@ -42,7 +37,6 @@ class FeatureOptions:
         none.
     edge_density_frac:
         Edge-density threshold as a fraction of the image's own gradient p99.
-        A fixed percentile would return the same density for every image.
     """
 
     working_size: int | None = 128

@@ -1,12 +1,8 @@
 """The feature contract: one class, one number, one description.
 
-A feature is a class, not a module, so its required surface is explicit and
-checked when the class is created. Subclasses declare ``name`` and
-``description``, and optionally ``is_count`` / ``needs_colour``, then implement
-:meth:`compute`.
-
-The checks below run at import time, which is deliberate: a malformed feature
-should fail when the package loads, not when a user first selects it.
+A subclass declares ``name`` and ``description``, optionally ``is_count`` and
+``needs_colour``, and implements :meth:`compute`. The checks run when the class is
+created.
 """
 
 from __future__ import annotations
@@ -41,13 +37,10 @@ class Feature(ABC):
         account. Its own validation runs when the class is created.
     is_count:
         True when the value is a whole number: peaks and holes. Level counts
-        that are averaged over lines are not whole numbers and do not carry it,
-        which makes the flag something a caller can act on - a table column to
-        treat as a count, a histogram to bin at integer edges.
+        that are averaged over lines are not whole numbers and do not carry it.
     needs_colour:
         True if the feature reads absolute colour instead of the preprocessed
-        luminance image. The pipeline is a property of the feature: it must
-        not be inherited from whatever group the feature happens to sit in.
+        luminance image.
     """
 
     name: ClassVar[str]

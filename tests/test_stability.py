@@ -2,7 +2,7 @@
 
 Count features - the ones flagged ``is_count``, whose values are whole numbers -
 must be *identical* under small shifts and noise; real-valued features must stay
-within tolerance. A count that flips on a 5-pixel shift is noise, not signal.
+within tolerance.
 """
 
 import numpy as np

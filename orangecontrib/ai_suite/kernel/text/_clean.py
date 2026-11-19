@@ -83,8 +83,8 @@ def reflow(text: str) -> str:
 def _remove_page_numbers(text: str) -> tuple[str, int]:
     """Drop the lines that are a page number and nothing else.
 
-    A blank line is never a page number: it is the paragraph break, and the rule
-    that removes numbers must not touch it (see :data:`_PAGE_NUMBER`).
+    A blank line is never a page number: it is the paragraph break (see
+    :data:`_PAGE_NUMBER`).
     """
     lines = text.splitlines()
     kept = [line for line in lines if not line.strip() or not _PAGE_NUMBER.match(line)]
@@ -104,7 +104,11 @@ def _remove_repeated_lines(text: str) -> tuple[str, int]:
 
 
 def clean_text(text: str, options: CleanOptions | None = None) -> CleanResult:
-    """Apply the selected cleaning rules in a stable order."""
+    """Return ``text`` with the selected cleaning rules applied.
+
+    The rules run in a fixed order: Gutenberg markers, page numbers, repeated lines,
+    then reflow.
+    """
     opts = options or CleanOptions()
     text = _normalise(text)
     removed = 0

@@ -1,8 +1,7 @@
-"""Image Pixels: flatten downsampled images into raw pixel values.
+"""Image Pixels: a table of raw pixel values, one row per image.
 
-A deliberately vanilla baseline: convert each image to luminance, resize it to
-a square grid and flatten it row-major. There is no convolution, no spatial
-encoding and no feature engineering - just the pixels.
+Luminance, resized to a square grid and flattened row-major, with no convolution
+and no spatial encoding.
 """
 
 from __future__ import annotations
@@ -105,16 +104,13 @@ class PixelValuesWorker(QThread):
 
 
 class OWImagePixels(OWWidget):
-    """Flatten each input image into raw pixel values.
+    """Flatten each input image into a row of raw pixel values.
 
-    Input is an Import Images table. Every image is converted to luminance,
-    resized to a square grid and flattened row-major into values in [0, 1].
-    The only control is the grid dimension; the default 10 produces 100
-    values per image.
-
-    The output keeps the input's class variables and meta columns, including
-    the image path, so rows remain traceable. This widget is intentionally
-    plain: it is the no-convolution, no-feature-engineering baseline.
+    Input is an Import Images table. Every image is converted to luminance, resized
+    to a square grid and flattened row-major into values in [0, 1]; the only control
+    is the grid dimension, 10 by default, which gives 100 values per image. The
+    output keeps the input's class variables and meta columns, including the image
+    path, so rows remain traceable.
     """
 
     name = "Image Pixels"

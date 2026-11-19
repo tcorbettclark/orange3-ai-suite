@@ -26,7 +26,7 @@ def test_textless_data_sets_warning(qapp):
 
 
 def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
-    """Full pipeline in-thread (blocking)."""
+    """The whole pipeline in the calling thread, through ``run_training_blocking``."""
     w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
@@ -51,7 +51,7 @@ def test_trainer_outputs_commit_on_done(qapp, capture, text_table):
 
 
 def test_worker_stop_flag_honoured(qapp, capture, text_table, monkeypatch):
-    """The Stop button's effect, mid-run: 200 epochs requested, stop after 3."""
+    """The Stop button mid-run: 200 epochs requested, stopped after three."""
     w = OWLMPretrainer()
     w.show()
     w.set_data(text_table)
@@ -112,7 +112,7 @@ def test_training_failure_surfaces_as_message(qapp, text_table, monkeypatch):
 
 
 def test_only_the_selected_architectures_controls_are_visible(qapp):
-    """Every architecture owns its hyperparameters, so the others' are hidden."""
+    """Only the selected architecture's hyperparameter controls are visible."""
     w = OWLMPretrainer()
     w.show()
     for index, expected in enumerate(["bigram", "mlp", "lstm"]):

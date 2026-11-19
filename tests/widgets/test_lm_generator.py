@@ -6,10 +6,10 @@ from orangecontrib.ai_suite.widgets.ow_lm_generator import OWLMGenerator
 
 
 class StubModel:
-    """Duck-typed kernel convention: stream(prompt, temperature, max, seed).
+    """A duck-typed stand-in for the kernel's ``stream`` convention.
 
-    Yields in word-sized pieces, which is all the widget may assume: the real
-    streams chunk wherever the library does.
+    It yields word-sized pieces, which is all the widget may assume: a real stream
+    chunks wherever the library does.
     """
 
     def __init__(self, pieces=("the", " cat", " sat"), on_chunk=None):

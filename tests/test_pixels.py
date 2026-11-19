@@ -1,9 +1,4 @@
-"""The plain pixel baseline: decode, resize, flatten as one call.
-
-The pipeline has two callers - the Image Pixels widget and the example that
-prints it - so the composition is kernel code with its own tests rather than a
-line each of them spells for itself.
-"""
+"""The plain pixel baseline: decode, resize, flatten as one call."""
 
 import numpy as np
 import pytest

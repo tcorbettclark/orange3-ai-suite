@@ -1,14 +1,9 @@
 """Loading, generating and scoring through mlx-lm, in this process.
 
-Everything the lora package needs from mlx-lm *outside* a training run. mlx is
-imported inside the functions, so importing this module costs nothing on a
-machine without MLX - and :func:`available` is how a caller asks the question
-without importing anything at all.
-
-The generation convention is mlx-lm's: a model and its tokenizer, a sampler built
-from the temperature (0 is greedy), and the completion without the prompt. The
-prompt echo and the "one unit" rule belong to the lora layer, which is where the
-kernel's convention lives.
+:func:`load_model`, :func:`stream_text` and :func:`evaluate_text` import mlx inside the
+function, so importing this module costs nothing on a machine without it, and
+:func:`available` answers before any import is tried. ``stream_text`` returns the
+completion without the prompt, in mlx-lm's own chunks.
 """
 
 from __future__ import annotations
@@ -27,7 +22,7 @@ EVAL_WINDOW = 512
 
 
 def available() -> bool:
-    """Whether this machine can run MLX at all: a question, not an import."""
+    """Whether this machine can run MLX at all, without importing it."""
     import importlib.util
 
     return (
@@ -63,8 +58,8 @@ def stream_text(
 ) -> Iterator[str]:
     """The completion in the chunks mlx-lm produces, without the prompt.
 
-    ``seed`` seeds MLX's global generator, which is the only seed mlx-lm's
-    sampler reads; ``temperature`` is a sampler here rather than a kwarg.
+    ``seed`` seeds MLX's global generator, the only one mlx-lm's sampler reads, so it
+    applies process-wide.
     """
     if temperature < 0:
         raise ValueError("temperature must be >= 0 (0 = greedy)")
@@ -106,7 +101,11 @@ def evaluate_text(
     max_tokens: int,
     window: int = EVAL_WINDOW,
 ) -> dict:
-    """Loss and perplexity over ``text``, in fixed ``window``-token slices."""
+    """Loss and perplexity over ``text``, in fixed ``window``-token slices.
+
+    Returns ``{'loss', 'perplexity'}``; a text of fewer than two ids scores NaN, and
+    ``max_tokens`` below 2 raises.
+    """
     if max_tokens < 2:
         raise ValueError("max_tokens must be at least 2")
     import mlx.core as mx

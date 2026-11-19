@@ -1,9 +1,8 @@
 """The feature guide: every feature's description as one Markdown page.
 
-Generated from the catalogue each time it is asked for, so there is no second
-copy to keep in step with the descriptions. The Markdown stays inside what Qt's
-own renderer supports - headings, emphasis, inline code, links and lists - so
-the widget can show exactly the text a reader would get from the Python call.
+The page is generated from the catalogue each time it is asked for. The Markdown
+stays inside what Qt's own renderer supports - headings, emphasis, inline code,
+links and lists.
 """
 
 from __future__ import annotations

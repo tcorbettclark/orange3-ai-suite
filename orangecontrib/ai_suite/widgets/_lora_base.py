@@ -1,11 +1,10 @@
-"""Shared widget machinery for the LoRA Pre-trainer and LoRA SFT widgets.
+"""The LoRA training UI that LoRA Pre-trainer and LoRA SFT share.
 
-A thin shell over :mod:`orangecontrib.ai_suite.kernel.lora`. The base class owns the QThread, live
-loss curve, base-model selector, hyperparameters and Model output. Subclasses
-supply only the data contract and the explanatory data box.
+The QThread that runs kernel training, the live loss curve and base-model selector,
+the hyperparameters, and the Model output both widgets send.
 
-MLX is required (macOS on Apple Silicon); other machines get the standard
-graceful-degradation message.
+Training needs MLX (macOS on Apple Silicon); elsewhere the widget reports the
+missing dependency.
 """
 
 from __future__ import annotations
@@ -82,13 +81,12 @@ class LoraWorker(QThread):
 
 
 class LoRATrainerBase(OWWidget, openclass=True):
-    """Shared LoRA training UI for the two LoRA widgets.
+    """Training controls, live loss curve and Model output for the two LoRA widgets.
 
     Subclasses supply ``data_box_title``, ``data_help`` and ``_make_lora_data``.
-    The base model arrives on the Base model input, so a connected BritLLM Models
-    widget passes its local path explicitly; the line edit also accepts a path or
-    an HF id. The output is a ``LoRAModel``: the base model plus the trained
-    adapter, ready for the LM Generator. The live curve shows loss per iteration.
+    The base model arrives as a path or an HF id on the Base model input, and the
+    output is a ``LoRAModel``: the base model plus the trained adapter, ready for
+    the LM Generator.
     """
 
     name = None  # not a registered widget; subclasses provide the UI
@@ -302,10 +300,9 @@ class LoRATrainerBase(OWWidget, openclass=True):
         """This run's scratch parent, deleting the previous run's.
 
         One directory per widget, not one per run: the kernel gives each run a
-        fresh child of it, so reusing the parent is safe, and dropping it deletes
-        the previous run's adapter. It is dropped here rather than in
-        ``onDeleteWidget`` because it has to outlive training - a ``LoRAModel``
-        on the Model output keeps reading the adapter directory after the run.
+        fresh child of it. It owns the previous run's adapter, and it outlives
+        training, because a ``LoRAModel`` on the Model output keeps reading the
+        adapter directory after the run.
         """
         if self._scratch is not None:
             self._scratch.cleanup()
@@ -328,7 +325,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
     # ---- live feedback -------------------------------------------------------
 
     def _on_event(self, event):
-        """One progress event, matched by type: the event *is* the protocol."""
+        """One progress event, handled by its type."""
         match event:
             case Params():
                 self._trainable_note = f"trainable {event.fraction:.3f}% ({event.detail})"

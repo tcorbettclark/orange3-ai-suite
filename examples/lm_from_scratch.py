@@ -1,17 +1,9 @@
-"""Train a tiny language model from scratch, then generate and score text with it.
+"""A tiny character-level language model trained, sampled and scored on a six-line corpus.
 
-Run it from the repository root:
-
-    uv run python examples/lm_from_scratch.py
-
-The four objects, and the lines where they meet:
-
-    text ──tokenizer_from_text──> Tokenizer
-    MLP(...) ───────────────────> Architecture
-    LanguageModel(architecture, tokenizer)      # nothing trained yet
-        .fit(text, TrainingOptions(...))        # pairs, split, graph, weights
-        .generate(prompt, temperature)          # context -> logits -> id
-        .evaluate(held_out_text)                # loss and perplexity
+Run it from the repository root with ``uv run python examples/lm_from_scratch.py``. The
+script takes one object at a time: a tokenizer, an MLP architecture, the
+``LanguageModel`` built from the two, then that model's ``fit``, ``generate`` and
+``evaluate`` calls.
 """
 
 import math
@@ -56,7 +48,7 @@ epochs = []
 
 
 def on_epoch(stats):
-    """One dict per epoch - the numbers the widget plots - plus our own sample."""
+    """Keep each epoch's stats dict and add the model's current sample to it."""
     epochs.append(stats)
     stats["sample"] = model.generate("the cat ", temperature=0.5, max_new_tokens=40)
 

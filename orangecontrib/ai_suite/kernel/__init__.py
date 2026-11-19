@@ -1,6 +1,5 @@
-"""Pure-Python kernel for the Orange AI teaching suite.
+"""The pure-Python kernel the suite's Orange widgets are built on.
 
-The kernel never imports Orange or Qt. It speaks NumPy arrays, strings, paths
-and its own objects, so the same code runs inside Orange widgets and in a plain
-Python session.
+Nothing here imports Orange or Qt: the kernel works on NumPy arrays, strings, paths
+and its own objects.
 """

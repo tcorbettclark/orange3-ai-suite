@@ -1,18 +1,9 @@
-"""What a feature is, in words: name, sentence, intuition and mechanics.
+"""A feature described in words: title, summary, intuition, technical and references.
 
-Every feature carries one :class:`Description`. The fields have different jobs
-and different readers, and the limits below are what the widget and the
-generated guide rely on:
-
-- ``title`` names the column for a person;
-- ``summary`` is the one-sentence tooltip;
-- ``intuition`` explains, without statistics, which kinds of picture move the
-  number up and which leave it alone;
-- ``technical`` says how *this* implementation computes it, and
-  ``references`` points at further reading.
-
-The plain-language field is checked against a small list of jargon, because the
-point of writing it separately is lost if it reads like the technical field.
+``title`` names the table column, ``summary`` is the one-sentence tooltip,
+``intuition`` says in plain words which pictures move the number, ``technical``
+says how this implementation computes it, and ``references`` holds Markdown links
+to further reading.
 """
 
 from __future__ import annotations

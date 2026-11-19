@@ -1,8 +1,7 @@
-"""LoRA SFT: supervised fine-tuning on prompt/response pairs.
+"""LoRA SFT: a LoRA adapter trained on prompt/completion pairs.
 
-A thin shell over :mod:`orangecontrib.ai_suite.kernel.lora`; the shared training UI lives in
-:mod:`._lora_base`. This widget supplies the supervised data contract: prompt
-and completion columns, with the prompt masked out of the loss.
+One row per pair, with the prompt masked out of the loss. The widget itself is the
+shared LoRA training UI in :mod:`._lora_base`.
 """
 
 from __future__ import annotations
@@ -15,12 +14,10 @@ from ._lora_base import LoRATrainerBase
 class OWLoRASFT(LoRATrainerBase):
     """Supervised fine-tuning of a pretrained language model.
 
-    Input is a Table with prompt and completion text columns (Q&A pairs are a
-    special case). Output is a ``LoRAModel``: the base model plus the trained
-    adapter. The completion tokens carry the loss and the prompt is masked out,
-    so this is supervised fine-tuning rather than continued pre-training.
-    Because the contract is just prompt/response pairs, the same widget covers
-    Q&A, instruction following and tool use.
+    Input is a Table with prompt and completion text columns; output is a
+    ``LoRAModel``, the base model plus the trained adapter. The completion tokens
+    carry the loss and the prompt is masked out, so the same widget covers Q&A,
+    instruction following and tool use.
     """
 
     name = "LoRA SFT"

@@ -1,7 +1,8 @@
-"""Registry of the suite's assets, for the CLI and model-only widget.
+"""The suite's downloadable Hugging Face artifacts, keyed by name.
 
-This is the asset registry (downloadable Hugging Face artifacts) - not the
-image feature catalogue under ``kernel/images/features``.
+``ASSETS`` holds every asset; ``MODEL_ASSETS`` holds the model alone, because the
+BritLLM Models widget must not list datasets. The image feature catalogue is a
+separate registry, under ``kernel/images/features``.
 """
 
 from __future__ import annotations

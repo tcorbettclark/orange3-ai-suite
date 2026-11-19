@@ -1,9 +1,7 @@
-"""LM Pre-trainer: pre-train a tiny language model on text data.
+"""LM Pre-trainer: a trained language model and a table of per-epoch stats.
 
-A thin shell over :mod:`orangecontrib.ai_suite.kernel.lm`: options, a live loss plot and the
-checkpoint table. Training runs in a background QThread and streams per-epoch
-stats into pyqtgraph; all substance (tokenizer, pairs, architectures, training,
-sampling) lives in the kernel.
+Architecture and tokenizer options, hyperparameters and a live loss plot; training
+runs in a background QThread that streams each epoch's stats into pyqtgraph.
 """
 
 from __future__ import annotations
@@ -73,17 +71,13 @@ class TrainingWorker(QThread):
 class OWLMPretrainer(OWWidget):
     """Pre-train a small language model and stream its learning curve.
 
-    Input is a Table with text columns (or an Orange3-Text Corpus). Outputs are
-    the trained model object (with its tokenizer embedded) and a checkpoint
-    table: one row per epoch with loss, perplexity and, optionally, a sample of
-    generated text.
+    Input is a Table with text columns (or an Orange3-Text Corpus). The Model output
+    is the trained model object with its tokenizer embedded; the Checkpoint output is
+    one row per epoch with loss, perplexity and, when samples are recorded, a sample
+    of generated text.
 
-    The architecture dropdown selects the bigram, MLP or LSTM model; the tokenizer dropdown switches between the
-    character and word tokenizers.
-    Running several architectures on one corpus is the central experiment:
-    the bigram plateaus, the MLP has a fixed visible memory, and the LSTM
-    trains smoothly at a higher cost. Training/validation loss is plotted live
-    so overfitting on a tiny corpus is visible rather than asserted.
+    The architecture dropdown selects the bigram, MLP or LSTM model, and the tokenizer
+    dropdown the character or word tokenizer.
     """
 
     name = "LM Pre-trainer"
@@ -234,10 +228,8 @@ class OWLMPretrainer(OWWidget):
     def _architecture(self):
         """The selected architecture, configured from the settings it declares.
 
-        ``get_params`` names the hyperparameters, and each setting is named
-        after the parameter it feeds, so the wiring is derived from the class
-        rather than restated here - a new parameter on an architecture is a
-        control and nothing else.
+        Each setting is named after the estimator parameter it feeds, as
+        ``f"{name}_{param}"``.
         """
         cls = ARCHITECTURES[self.architecture_index][0]
         name = cls.architecture_name()
@@ -245,12 +237,7 @@ class OWLMPretrainer(OWWidget):
         return cls(**values)
 
     def _training_options(self) -> TrainingOptions:
-        """The run's settings, as the kernel's record of a run.
-
-        None of these describe the architecture: tokenization and vocabulary
-        pruning happen before the model exists, and the architecture's own
-        hyperparameters come from the controls it declares.
-        """
+        """The run's settings, as the kernel's record of a run."""
         return TrainingOptions(
             epochs=self.epochs,
             batch_size=self.batch_size,
@@ -260,7 +247,7 @@ class OWLMPretrainer(OWWidget):
         )
 
     def _epoch_sample(self):
-        """One generation from the model as it stands, or None when switched off."""
+        """One generation from the model as it stands, or None when ``store_samples`` is off."""
         if not self.store_samples:
             return None
         return lambda model: model.generate(

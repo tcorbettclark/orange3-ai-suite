@@ -1,4 +1,4 @@
-"""Adapters: the sanctioned boundary between Orange objects and nn-kernel."""
+"""Adapters: the conversion between Orange tables and the kernel's arguments and results."""
 
 import numpy as np
 from Orange.data import Domain, StringVariable, Table

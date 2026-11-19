@@ -1,9 +1,8 @@
-"""BritLLM Models: download and cache BritLLM base models for the LoRA widgets.
+"""BritLLM Models: download and cache the BritLLM base model for the LoRA widgets.
 
-One pinned 4-bit MLX BritLLM. Click Download to fetch it into the Hugging Face
-cache and verify its weights; the local directory is sent on the Model path
-output. The LoRA widgets receive that path on their Base model input, so the
-handoff is a signal rather than a lookup in a shared cache.
+One pinned 4-bit MLX BritLLM, fetched into the Hugging Face cache and verified by
+weight; its local directory is sent on the Model path output, which the LoRA
+widgets take on their Base model input.
 """
 
 from __future__ import annotations
@@ -60,13 +59,11 @@ class _Worker(QThread):
 
 
 class OWBritLLMModels(OWWidget):
-    """Download the 4-bit BritLLM model and pass its local path downstream.
+    """Download the 4-bit BritLLM model and pass its local directory downstream.
 
-    The model comes from one pinned Hugging Face repository. The cache is the
-    standard Hugging Face hub cache (``HF_HUB_CACHE``, else ``$HF_HOME/hub``),
-    so another HF consumer can reuse it and a lab can share it by setting
-    ``HF_HOME``. The output is the snapshot directory, not a name the LoRA
-    widgets would have to resolve themselves.
+    The model comes from one pinned Hugging Face repository, and the cache is the
+    standard hub cache (``HF_HUB_CACHE``, else ``$HF_HOME/hub``). The output is the
+    snapshot directory itself.
     """
 
     name = "BritLLM Models"

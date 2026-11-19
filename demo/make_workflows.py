@@ -1,20 +1,10 @@
-"""Generate the .ows demo workflows through the canvas Scheme API.
+"""The two ``.ows`` demo workflows, written through ``orangecanvas.scheme``.
 
-Builds (idempotently):
-
-    demo/mnist_features.ows   (Import Images -> Image Features ->
-                               Test & Score + Neural Network, plus
-                               Data Table / Column Statistics / Confusion Matrix)
-    demo/cloud_features.ows   (same shape, CCSN cloud settings)
-
-The canvas API (orangecanvas.scheme) writes the .ows XML we would otherwise
-hand-craft; widget settings are pre-seeded per node (Import Images path,
-Image Features' working size). On load, the canvas resolves
-widgets by qualified_name and matches links by channel name, so the
-descriptions here only need faithful channel names/ids — extracted
-programmatically from the real widget classes.
-
-    uv run python demo/make_workflows.py
+``uv run python demo/make_workflows.py`` writes ``demo/mnist_features.ows`` and
+``demo/cloud_features.ows``, each importing images into Image Features and then Test &
+Score with a Neural Network, plus Data Table, Column Statistics and Confusion Matrix.
+Widget settings are seeded on the nodes that need them, and re-running rewrites both
+files.
 """
 
 from __future__ import annotations
@@ -34,7 +24,7 @@ BASE = Path(__file__).resolve().parent
 
 
 def make_descriptions() -> dict[str, WidgetDescription]:
-    """Widget descriptions with channel names/ids taken from the real classes."""
+    """A description for each of the seven demo widgets, keyed by the label its nodes carry."""
     from Orange.widgets.data.owfeaturestatistics import OWFeatureStatistics
     from Orange.widgets.data.owtable import OWTable
     from Orange.widgets.evaluate.owconfusionmatrix import OWConfusionMatrix
@@ -92,7 +82,10 @@ def _type_str(type_):
 
 
 def image_import_path_properties(directory: Path):
-    """Import Images opens folders via `recent_paths` (RecentPath objects)."""
+    """The Import Images node properties that name ``directory`` as the folder to open.
+
+    The widget reads its folders from ``recent_paths``, a list of ``RecentPath`` objects.
+    """
     from orangewidget.utils.filedialogs import RecentPath
 
     recent = RecentPath(str(directory), str(directory.name), None)  # type: ignore

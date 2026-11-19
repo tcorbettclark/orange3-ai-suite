@@ -1,11 +1,8 @@
-"""Pair-building tests - BOS padding and unit-boundary discipline.
+"""Pair building from an EOS-terminated token stream: BOS padding and unit boundaries.
 
-``make_pairs`` takes an EOS-terminated token stream, so every case is tested
-on hand-written integers: no vocabulary, no corpus, no tokenizer.
-
-A unit of ids ``2, 3, 4`` is written ``[2, 3, 4, EOS]`` in the stream, and it
-contributes four pairs: three for its tokens and one for its EOS. Targets are
-therefore every token in the stream, in order - ``len(stream)`` pairs, always.
+A unit of ids ``2, 3, 4`` is written ``[2, 3, 4, EOS]`` in the stream, and contributes
+four pairs: three for its tokens and one for its EOS. Targets are every token of the
+stream in order, so there are ``len(stream)`` pairs, always.
 """
 
 import numpy as np

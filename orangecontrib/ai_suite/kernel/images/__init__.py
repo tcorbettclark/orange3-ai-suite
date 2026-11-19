@@ -1,20 +1,7 @@
-"""Image data: what the caller handed us, and what can be measured from it.
+"""Images as table rows: a row of luma values in [0, 1], and the features described
+from each image.
 
-Five parts, each with a reason to change of its own:
-
-- :mod:`decode` - what the caller handed us: alpha, channel order, value
-  range. Parameterless, and it refuses a range it cannot interpret.
-- :mod:`resize` - resampling to a fixed square, one policy per axis: area
-  averaging when an axis shrinks, bilinear when it grows.
-- :mod:`flatten` - a 2-D grid as one row, with a coordinate name per cell:
-  the columns of a pixel-values table.
-- :mod:`pixels` - the plain baseline itself: those three steps, in that order,
-  as one call. No features, no table.
-- ``features`` - the described, catalogued measurements and the pipeline
-  they are defined against.
-
-The sharing is deliberate and only at this level: ``features`` decodes and
-resizes through :mod:`decode` and :mod:`resize`; :mod:`pixels` composes the three
-plain steps; neither reaches into the other. The kernel builds no tables, so the
-caller names the columns with :func:`flatten.flatten`'s names.
+:mod:`decode` reads the caller's array, :mod:`resize` scales it to a square,
+:mod:`flatten` names each cell, and :mod:`pixels` composes those three steps.
+``features`` describes the same image through the same decode and resize.
 """

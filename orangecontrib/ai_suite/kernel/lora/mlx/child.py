@@ -1,16 +1,9 @@
-"""The training child: our code, so the parent reads a format we own.
+"""The training child: the process mlx-lm trains in, reporting through :mod:`protocol`.
 
-mlx-lm's progress output is an ANSI-coloured table meant for a person at a
-terminal. Rather than parse it, this module calls mlx-lm's own Python API -
-``build_parser`` for the current defaults, ``load`` and ``load_dataset`` to build
-what training needs, ``train_model`` with a ``TrainingCallback`` - and writes one
-JSON object per line on stdout using the format owned by :mod:`protocol`.
-Everything else on stdout is mlx-lm's human log, which the parent forwards to its
-tail untouched.
-
-It runs as ``python -m ...mlx.child <json spec>``: the parent passes
-:class:`~train.TrainingSpec` as JSON and this module rebuilds it by name, so a
-field added on one side and not the other fails here rather than being ignored.
+It runs as ``python -m ...mlx.child <json spec>``: the parent passes a JSON
+:class:`~train.TrainingSpec` and the child rebuilds it by name, so a field one side
+does not know fails here. Every line on stdout that is not a marked event is mlx-lm's
+human log, which the parent keeps for a failure message.
 """
 
 from __future__ import annotations
@@ -31,11 +24,10 @@ def emit(event: Params | TrainReport | ValReport) -> None:
 
 
 def apply_spec(args: Any, spec: TrainingSpec) -> None:
-    """Fill an mlx-lm argument namespace from the run specification.
+    """Overwrite the fields of an mlx-lm argument namespace with the run's specification.
 
-    The namespace comes from mlx-lm's own parser (see :func:`main`), so a new
-    mlx-lm field gets its default instead of an AttributeError; this function
-    only overwrites what the run actually decides.
+    The namespace comes from mlx-lm's own parser, so every field the spec does not name
+    keeps mlx-lm's default.
     """
     for field in fields(TrainingSpec):
         setattr(args, field.name, getattr(spec, field.name))
@@ -62,13 +54,10 @@ def emit_params(model: Any) -> None:
 
 
 def install_params_hook(lora_module: Any) -> None:
-    """Route mlx-lm's trainable-parameter report into :func:`emit_params`.
+    """Replace mlx-lm's trainable-parameter printer with one that also emits the counts.
 
-    ``train_model`` reports those counts by printing a line; it reaches the
-    printer through a module global, so replacing that global in this child -
-    which is ours, single-threaded, and about to train - is how the counts become
-    data. The lookup is checked first: if mlx-lm moves the printer, this fails
-    loudly here instead of silently dropping the metric.
+    The printer is reached through a module global in ``mlx_lm.lora``, so a missing one
+    raises here rather than dropping the metric silently.
     """
     original = getattr(lora_module, "print_trainable_parameters", None)
     if original is None:
@@ -85,7 +74,7 @@ def install_params_hook(lora_module: Any) -> None:
 
 
 def emit_metrics(training_callback: type) -> Any:
-    """A callback that turns mlx-lm's reports into the parent's metric dicts."""
+    """A callback on the given base class that emits one event per loss report."""
 
     class Emitter(training_callback):  # type: ignore[misc, valid-type]
         def on_train_loss_report(self, info: dict) -> None:

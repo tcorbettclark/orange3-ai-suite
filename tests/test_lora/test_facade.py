@@ -1,8 +1,6 @@
 """The package facade: the names a caller needs, and nothing that is not.
 
-Pinned deliberately, matching the lm façade's pin. Widening the surface should
-be a decision that breaks a test, not something that happens by adding an
-import.
+``EXPECTED`` is the whole surface, compared against ``lora.__all__``.
 """
 
 import orangecontrib.ai_suite.kernel.lora as lora

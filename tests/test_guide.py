@@ -1,4 +1,4 @@
-"""The feature guide: one page generated from the catalogue, never a copy."""
+"""The feature guide: one page generated from the catalogue."""
 
 from orangecontrib.ai_suite.kernel.images.features import (
     all_features,

@@ -1,27 +1,10 @@
-"""The feature catalogue: one module, one class, one feature - and its index.
+"""The feature catalogue: every feature in column order, by name and by position.
 
-This package is the primary interface to the features. Each feature is a class
-in its own module. The catalogue is the list below, in column order, and the
-accessors are how the rest of the kernel and the widgets read it.
+Each feature is a class in its own module and one instance in ``_CATALOGUE``, whose
+order is the column order and the only definition of it.
 
-Importing this package imports every feature, which is deliberate: each class
-validates itself when it is created (see :mod:`..feature`), so a malformed
-feature fails here rather than during extraction.
-
-``_CATALOGUE`` *is* the column order - the only place it is defined - and it is
-private because :func:`all_features` already returns it. It is written out
-rather than discovered by scanning the directory: a module that nothing imports
-would otherwise be silently invisible, which is a worse failure than a stale
-list. The tests assert that the catalogue and the directory agree.
-
-``POSITION`` and ``is_known`` are the seam :mod:`..extraction` and :mod:`..groups`
-use; they are public names but not advertised, because a caller reading features
-should go through the accessors.
-
-Order here is column order and nothing else. Which features belong together is
-a grouping concern (:mod:`..groups`), so neither this file nor the classes it
-lists may group the features into families: a second statement of the grouping
-would only be something else to go stale.
+Importing this package imports every feature, and each class validates itself when
+it is created, so a malformed feature fails on import rather than during extraction.
 """
 
 from __future__ import annotations
@@ -161,7 +144,7 @@ def is_known(name: str) -> bool:
 
 
 def get_feature(name: str) -> Feature:
-    """Look up one feature by name; a friendly error for unknown names."""
+    """One feature by name; ``ValueError`` when the name is not in the catalogue."""
     try:
         return _BY_NAME[name]
     except KeyError:

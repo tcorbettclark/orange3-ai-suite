@@ -1,6 +1,6 @@
 """Pixel-level check: white label boxes mask the lines beneath.
 
-The model is seeded so the layout is identical on every run.
+The seeded model gives the same layout on every run.
 """
 
 from AnyQt.QtCore import QRectF

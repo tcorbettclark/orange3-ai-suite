@@ -1,16 +1,10 @@
-"""Orange <-> kernel adapters.
+"""Orange Tables built from kernel results, and kernel arguments read out of Tables.
 
-All Orange-type conversion (Table, Corpus, meta columns) lives here, in the
-widget layer. The kernel never imports Orange; this module never imports Qt.
-It imports Orange types, and reads one kernel fact where it is needed: the
-epoch-stats key order the kernel's training runs produce. That import is inside
-:func:`checkpoint_table`, because the key order lives beside the producer, whose
-module imports Keras - and the image widgets import this module too, so they must
-not pay for the ML stack at startup.
+The one place Orange types are converted: Table, Corpus and meta-column inputs
+become kernel arguments, and a list of generations or of epoch stats becomes a
+Table.
 
-Inputs are read duck-typed where cheap: an Orange3-Text ``Corpus`` *is* a
-``Table`` subclass (so a plain ``Table`` input accepts it automatically);
-``.documents`` is used when present, string meta columns otherwise.
+The kernel never imports Orange, and this module never imports Qt.
 """
 
 from __future__ import annotations
@@ -26,12 +20,11 @@ from Orange.data import (
 
 
 def image_paths(table: Table):
-    """Image column and resolved paths from an Import-Images-style table.
+    """The image column of a table, and its paths resolved against the column's ``origin``.
 
-    Returns ``(column, paths)`` where paths are resolved against the column's
-    ``origin`` attribute - exactly the contract the Image Analytics add-on's
-    Import Images produces. Uses that add-on's public helpers via a lazy
-    import; the error message covers its absence.
+    The column must be the one Import Images marks as an image path, and the paths
+    come from that add-on's own ``extract_paths``. A table without such a column,
+    or without the add-on installed, raises ``ValueError``.
     """
     try:
         from orangecontrib.imageanalytics.utils.image_utils import extract_paths
@@ -59,9 +52,11 @@ def image_paths(table: Table):
 
 
 def table_texts(table: Table) -> list[str]:
-    """Extract one document per row: string meta columns joined by newline.
+    """One document per row: the string meta columns joined by newline.
 
-    Prefers ``table.documents`` when the input is an Orange3-Text Corpus.
+    ``table.documents`` wins when the input is an Orange3-Text Corpus, and a
+    string column named ``text`` is used on its own. A table with no string
+    column raises ``ValueError``.
     """
     docs = getattr(table, "documents", None)
     if docs is not None and len(docs) == len(table):
@@ -80,19 +75,19 @@ def table_texts(table: Table) -> list[str]:
 def corpus_text(table: Table) -> str:
     """All documents of a table as the one text the kernel takes.
 
-    Rows are separated by a newline, which is a hard break for sentence
-    splitting, so joining cannot merge the last sentence of one row into the
-    first of the next - inside a row or at a seam, the same rule applies.
+    Rows are separated by a newline, a hard break for the kernel's sentence
+    splitting.
     """
     return "\n".join(table_texts(table))
 
 
 def table_pairs(table: Table) -> list[tuple[str, str]]:
-    """Prompt-response pairs from a Table, the supervised fine-tuning format.
+    """Prompt-response pairs from a table, the supervised fine-tuning format.
 
-    Looks for columns named ``prompt``/``completion`` (or their common
-    synonyms, case-insensitive); otherwise takes the first two string metas in
-    display order. A missing second text column is an error.
+    Columns named ``prompt``/``completion`` (or their common synonyms, matched
+    case-insensitively) are used when present, otherwise the first two string
+    metas in display order. Pairs with an empty side are dropped, and a missing
+    second text column raises ``ValueError``.
     """
     string_metas = [v for v in table.domain.metas if v.is_string]
     by_name = {v.name.lower(): v for v in string_metas}
@@ -115,21 +110,24 @@ def table_pairs(table: Table) -> list[tuple[str, str]]:
 
 
 def generations_table(generations: list[str]) -> Table:
-    """Generations as a one-column Table (readable in Corpus Viewer and
-    Orange3-Text widgets when that add-on is installed)."""
+    """Generations as a one-column Table of ``generation`` strings.
+
+    The column is a string meta, which Corpus Viewer and the Orange3-Text widgets
+    read when that add-on is installed.
+    """
     domain = Domain([], metas=[StringVariable("generation")])
     metas = np.asarray(generations, dtype=object).reshape(-1, 1)
     return Table.from_numpy(domain, np.empty((len(generations), 0)), None, metas)
 
 
 def checkpoint_table(stats: list[dict]) -> Table:
-    """Epoch -> loss/perplexity + sample text (the gibberish -> pastiche table).
+    """One row per epoch of loss, perplexity and sample text.
 
-    The columns are the kernel's own epoch-stats key order, taken from the module
-    that produces them rather than re-listed here; a row may carry a ``sample``
-    meta value, which is the hook's addition, not the kernel's. The import is
-    local because that module imports Keras, and this one is imported by the
-    image widgets too.
+    The columns follow the kernel's epoch-stats key order, taken from the module
+    that produces them; ``sample`` is the widget's addition, not the kernel's, and
+    an epoch without one gets an empty string. The import stays inside this
+    function: the epoch-stats module imports Keras, and the image widgets import
+    this module.
     """
     from orangecontrib.ai_suite.kernel.lm.stats import EPOCH_STATS_KEYS as columns
 
@@ -149,5 +147,5 @@ def checkpoint_table(stats: list[dict]) -> Table:
 
 
 def generations_strings(table: Table) -> list[str]:
-    """Inverse of :func:`generations_table`, for tests and downstream inspection."""
+    """The generations of a :func:`generations_table` Table, in row order."""
     return [str(row) for row in table.metas[:, 0]]

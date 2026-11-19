@@ -30,7 +30,7 @@ CORPUS = "the cat sat on the mat. the cat saw the dog. a dog and a cat ran."
 
 
 def fit(tokenizer, text, architecture, *, on_epoch=None, stop_requested=None, **options):
-    """Training in one line: the model owns fit, the options carry the run."""
+    """A fitted ``LanguageModel`` for ``text``, in one call."""
     return LanguageModel(architecture, tokenizer).fit(
         text,
         TrainingOptions(**options),
@@ -344,7 +344,7 @@ def test_language_model_is_serialisable_in_principle(mlp_model):
 
 
 def test_stop_requested_works_without_epoch_hook(tokenizer):
-    """The stop flag must not depend on an on_epoch callback being present."""
+    """A stop request is honoured with no on_epoch callback attached."""
     model = fit(
         tokenizer,
         CORPUS,

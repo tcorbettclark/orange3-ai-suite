@@ -1,13 +1,10 @@
-"""Image Features: interpretable features for image classification.
+"""Image Features: a table of interpretable features, one row per readable image.
 
-A thin shell over :mod:`orangecontrib.ai_suite.kernel.images.features`. The widget adds preprocessing and
-group options, a thumbnail grid with a feature-values panel, and the Orange
-signal adapters.
+Preprocessing and feature-group options beside a thumbnail grid and a
+feature-values panel, with the Orange signal adapters.
 
-Decoded images and their raw feature values are cached, so changing feature
-groups reuses the cached features instead of re-reading every image. Loading and
-feature computation run in a background thread; the widget's progress bar
-reports both phases.
+Decoded images and raw feature values are cached per input table, so toggling a
+group re-reads nothing; loading and extraction run in a background thread.
 """
 
 from __future__ import annotations
@@ -240,20 +237,17 @@ class ThumbnailLoader(QThread):
 class OWImageFeatures(OWWidget):
     """Extract human-interpretable features from images.
 
-    Input is an Import Images table (image paths in a meta column). Output is
-    one row per readable image, one column per selected feature, with the
-    input's class variables and metas kept so any row can be traced back to its
-    source image.
+    Input is an Import Images table (image paths in a meta column); output is one
+    row per readable image, one column per selected feature, with the input's class
+    variables and metas kept so any row can be traced back to its source image.
 
     The controls select preprocessing (working size, centre crop, contrast
-    normalisation, optional denoising) and feature groups. Toggling groups is
-    the ablation experiment; group G (colour) is the opt-in shortcut
-    demonstration. The main area shows every input image as a thumbnail, with
-    the count and the current selection in the header. A right-hand panel shows
-    the selected image's feature values, grouped A-G, and a class-split
-    histogram for the selected feature. The ``Selected image`` output sends
-    that row as a one-row table; connect it to a data table's subset input to
-    highlight the image among all rows.
+    normalisation, optional denoising) and feature groups, with group G (colour) as
+    the opt-in shortcut demonstration. The thumbnail grid shows every input image,
+    and a side panel shows the selected image's feature values and a class-split
+    histogram. The ``Selected image`` output sends that row as a one-row table,
+    which a data table's subset input can take to highlight the image among all
+    rows.
     """
 
     name = "Image Features"
@@ -1058,8 +1052,7 @@ class OWImageFeatures(OWWidget):
     def wait_for_extraction(self, timeout_ms: int = 30000):
         """Wait for the current and any pending extraction worker.
 
-        The worker stores its result before emitting the signal, so tests can
-        consume it without spinning the GUI event loop.
+        The worker stores its result before it emits the signal.
         """
         while self._worker is not None:
             worker = self._worker

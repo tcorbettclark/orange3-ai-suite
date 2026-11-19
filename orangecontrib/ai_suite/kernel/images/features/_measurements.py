@@ -1,13 +1,8 @@
 """Image measurements shared by more than one feature.
 
-Every function here is pure and stateless: it recomputes what it returns. Two
-features may call the same measurement, but no value is ever cached or handed
-from one feature to another — that independence is the point of one class per
-feature, and it is what keeps a feature's cost attributable to that feature.
-
-A measurement lives here only when more than one feature needs it; anything used
-by a single feature belongs in that feature's module. Numeric *rules* (the
-epsilon, the flat-input policy, the slope scaling) live in :mod:`_conventions`.
+Every function is pure and stateless, recomputing what it returns, and a
+measurement lives here only when more than one feature needs it. The numeric
+rules it builds on live in :mod:`_conventions`.
 """
 
 from __future__ import annotations
@@ -36,10 +31,10 @@ class MassMoments(NamedTuple):
 
 
 def peak_count(profile: np.ndarray, options: FeatureOptions) -> float:
-    """Interior maxima with prominence of at least the configured fraction.
+    """The number of interior maxima with prominence of at least the configured fraction.
 
-    The profile is padded with its own minimum on both ends so a maximum at the
-    image border still counts; the padding can never create a false peak.
+    A maximum on the image border counts: the profile is padded with its own
+    minimum on both ends.
     """
     dynamic_range = float(profile.max() - profile.min())
     if dynamic_range < EPS:
@@ -56,10 +51,9 @@ def roughness(profile: np.ndarray) -> float:
 
 
 def diagonal_profile(image: np.ndarray, anti: bool) -> np.ndarray:
-    """Mean intensity along every diagonal, from a dense projection.
+    """Mean intensity along every diagonal.
 
-    ``ndarray.diagonal`` is exact (no interpolation). ``anti`` reads the
-    anti-diagonal by mirroring the columns first.
+    ``anti`` reads the anti-diagonal direction instead of the main diagonal.
     """
     source = image[:, ::-1] if anti else image
     h, w = image.shape
@@ -72,8 +66,8 @@ def diagonal_profile(image: np.ndarray, anti: bool) -> np.ndarray:
 def mass_moments(image: np.ndarray) -> MassMoments:
     """Intensity-weighted centre of mass and covariance, normalised to [0, 1].
 
-    A black image has no mass: the centre is the middle of the frame and the
-    variances are zero.
+    A black image has no mass: the centre is the middle of the frame, and the
+    variances and the covariance are zero.
     """
     h, w = image.shape
     xs = np.linspace(0.0, 1.0, w, dtype=np.float64)
@@ -107,7 +101,7 @@ def gradient_magnitude(image: np.ndarray) -> np.ndarray:
 
 
 def local_std_mean(image: np.ndarray) -> float:
-    """Mean local standard deviation over 5x5 windows (E[x^2] - E[x]^2)."""
+    """Mean local standard deviation over ``LOCAL_STD_WINDOW`` x ``LOCAL_STD_WINDOW`` windows."""
     image32 = image.astype(np.float32)
     mean = cv2.boxFilter(image32, -1, (LOCAL_STD_WINDOW,) * 2)
     mean_sq = cv2.boxFilter(image32 * image32, -1, (LOCAL_STD_WINDOW,) * 2)
@@ -116,12 +110,7 @@ def local_std_mean(image: np.ndarray) -> float:
 
 
 def block_mean_variance(image: np.ndarray) -> float:
-    """Variance of 16x16 block means (INTER_AREA downsampling).
-
-    This is coarse block averaging, its own decision for the coarse-texture
-    feature - not :mod:`images.resize`'s shrink/grow policy, which it sits
-    outside deliberately.
-    """
+    """Variance of the means of ``COARSE_BLOCK`` x ``COARSE_BLOCK`` blocks, area-averaged."""
     h, w = image.shape
     out_h, out_w = max(h // COARSE_BLOCK, 1), max(w // COARSE_BLOCK, 1)
     blocks = cv2.resize(image, (out_w, out_h), interpolation=cv2.INTER_AREA)
@@ -129,13 +118,11 @@ def block_mean_variance(image: np.ndarray) -> float:
 
 
 def otsu_foreground(image: np.ndarray) -> np.ndarray:
-    """Bright-foreground Otsu binarisation.
+    """A boolean foreground mask from Otsu's threshold, the bright side as foreground.
 
-    cv2's THRESH_OTSU accepts only 8U/16U input, so the image is min-max scaled
-    to uint8 and the threshold mapped back to the original scale (Otsu is
-    invariant under affine rescaling, so this is exact). A flat image has no
-    foreground. Polarity is fixed: brighter than threshold is foreground, so a
-    genuinely dark-object-on-light image must be inverted by the caller.
+    Polarity is fixed: brighter than the threshold is foreground, so a
+    dark-object-on-light image must be inverted by the caller. A flat image has
+    no foreground.
     """
     lo, hi = float(image.min()), float(image.max())
     if hi - lo < EPS:
@@ -168,9 +155,7 @@ def mirror_corr(image: np.ndarray, axis: int) -> float:
 def colour_channels(image: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """(r, g, b) float64 planes, or None for grayscale input.
 
-    Grayscale has no colour by definition, so the colour features return 0.0
-    for it; the code rule lives here, and each feature's document names its
-    own consequence.
+    Grayscale has no colour, so the colour features turn None into 0.0.
     """
     if image.ndim == 2:
         return None

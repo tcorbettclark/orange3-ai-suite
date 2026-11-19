@@ -1,20 +1,8 @@
-"""One photograph as raw pixel values.
+"""One photograph's ``pixel_row`` output, printed as numbers, as characters and at three sizes.
 
-Run it from the repository root:
-
-    uv run python examples/image_pixels.py [photo] [grid size]
-
-The plain baseline is three kernel steps composed by one kernel function, and
-the Image Pixels widget calls that function too: ``decode`` (luma, [0, 1]),
-``resize`` (a fixed square resolution) and ``flatten`` (one row, with a
-coordinate name per cell) as ``images.pixels.pixel_row``. None of them reads a
-file or builds a table - the widget supplies those. This script shows what the
-composition guarantees:
-
-* values are luma in [0, 1], in row-major order;
-* there are exactly ``size * size`` of them, and the grid size is passed in;
-* the grid is the whole frame resized straight to a square, with no centre crop
-  and no contrast stretch - a dark photograph stays dark.
+Run it from the repository root with ``uv run python examples/image_pixels.py``,
+optionally with a photo path and a grid size. The grid is the whole frame resized to a
+square, with no crop and no contrast stretch, so a dark photograph stays dark.
 """
 
 import sys
@@ -30,7 +18,10 @@ RAMP = " .:-=+*#%@"  # ten steps from dark to bright
 
 
 def load(path: Path) -> np.ndarray:
-    """Read a photo as RGB. The kernel never guesses channel order."""
+    """Read a photo as RGB, resolving a bare name against this directory.
+
+    The kernel reads RGB and never guesses channel order.
+    """
     if not path.is_file() and (HERE / path).is_file():
         path = HERE / path  # a bare name means one of the photos in this directory
     if not path.is_file():

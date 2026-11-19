@@ -1,13 +1,8 @@
-"""The boundary's whole external surface, checked against the installed library.
+"""The boundary's external surface, checked against the installed library.
 
-Everything in ``lora/mlx`` that names mlx or mlx-lm, in one place: the loader,
-the sampler, the tuner's entry points and callback, the printer the params hook
-replaces, and the parameter counters. No model, no weights, no Metal work - an
-mlx-lm upgrade that moves any of these fails here instead of halfway through a
-student's run.
-
-Skipped when the ``lora`` extra is not installed, like the rest of the LoRA
-kernel tests.
+Everything in ``lora/mlx`` that names mlx or mlx-lm: the loader, the sampler, the
+tuner's entry points and callback, the printer the params hook replaces, and the
+parameter counters. Skipped when the ``lora`` extra is not installed.
 """
 
 from types import SimpleNamespace

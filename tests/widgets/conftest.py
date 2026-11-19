@@ -1,8 +1,7 @@
 """Widget test fixtures: offscreen Qt, no display needed.
 
-This directory is only collected when the Orange interpreter runs the suite
-(see root conftest.py), so importing Orange is safe here — but the conftest
-itself is still IMPORTED when a plain Python runs pytest, so bail cleanly.
+The whole module is skipped unless Orange and AnyQt both import, which is what a
+plain Python run of pytest gets.
 """
 
 import pytest
@@ -77,10 +76,11 @@ def make_model():
 
 
 class _DummyHoverEvent:
-    """Stand-in for QGraphicsSceneHoverEvent, which PyQt6 refuses to
-    instantiate. The widget's handlers run their own code first and then
-    forward the event via super(); that forward raises TypeError on the
-    dummy, which `fire_hover` is allowed to swallow -- and *only* that."""
+    """A stand-in for QGraphicsSceneHoverEvent, which PyQt6 refuses to instantiate.
+
+    A handler that forwards it to ``super()`` raises TypeError there, and
+    ``fire_hover`` swallows that one.
+    """
 
     def screenPos(self):
         from AnyQt.QtCore import QPoint
@@ -124,7 +124,7 @@ def widget(qapp, make_model):
 
 @pytest.fixture(scope="module")
 def image_dir(tmp_path_factory):
-    """flat / noisy / disc images on disk, PNG, 64x64."""
+    """Flat, noisy and disc images on disk as 64x64 PNGs, with their paths."""
     rng = np.random.default_rng(0)
     d = tmp_path_factory.mktemp("images")
     paths = []

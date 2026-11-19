@@ -1,15 +1,9 @@
-"""Neural Network Viewer: draw a trained MLP with its weights annotated.
+"""Neural Network Viewer: a trained MLP drawn with its weights annotated on the edges.
 
-Takes the *Model* output of Orange's Neural Network widget (which wraps
-scikit-learn's MLPClassifier / MLPRegressor) and renders the network on
-a native Qt graphics scene: one column of nodes per layer, edges whose
-width is proportional to |weight| (blue = positive, red = negative), the
-numeric value printed beside each edge (for small networks), and biases
-under the neurons they feed. Hovering an edge thickens it, fills its two
-end nodes with its colour, and tints the associated labels with it; every
-edge and node also has a tooltip with its exact value.
-
-The diagram always scales to fit the window.
+One column of nodes per layer, edge width proportional to |weight| and colour its
+sign, the numeric weight printed where the network is small, and biases under the
+neurons they feed. The diagram scales to fit the window, and every edge and node has
+a tooltip with its exact value.
 """
 
 import numpy as np
@@ -31,8 +25,10 @@ from Orange.widgets.widget import Input, Msg, OWWidget
 
 
 def _qt_enum(owner, group, name):
-    """Resolve an enum across Qt bindings: Qt 5 exposes ``owner.name``,
-    Qt 6 scopes it as ``owner.group.name``."""
+    """The enum attribute ``name`` of ``owner``, under either Qt binding.
+
+    Qt 5 exposes ``owner.name``; Qt 6 scopes it as ``owner.group.name``.
+    """
     value = getattr(owner, name, None)
     if value is None:
         value = getattr(getattr(owner, group), name)
@@ -65,7 +61,7 @@ NODE_PEN = QPen(QColor("#333333"), 1.1)
 
 
 def _tint(item, color=None):
-    """Set a text item's colour, or restore its original (color=None)."""
+    """Set a text item's colour, or restore its original when ``color`` is None."""
     if color is None:
         item.setBrush(QBrush(item._base_color))
     else:
@@ -81,8 +77,7 @@ def _fmt(value, spec):
 
 
 class NodeItem(QGraphicsEllipseItem):
-    """Accepts hover (keeping it off the edges beneath) and shows its
-    tooltip instantly; it has no other hover behaviour."""
+    """A node that shows its tooltip on hover and keeps the hover off the edges beneath."""
 
     def hoverEnterEvent(self, event):
         QToolTip.showText(event.screenPos(), self.toolTip())
@@ -94,8 +89,7 @@ class NodeItem(QGraphicsEllipseItem):
 
 
 class BoxedTextItem(QGraphicsSimpleTextItem):
-    """Text with an opaque white background, for labels drawn on top
-    of edges."""
+    """Text with an opaque white background, for labels drawn on top of edges."""
 
     def paint(self, painter, option, widget=None):
         painter.fillRect(self.boundingRect().adjusted(-2, -1, 2, 1), QColor("white"))
@@ -103,11 +97,7 @@ class BoxedTextItem(QGraphicsSimpleTextItem):
 
 
 class EdgeItem(QGraphicsLineItem):
-    """An edge whose weight is encoded in width and colour. On hover it
-    thickens, its two end nodes fill with the edge's colour (size
-    unchanged), and every label belonging to those nodes (names,
-    numbers, biases) and to the edge itself is tinted with the edge's
-    colour."""
+    """An edge whose weight is encoded in width and colour, tinted on hover."""
 
     def __init__(self, x0, y0, x1, y1, width, color, tooltip, ends=()):
         super().__init__(QLineF(x0, y0, x1, y1))
@@ -174,16 +164,9 @@ class NNView(QGraphicsView):
 class OWNeuralNetworkViewer(OWWidget):
     """Draw a trained neural network with weights on the edges.
 
-    Input is the Model output of Orange's Neural Network widget (a
-    scikit-learn MLP). Nodes are arranged one column per layer; edge width
-    encodes |weight| and colour its sign. For small networks the numeric
-    weight is printed on each edge; hovering any edge reveals exact values and
-    highlights its endpoints. Biases appear under the neurons they feed and in
-    tooltips.
-
-    The view scales to fit the window. Weights that are NaN or infinite are
-    drawn as zero-weight edges and flagged, and a model without recognisable
-    weight matrices shows a waiting message instead of crashing.
+    Input is the Model output of Orange's Neural Network widget (a scikit-learn MLP).
+    A model without recognisable weight matrices shows a waiting message, and NaN or
+    infinite weights are drawn as zero-weight edges and flagged in a warning.
     """
 
     name = "Neural Network Viewer"

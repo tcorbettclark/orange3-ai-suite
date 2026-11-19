@@ -1,6 +1,8 @@
-"""Input validation: anything that is not a full MLP (coefs_ without a
-matching intercepts_, or no skl_model at all) must show the warning and
-the placeholder text instead of raising inside the input handler."""
+"""Input validation: a model that is not a full MLP warns instead of raising.
+
+A model with ``coefs_`` and no ``intercepts_``, or with no ``skl_model`` at all, gets
+the warning and the placeholder text from the input handler.
+"""
 
 import numpy as np
 
@@ -37,8 +39,7 @@ class _NonFiniteWeights:
 
 
 def _placeholder_texts(widget):
-    """Only the placeholder message, not the per-node name labels (which
-    are also plain QGraphicsSimpleTextItems)."""
+    """The placeholder items only, not the per-node name labels, which are text items too."""
     return [
         i
         for i in widget.scene.items()

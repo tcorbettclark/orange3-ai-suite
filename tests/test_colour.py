@@ -18,7 +18,7 @@ def _compute(image):
 
 
 def sky_photo(size=64):
-    """Blue sky with white clouds (the shortcut case)."""
+    """A blue sky with a white cloud."""
     img = np.zeros((size, size, 3), dtype=np.float32)
     img[..., 2] = 0.8  # blue everywhere
     img[..., :2] = 0.5
@@ -28,7 +28,7 @@ def sky_photo(size=64):
 
 
 def field_photo(size=64):
-    """Ground: grass green everywhere (no sky)."""
+    """A green field with no sky."""
     img = np.zeros((size, size, 3), dtype=np.float32)
     img[..., 0], img[..., 1], img[..., 2] = (0.25, 0.55, 0.20)
     return img

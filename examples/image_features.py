@@ -1,18 +1,8 @@
-"""Extract interpretable image features, and see where the numbers come from.
+"""The kernel's image features and their catalogue, printed for three cloud photographs.
 
-Run it from the repository root:
-
-    uv run python examples/image_features.py
-
-The path, and the lines where the parts meet:
-
-    image (RGB) ──extract_features──> FeatureVector     # one number per feature
-    catalogue ──────────────────────> 38 feature classes, each with a description
-    groups ─────────────────────────> membership lists, for ablation and display
-
-The three photographs are real skies from the CCSN database (CC0), not
-synthetic ones: `examples/CREDITS.md` gives the source and citation. Nothing
-here needs Orange or Qt.
+Run it from the repository root with ``uv run python examples/image_features.py``. The
+photographs are real skies from the CCSN database (CC0), credited in
+``examples/CREDITS.md``, and nothing here needs Orange or Qt.
 """
 
 from pathlib import Path
@@ -33,7 +23,10 @@ HERE = Path(__file__).parent
 
 
 def load(name: str) -> np.ndarray:
-    """Read a photo as RGB. The kernel never guesses channel order."""
+    """Read one of the photographs in this directory as an RGB array.
+
+    The kernel reads RGB and never guesses channel order.
+    """
     bgr = cv2.imread(str(HERE / name))
     if bgr is None:
         raise SystemExit(f"cannot read {HERE / name}")

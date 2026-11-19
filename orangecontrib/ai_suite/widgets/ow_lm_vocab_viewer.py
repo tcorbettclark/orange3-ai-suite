@@ -1,13 +1,9 @@
-"""LM Vocab Viewer: a read-only view of a tokenizer.
+"""LM Vocab Viewer: read-only token, id and count tables for a tokenizer.
 
-Input is a model (preferred: its embedded tokenizer is shown) or data with text
-columns (then the character and word tokenizers are built side by side,
-making the LM Pre-trainer's tokenizer choice visible). There are deliberately no
-outputs: the viewer never feeds back into training or generation, so
-vocabulary-mismatch bugs are impossible by construction.
-
-The viewer shows the token-to-id table, corpus frequency counts (a Zipf's
-law side lesson) and its longest tokens.
+Input is a model, whose embedded tokenizer is shown, or data with text columns,
+where a character and a word tokenizer are built side by side; the summary line
+reports vocabulary size, mean token length and the hapax fraction. There are no
+outputs.
 """
 
 from __future__ import annotations
@@ -30,13 +26,10 @@ def _fill_table(table_widget: QTableWidget, rows: list[tuple]) -> None:
 class OWLMVocabViewer(OWWidget):
     """Inspect a tokenizer: tokens, ids and frequencies.
 
-    Connect a model to see the vocabulary embedded in it, or connect text data
-    to compare a character and a word tokenizer built from that
-    data. The summary line reports vocabulary size, mean token length and the
-    fraction of tokens seen only once; the tabs list the full vocabulary for
-    each tokenizer.
-
-    Read-only by design: there are no output signals.
+    A connected model shows the vocabulary embedded in it; connected text data gives
+    a character and a word tokenizer built from it. The summary line reports
+    vocabulary size, mean token length and the hapax fraction, and the tabs list each
+    full vocabulary. There are no output signals.
     """
 
     name = "LM Vocab Viewer"
@@ -142,7 +135,7 @@ class OWLMVocabViewer(OWWidget):
 
     @staticmethod
     def _show_tokenizer(tokenizer, table: QTableWidget) -> None:
-        """Rows in rank order: vocabulary order is meaningless, frequency is not."""
+        """Fill a table with the special tokens, then tokens by descending count."""
         specials = [
             (tokenizer.token(i), i, tokenizer.counts[i]) for i in range(tokenizer.n_special)
         ]

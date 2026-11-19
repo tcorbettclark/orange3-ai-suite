@@ -1,9 +1,4 @@
-"""The stride both validation splits are built on.
-
-Two callers, one rule, so the rule gets its own tests: the split methods are then
-free to test only their own policy (units vs rows, fractions that must exclude 0
-vs allow it).
-"""
+"""The stride both validation splits are built on."""
 
 import pytest
 

@@ -1,5 +1,4 @@
-"""Feature extraction front door: :class:`FeatureVector` and
-:func:`extract_features`."""
+"""The feature extraction front door: one image in, a :class:`FeatureVector` out."""
 
 from __future__ import annotations
 
@@ -14,16 +13,12 @@ from .options import FeatureOptions
 
 
 class FeatureVector(Mapping[str, float]):
-    """Result of feature extraction: a name -> value mapping in column order.
+    """Result of feature extraction: a read-only name -> value mapping in column order.
 
-    A read-only :class:`~collections.abc.Mapping`, so ``vec["hole_count"]``,
-    ``vec.keys()``, ``vec.items()``, ``vec.get`` and equality against a plain
-    dict all behave as expected. Values are held in catalogue column order
-    whatever order they were supplied in, so :meth:`names` and
-    :meth:`to_array` cannot disagree.
-
-    Feature metadata (description, count flag) lives in the catalogue:
-    ``get_feature(name)``. Group views are delegated to :mod:`groups`.
+    Values are held in catalogue column order whatever order they were supplied in,
+    so :meth:`names` and :meth:`to_array` always line up. Feature metadata
+    (description, count flag) lives in the catalogue, ``get_feature(name)``, and
+    group views are delegated to :mod:`groups`.
     """
 
     def __init__(self, values: Mapping[str, float]):
@@ -69,7 +64,7 @@ def extract_features(
     groups: str | None = None,
     exclude: Iterable[str] | None = None,
 ) -> FeatureVector:
-    """Extract features from one image.
+    """Feature values for one image, as a :class:`FeatureVector`.
 
     Parameters
     ----------

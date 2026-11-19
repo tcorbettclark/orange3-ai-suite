@@ -1,4 +1,4 @@
-"""Asset download/cache/prepare tests. No network."""
+"""The asset download, cache and prepare paths, tested without a network."""
 
 import hashlib
 import json

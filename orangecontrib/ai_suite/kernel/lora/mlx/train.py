@@ -1,21 +1,9 @@
-"""Training as an iterator, with the process hidden behind it.
+"""Training as an iterator, with the child process and the stop hidden behind it.
 
-A :class:`Run` is what the lora layer uses: iterate it for progress events, call
-:meth:`Run.stop` from any thread, and read ``outcome`` when the iteration ends.
-Three things that are not ours to invent are hidden behind it:
-
-- **the child process** (:mod:`child`), which is where mlx-lm's Python API is
-  actually called. It exists because training holds gigabytes of Metal memory,
-  has to be interruptible, and must not be able to take Orange down with it.
-- **the wire format** (:mod:`protocol`): one event per line on the child's stdout,
-  everything else being mlx-lm's human log.
-- **the stop**, which has to be a signal. ``stop()`` sets a flag *and* terminates
-  the child's process group, which is what also wakes the reader parked on its
-  stdout - and a timer escalates to SIGKILL if the child ignores the signal, so a
-  stuck Metal call cannot leave the reader parked for ever. The blocking half is
-  here too: iteration does not end, and the directory is not safe to read, until
-  the child is gone. mlx-lm saves a checkpoint straight to its final path, so a
-  directory read while a writer is alive can pick up a truncated file.
+A :class:`Run` is iterated for progress events, stopped from any thread with
+``stop()``, and read for ``outcome`` once the iteration ends. Iteration does not end,
+and the adapter directory is not safe to read, until the child is gone: a stop
+terminates its process group and escalates to SIGKILL if the child ignores the signal.
 """
 
 from __future__ import annotations
@@ -43,13 +31,7 @@ _TAIL_LINES = 200
 
 @dataclass(frozen=True)
 class TrainingSpec:
-    """One run, as mlx-lm describes it: every setting a training call takes.
-
-    The lora layer builds this from its own options, so the mapping from a
-    teaching setting to a library setting is written once, in one direction. A
-    field added here and not there is a dataclass error rather than a silently
-    ignored setting, because the child rebuilds the spec from JSON.
-    """
+    """One run, as mlx-lm describes it: every setting a training call takes."""
 
     model: str
     data: str
@@ -83,17 +65,16 @@ class TrainingFailed(RuntimeError):
 
 
 def command(spec: TrainingSpec) -> list[str]:
-    """The one way to start a run: our child module, and the run as one JSON argument."""
+    """The argv that starts the child for a spec: our module and the spec as one argument."""
     return [sys.executable, "-m", _CHILD, json.dumps(asdict(spec))]
 
 
 class Run:
-    """One training run: iterate it for events; ``stop()`` from any thread.
+    """One training run: iterate it for events, and ``stop()`` it from any thread.
 
-    Iteration is what spawns the child, so constructing a run costs nothing and a
-    run that is stopped before it starts never spawns one. When iteration ends -
-    normally, by :meth:`stop`, or because the consumer left the loop - the child
-    is gone and ``outcome`` says whether a stop cut the run short.
+    Iteration spawns the child, so a run constructed and never iterated costs nothing.
+    When the iteration ends, however it ends, the child is gone and ``outcome`` says
+    whether a stop cut the run short.
     """
 
     def __init__(self, spec: TrainingSpec, *, stop_timeout: float = STOP_TIMEOUT) -> None:
@@ -120,11 +101,9 @@ class Run:
     def stop(self) -> None:
         """Ask the run to stop; returns at once, so any thread may call it.
 
-        Sets the flag the reader checks, and terminates the child's process group
-        - which is also what wakes the reader, since the signal closes the pipe it
-        is parked on. If the child ignores it (a Metal call that will not be
-        interrupted), a timer escalates to SIGKILL; the *blocking* wait for the
-        child belongs to iteration and to :meth:`close`, never here.
+        The signal closes the pipe the reader is parked on, and a timer escalates to
+        SIGKILL if the child ignores it (a Metal call that will not be interrupted). The
+        blocking wait for the child belongs to iteration and to :meth:`close`.
         """
         self._stop.set()
         process = self._process

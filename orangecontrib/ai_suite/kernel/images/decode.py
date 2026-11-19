@@ -1,13 +1,8 @@
-"""Decoding the caller's array: channels, alpha and value range.
+"""The caller's array as float32 luma, and as values in [0, 1].
 
-Callers hand the kernel an array in the channel order and value range they have;
-these helpers are the single place that says what that means. ``to_luminance``
-converts RGB(A) or grayscale to luma, ``to_unit_scale`` brings pixel values into
-[0, 1].
-
-Both refuse rather than guess where guessing would silently change a feature: a
-2-channel array is not RGB, and a 16-bit, HDR or negative array is not a [0, 255]
-image.
+``to_luminance`` turns 2-D grayscale or 3-D RGB(A) input into luma, keeping the
+input's scale; ``to_unit_scale`` brings either the unit or the 8-bit range into
+[0, 1]. An array outside those channel counts or ranges raises ``ValueError``.
 """
 
 from __future__ import annotations
@@ -27,17 +22,12 @@ def drop_alpha(image: np.ndarray) -> np.ndarray:
 
 
 def to_luminance(image: np.ndarray) -> np.ndarray:
-    """Convert an RGB(A) or grayscale array to a float32 grayscale image.
+    """Convert an RGB(A) or grayscale array to a float32 luma image.
 
     Accepts 2-D input as-is (already grayscale) and 3-D input with 3 (RGB) or
-    4 (RGBA, alpha dropped) channels. The weighted sum is elementwise rather
-    than a matrix-vector product: some numpy builds emit spurious BLAS warnings
-    for the equivalent matmul dispatch. Values keep the input's scale.
-
-    The weights are applied to the values as given, so for the usual
-    gamma-encoded sRGB input this is luma (Y'), not linear-light luminance.
-    Every feature therefore tracks perceived brightness rather than physical
-    intensity; linearising first would change the numbers, not the ordering.
+    4 (RGBA, alpha dropped) channels; values keep the input's scale. The weights
+    apply to the values as given, so for gamma-encoded sRGB input this is luma
+    (Y'), not linear-light luminance.
     """
     image = np.asarray(image)
     if image.ndim == 2:
@@ -62,11 +52,8 @@ def to_unit_scale(image: np.ndarray) -> np.ndarray:
     """Scale pixel values into [0, 1], accepting the unit or the 8-bit range.
 
     A peak at or below 1.0 is taken as already unit-scaled; a peak up to 255 is
-    divided by 255 and clipped. Anything brighter is rejected: dividing a
-    16-bit or HDR image by 255 would keep it above 1 and quietly flip every
-    threshold that assumes unit scale. A floor below zero is rejected for the
-    same reason: negative intensity is neither range, and passing it through
-    would invert every threshold in the other direction.
+    divided by 255 and clipped. A peak above 255 or a floor below zero raises
+    ``ValueError``.
     """
     image = np.asarray(image, dtype=np.float32)
     if image.size == 0:

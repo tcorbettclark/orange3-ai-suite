@@ -28,12 +28,7 @@ def test_widget_category_layout():
 
 
 def test_the_readme_widget_table_lists_exactly_the_registered_widgets():
-    """The README table is a page beside the registry: it must not drift.
-
-    The same discovery the toolbox uses is compared with the table's rows, so a
-    new widget with no row - or a row for a widget that no longer exists - fails
-    here rather than in a classroom.
-    """
+    """The README widget table and the registered widgets are the same list."""
     import pathlib
 
     readme = (pathlib.Path(__file__).resolve().parents[2] / "README.md").read_text()

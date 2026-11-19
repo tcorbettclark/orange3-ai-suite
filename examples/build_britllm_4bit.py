@@ -1,20 +1,11 @@
-"""Build (and optionally publish) the pinned 4-bit MLX BritLLM artifact.
+"""Builds (and optionally publishes) the pinned 4-bit MLX BritLLM artifact; a maintainer script.
 
-Maintainer script, not the student path. It downloads the fp16 source, converts
-it with ``mlx_lm convert --quantize`` (4-bit affine, group 64, the MLX defaults),
-adds the chat template the masked SFT path needs, writes a manifest and model
-card, and prints the ``Asset`` constant to paste into ``kernel/assets/britllm.py``.
-
-    uv run --extra lora python examples/build_britllm_4bit.py
-    uv run --extra lora python examples/build_britllm_4bit.py --upload
-
-The converted directory goes to a new temporary directory unless ``--target``
-is given, so the repository is not written to. The second form needs
-``hf auth login`` and publishes to ``tcorbettclark/britllm-3b-v0.1-4bit-mlx``
-(override with ``--repo-id``), then prints the commit SHA to pin. The classic
-LFS uploader is the default; ``--xet`` opts into the chunked uploader.
-Students use the BritLLM Models widget or
-``orange-ai-assets fetch britllm-4bit``; neither converts anything.
+``uv run --extra lora python examples/build_britllm_4bit.py`` writes a 4-bit affine
+(group 64) MLX copy of the fp16 source, with the minimal chat template the masked SFT
+path needs, plus a manifest, a model card and the ``Asset`` block for
+``kernel/assets/britllm.py``. ``--upload`` publishes that copy to
+``tcorbettclark/britllm-3b-v0.1-4bit-mlx`` (``--repo-id`` overrides) and prints the
+commit SHA to pin.
 """
 
 from __future__ import annotations
@@ -42,11 +33,11 @@ MINIMAL_CHAT_TEMPLATE = (
 
 
 def add_minimal_chat_template(model_dir: Path) -> bool:
-    """Add a minimal chat template when the tokenizer has none.
+    """Add a minimal chat template to ``tokenizer_config.json``, returning whether it added one.
 
-    A raw base model's tokenizer ships no chat template, but mlx-lm's
-    prompt-masking SFT path requires one. The converted copy gets a minimal
-    generic role template ('user: .../assistant: ...'); weights are untouched.
+    True means the file gained the template and False that it already had one; weights
+    are untouched. A raw base model's tokenizer ships none, and mlx-lm's prompt-masking
+    SFT path fails without one.
     """
     cfg_path = model_dir / "tokenizer_config.json"
     cfg = json.loads(cfg_path.read_text())
@@ -58,10 +49,10 @@ def add_minimal_chat_template(model_dir: Path) -> bool:
 
 
 def parameter_count(source: Path) -> float:
-    """Billions of parameters, from the source fp16 shard headers.
+    """Billions of parameters, counted from the source fp16 shard headers.
 
-    MLX quantised leaf sizes report packed storage, not parameter counts, so the
-    source headers are the honest numerator.
+    ``source`` is the fp16 snapshot, not the converted directory: quantised leaves report
+    packed storage rather than parameter counts.
     """
     index = json.loads((source / "model.safetensors.index.json").read_text())
     param_bytes = 0

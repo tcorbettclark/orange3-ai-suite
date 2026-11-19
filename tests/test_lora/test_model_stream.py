@@ -1,11 +1,8 @@
 """The streaming convention on the MLX side: one sampling path, chunked.
 
-``generate`` is ``stream`` joined up, so the prompt echo, the sampling settings
-and the seed are decided in one place. The chunks are mlx-lm's, so a caller may
-only concatenate them - never depend on where the boundaries fall.
-
-No weights and no Metal work: the mlx-lm sampler is replaced, and only the model
-object it would need is faked.
+``generate`` is ``stream`` joined up: the prompt echo, the sampling settings and the
+seed are set in ``stream``, and the chunk boundaries are mlx-lm's, so a caller may only
+concatenate them. The mlx-lm sampler is replaced and no weights are loaded.
 """
 
 import pytest

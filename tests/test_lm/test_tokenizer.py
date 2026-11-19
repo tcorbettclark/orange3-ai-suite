@@ -1,9 +1,8 @@
-"""Tokenizer edge cases: special ids, the catalogue, encode/decode round trips, pruning
-(BOS/padding, unknowns, sentence boundaries) start here.
+"""Tokenizer edge cases: special ids, the catalogue, encode/decode round trips and pruning.
 
-Expected ids are always derived via ``tok.index(...)`` - no hardcoded id
-assumptions (the vocabulary order is an implementation detail, so it must never
-leak into the tests).
+Pruning keeps the most frequent tokens and encodes the rest as ``<unk>``. Expected ids
+come from ``tok.index(...)``, never from a hardcoded number, because the vocabulary
+order is an implementation detail.
 """
 
 import dataclasses

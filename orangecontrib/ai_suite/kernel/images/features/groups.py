@@ -1,20 +1,9 @@
 """Feature groups: membership lists over the catalogue.
 
-A group owns no feature and computes nothing. It is a membership list plus the
-words to describe it, so the same feature may appear in several groups - that
-overlap is what makes alternative ablations possible without touching the
-features themselves.
-
-Two rules keep the grouping honest, both checked at import:
-
-- every name listed by a group exists in the catalogue, and every feature belongs
-  to at least one group (an unlisted feature could never be selected);
-- a group is either on by default or opt-in, and opt-in groups are the ones
-  holding colour features - the shortcut stays a deliberate choice.
-
-Display rule: a feature is reported under the *first* group that lists it, so
-:func:`group_of` and the widget tree show each feature exactly once even when
-memberships overlap.
+A group owns no feature and computes nothing; it is a membership list plus the
+words describing it, so a feature can appear in several groups. Every name is
+checked against the catalogue at import, and a feature is reported under the first
+group that lists it.
 """
 
 from __future__ import annotations
@@ -203,7 +192,7 @@ def selection(groups: str | None = None) -> tuple[str, ...]:
     """Resolve a group selection to feature names, in stable column order.
 
     ``None`` means the default selection. A selection may name any subset of
-    groups; members are de-duplicated, so overlapping groups are harmless.
+    groups; members are de-duplicated across them.
     """
     letters = check_groups(DEFAULT_GROUPS if groups is None else groups)
     wanted = {name for letter in letters for name in get_group(letter).members}

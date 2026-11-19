@@ -1,7 +1,7 @@
 """LoRA Pre-trainer widget tests.
 
-The real-training test needs mlx in THIS environment (Apple Silicon [lora]
-extra) AND the converted model on disk; deg + routing tests run anywhere.
+The real-training test needs mlx installed here (the ``lora`` extra, Apple Silicon)
+and the converted model on disk; the others run anywhere.
 """
 
 import importlib.util
@@ -38,7 +38,7 @@ def test_mlx_missing_routes_to_install_hint(qapp):
 @pytest.mark.skipif(not MLX_OK, reason="[lora] extra (mlx) not installed in this environment")
 @pytest.mark.slow
 def test_real_training_path(qapp, capture):
-    """2-iteration QLoRA via the widget's blocking path end-to-end."""
+    """A two-iteration QLoRA run through the widget's blocking path."""
     model_dir = cached_path(BRITLLM_4BIT)
     if model_dir is None:
         pytest.skip(

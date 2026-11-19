@@ -1,8 +1,8 @@
 """Row granularity: how much text one row of the table holds.
 
-The units the model trains on are always sentences - :func:`split_sentences`, and
-``Tokenizer.encode`` closes each with EOS. This module only decides where table
-rows end, which is a storage and selection choice, not a modelling one.
+The units the model trains on are sentences whatever a row holds: :func:`split_sentences`
+cuts them and ``Tokenizer.encode`` closes each with EOS. This module only decides where
+table rows end.
 """
 
 from __future__ import annotations
@@ -12,11 +12,10 @@ from enum import StrEnum
 
 
 class RowGranularity(StrEnum):
-    """How much text one table row holds.
+    """How much text one table row holds: the whole file, a paragraph or a sentence.
 
-    The member name is for code, the value is the label a reader sees in the
-    menu, so there is one name to change rather than a member, a token and a
-    caption kept in step. Sentences are the model's units whatever this says.
+    The member value is the label a reader sees in the menu; the member name is what
+    code uses.
     """
 
     WHOLE_FILE = "Whole file"
@@ -36,16 +35,9 @@ _TERMINATOR = re.compile(r"(?<=[.!?…])\s+")
 def split_sentences(text: str) -> list[str]:
     """Split a document into sentences; a newline is a hard break.
 
-    Text-level on purpose: the two rules it encodes - a newline ends a
-    sentence, a terminator ends one only when whitespace follows - both depend
-    on characters that tokenization may discard. Callers that work in the
-    token domain get sentence structure from the tokenizer, which closes every
-    sentence with EOS (see ``Tokenizer.encode``).
-
-    Because a newline always breaks, documents joined by newlines cannot merge
-    the last sentence of one into the first of the next - which is why a corpus
-    can be assembled outside the kernel, with no separator convention to
-    remember beyond "newline between documents".
+    A terminator ends a sentence only when whitespace follows, so ``What?! No.`` keeps
+    ``?!`` together. A newline always breaks, so documents joined by newlines cannot
+    merge the last sentence of one into the first of the next.
     """
     out: list[str] = []
     for line in text.splitlines():

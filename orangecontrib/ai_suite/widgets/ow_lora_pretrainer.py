@@ -1,8 +1,7 @@
-"""LoRA Pre-trainer: continue pre-training a base LLM on raw text.
+"""LoRA Pre-trainer: a LoRA adapter trained on a corpus of documents.
 
-A thin shell over :mod:`orangecontrib.ai_suite.kernel.lora`; the shared training UI lives in
-:mod:`._lora_base`. This widget supplies the continued-pre-training data
-contract: one document per row, self-supervised next-token loss.
+One document per row, trained on the ordinary next-token objective. The widget
+itself is the shared LoRA training UI in :mod:`._lora_base`.
 """
 
 from __future__ import annotations
@@ -15,11 +14,9 @@ from ._lora_base import LoRATrainerBase
 class OWLoRAPretrainer(LoRATrainerBase):
     """Continue pre-training a pretrained language model on a raw corpus.
 
-    Input is a Table of text documents, one per row. Output is a ``LoRAModel``:
-    the base model plus the trained adapter. The corpus is unlabelled and the
-    loss is the ordinary next-token objective, so this is still pre-training;
-    the adapter only restricts which weights change. Use LoRA SFT when the data
-    contains prompt/response pairs.
+    Input is a Table of text documents, one per row. Output is a ``LoRAModel``: the
+    base model plus the trained adapter. The corpus is unlabelled and the loss is the
+    ordinary next-token objective.
     """
 
     name = "LoRA Pre-trainer"

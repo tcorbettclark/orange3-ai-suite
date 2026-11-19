@@ -1,15 +1,9 @@
-"""The training child's wire format: one event per stdout line.
+"""The training child's wire format: one typed event per marked stdout line.
 
-Both ends of this protocol are inside :mod:`..mlx` - :mod:`child` writes with
-:func:`encode`, :mod:`train` reads with :func:`decode` - so the format has one
-author and no parser to reverse-engineer. It lives in its own module because the
-reader and the writer (run with ``-m``) must import it without importing each
-other.
-
-The payload is a typed event rather than a dict: a caller that iterates a run
-switches on the event's *type*, so a new kind of report cannot arrive as a string
-somebody forgot to handle. Every line the child does not mark is mlx-lm's own
-human log, which the run collects for the tail a failure message quotes.
+:mod:`child` writes a line with :func:`encode` and :mod:`train` reads it with
+:func:`decode`; a line the child does not mark is mlx-lm's own human log, which the run
+keeps for the tail a failure message quotes. The reader and the writer import this
+module and never each other.
 """
 
 from __future__ import annotations
@@ -64,8 +58,8 @@ def encode(event: Event) -> str:
 def decode(line: str) -> Event | None:
     """The event on this line, or None when the line is mlx-lm's human log.
 
-    A malformed line, or a kind this version does not know, is a bug in our own
-    child, so it raises rather than being skipped as noise.
+    A malformed line, or a kind this version does not know, raises: both are bugs in our
+    own child rather than noise to skip.
     """
     if not line.startswith(MARKER):
         return None

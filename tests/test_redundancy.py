@@ -1,13 +1,8 @@
-"""No two features may be the same number.
+"""No two features may report the same number.
 
-Features are reviewed one at a time, which is exactly the seam where duplicates
-hide: a group B feature once recomputed a group C feature's centre of mass from
-its own profiles, and the two columns differed only by float32 summation noise.
-
-The probes below are deliberately varied (clouds, a digit, a ring, a bar, bands,
-a gradient) so features that are honestly distinct must disagree somewhere. A
-pair counts as a duplicate only if it agrees to 1e-6 on *every* probe and is not
-trivially near-zero everywhere.
+A pair counts as a duplicate only if it agrees to 1e-6 on *every* probe and is not
+trivially near-zero everywhere. The probes are a cloud, a digit-eight, a ring, a bar,
+bands and a gradient.
 """
 
 import itertools

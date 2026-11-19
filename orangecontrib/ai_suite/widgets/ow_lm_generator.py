@@ -1,13 +1,9 @@
-"""LM Generator: generate text with any kernel-convention model.
+"""LM Generator: a table of generated text from any kernel-convention model.
 
-The input is any object exposing ``stream(prompt, temperature,
-max_new_tokens, seed)``: the kernel's Keras ``LanguageModel``, a ``LoRAModel``,
-or a saved artifact loaded from disk. The text stream is what makes generation
-watchable - text appears as the model writes it, and Stop acts on the next chunk
-- and the output is still a one-column Table of complete generations.
-
-Temperature is the most instructive knob in language-model demos: low values
-repeat, high values dissolve into word salad.
+Any object exposing ``stream(prompt, temperature, max_new_tokens, seed)`` is an
+input: the kernel's Keras ``LanguageModel``, a ``LoRAModel``, or a saved artifact
+loaded from disk. The text appears as the model writes it, Stop takes effect at the
+next chunk, and the Generations output is a one-column Table.
 """
 
 from __future__ import annotations
@@ -68,14 +64,12 @@ class _GenerationWorker(QThread):
 class OWLMGenerator(OWWidget):
     """Generate text from a trained kernel-convention model.
 
-    Input is a model object (Keras, MLX/LoRA, or compatible). The controls set
-    the prompt, temperature, maximum new tokens, number of generations and
-    seed. Generations are emitted as a one-column Table, ready for Corpus
-    Viewer and the Orange3-Text analysis widgets.
+    Input is a model object (Keras, MLX/LoRA, or compatible); the controls set the
+    prompt, temperature, maximum new tokens, number of generations and seed, and the
+    Generations output carries a one-column Table.
 
-    For LoRA models, the "Use LoRA adapter" checkbox switches between the
-    adapted model and its raw base model, so the before/after comparison uses
-    the identical weights.
+    For a LoRA model, "Use LoRA adapter" switches between the adapted model and its
+    raw base model.
     """
 
     name = "LM Generator"
@@ -197,7 +191,7 @@ class OWLMGenerator(OWWidget):
             self.worker.stop()
 
     def _set_running(self, running: bool) -> None:
-        """One switch for the two buttons: a run has a Stop, an idle widget a Generate."""
+        """Enable Generate or Stop, according to whether a run is in progress."""
         self._generate_button.setEnabled(not running)
         self._stop_button.setEnabled(running)
 
