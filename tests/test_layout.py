@@ -4,6 +4,11 @@ The kernel is organised by domain; ``images`` is the image domain, holding the
 image pipeline (``decode``, ``resize``, ``flatten``, and ``pixels`` composing
 them) and the ``features`` package built on it. A leading underscore marks
 support code that nothing outside ``images`` may import.
+
+``lora`` puts everything that knows MLX behind ``lora/mlx``: the domain package
+above it - options, data, the split, the run's scratch, the artifact - imports
+nothing from ``mlx`` or ``mlx_lm``, and the boundary package never reaches back
+up into its parent.
 """
 
 import ast
@@ -102,3 +107,71 @@ def test_the_text_facade_exports_every_public_name_and_nothing_private():
     for name in facade.__all__:
         assert hasattr(facade, name), name
     assert not [name for name in facade.__all__ if name.startswith("_")]
+
+
+# ---- the MLX boundary ------------------------------------------------------
+
+LORA = KERNEL / "lora"
+LORA_MLX = LORA / "mlx"
+
+
+def _imports(path: pathlib.Path) -> list[tuple[str, int]]:
+    """(module, relative level) for every import in a file; level 0 is absolute."""
+    found = []
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.Import):
+            found.extend((alias.name, 0) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            found.append((node.module or "", node.level))
+    return found
+
+
+def test_only_the_mlx_boundary_names_mlx():
+    # mlx is Apple-Silicon-only, so a stray import above the boundary would make
+    # the whole kernel unimportable elsewhere - and would hide the coupling from
+    # the one module that is supposed to own it.
+    offenders = []
+    for path in (ROOT / "orangecontrib").rglob("*.py"):
+        if LORA_MLX in path.parents or "__pycache__" in path.parts:
+            continue
+        for module, level in _imports(path):
+            # relative imports name our own subpackage; only the library itself
+            # (an absolute import) is forbidden out here
+            if level == 0 and (module == "mlx" or module.startswith(("mlx.", "mlx_lm"))):
+                offenders.append(f"{path.relative_to(ROOT)}: {module}")
+    assert offenders == []
+
+
+def test_the_mlx_boundary_never_reaches_back_up_into_lora():
+    # A leaf importing its parent is an arrow pointing the wrong way: the domain
+    # package may know the boundary, never the reverse.
+    offenders = []
+    for path in LORA_MLX.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        for module, level in _imports(path):
+            if level > 1:
+                offenders.append(f"{path.relative_to(ROOT)}: {'.' * level}{module}")
+            elif module.startswith("orangecontrib.ai_suite.kernel.lora.") and not module.startswith(
+                "orangecontrib.ai_suite.kernel.lora.mlx"
+            ):
+                offenders.append(f"{path.relative_to(ROOT)}: {module}")
+    assert offenders == []
+
+
+def test_the_mlx_boundary_is_a_package_with_a_facade():
+    # What the domain may use is the subpackage's __all__, so the boundary has a
+    # contract rather than a directory of internals.
+    from orangecontrib.ai_suite.kernel.lora import mlx
+
+    assert {"run_training", "TrainingSpec", "load_model", "stream_text"} <= set(mlx.__all__)
+    for name in mlx.__all__:
+        assert hasattr(mlx, name), name
+    assert {p.name for p in LORA_MLX.glob("*.py")} == {
+        "__init__.py",
+        "child.py",
+        "layout.py",
+        "protocol.py",
+        "runtime.py",
+        "train.py",
+    }

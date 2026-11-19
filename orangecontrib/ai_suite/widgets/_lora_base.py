@@ -28,6 +28,9 @@ from orangecontrib.ai_suite.kernel.lora import (
     split_for_training,
     train_lora,
 )
+from orangecontrib.ai_suite.kernel.lora import (
+    available as lora_available,
+)
 
 _OPTION_DEFAULTS = LoRAOptions()
 
@@ -218,12 +221,7 @@ class LoRATrainerBase(OWWidget, openclass=True):
 
     @staticmethod
     def _mlx_available() -> bool:
-        import importlib.util
-
-        return (
-            importlib.util.find_spec("mlx") is not None
-            and importlib.util.find_spec("mlx_lm") is not None
-        )
+        return lora_available()
 
     def _build_request(self):
         """Validate state and stage data; None (with a message) when unusable."""

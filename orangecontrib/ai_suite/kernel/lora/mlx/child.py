@@ -4,39 +4,24 @@ mlx-lm's progress output is an ANSI-coloured table meant for a person at a
 terminal. Rather than parse it, this module calls mlx-lm's own Python API -
 ``build_parser`` for the current defaults, ``load`` and ``load_dataset`` to build
 what training needs, ``train_model`` with a ``TrainingCallback`` - and writes one
-JSON object per line on stdout using the format owned by :mod:`._protocol`.
+JSON object per line on stdout using the format owned by :mod:`protocol`.
 Everything else on stdout is mlx-lm's human log, which the parent forwards to its
 tail untouched.
 
-The wire format therefore has two authors and both are in this repository, so
-renaming a field breaks a test rather than a student's run.
-
-It runs in a subprocess on purpose - training holds gigabytes of Metal memory,
-has to be interruptible, and must not be able to take Orange down with it - and
-the whole run arrives as one JSON argument, so there are no command-line flags to
-keep in step with :class:`~.training.LoRAOptions`.
+It runs as ``python -m ...mlx.child <json spec>``: the parent passes
+:class:`~train.TrainingSpec` as JSON and this module rebuilds it by name, so a
+field added on one side and not the other fails here rather than being ignored.
 """
 
 from __future__ import annotations
 
 import json
 import sys
+from dataclasses import fields
 from typing import Any
 
-from ._protocol import encode
-
-#: The option fields that travel verbatim from LoRAOptions to mlx-lm's namespace.
-_OPTION_FIELDS = (
-    "iters",
-    "learning_rate",
-    "num_layers",
-    "batch_size",
-    "max_seq_length",
-    "steps_per_report",
-    "steps_per_eval",
-    "save_every",
-    "seed",
-)
+from .protocol import encode
+from .train import TrainingSpec
 
 
 def emit(metric: dict[str, Any]) -> None:
@@ -45,32 +30,20 @@ def emit(metric: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def apply_spec(args: Any, spec: dict[str, Any]) -> None:
+def apply_spec(args: Any, spec: TrainingSpec) -> None:
     """Fill an mlx-lm argument namespace from the run specification.
 
     The namespace comes from mlx-lm's own parser (see :func:`main`), so a new
     mlx-lm field gets its default instead of an AttributeError; this function
-    only overwrites what the run actually decides. A key it does not know is
-    refused: the parent derives the spec from ``LoRAOptions``, so an unknown key
-    means a setting was added and would otherwise be ignored in silence.
+    only overwrites what the run actually decides.
     """
-    known = {*_OPTION_FIELDS, "model", "data", "adapter_path", "mask_prompt"}
-    missing = sorted(known - set(spec))
-    if missing:
-        raise KeyError(f"run specification is missing {missing}")
-    unknown = sorted(set(spec) - known)
-    if unknown:
-        raise KeyError(f"run specification carries settings mlx-lm cannot use: {unknown}")
-    for name in _OPTION_FIELDS:
-        setattr(args, name, spec[name])
-    args.model = spec["model"]
-    args.data = spec["data"]
-    args.adapter_path = spec["adapter_path"]
+    for field in fields(TrainingSpec):
+        setattr(args, field.name, getattr(spec, field.name))
     args.train = True
     args.test = False
     args.fine_tune_type = "lora"
-    # SFT: the prompt is the caller's text, so its tokens are not the target.
-    args.mask_prompt = bool(spec["mask_prompt"])
+    # mlx-lm names the checkpoint interval differently from our options.
+    args.save_every = spec.save_every
 
 
 def emit_params(model: Any) -> None:
@@ -94,9 +67,9 @@ def install_params_hook(lora_module: Any) -> None:
 
     ``train_model`` reports those counts by printing a line; it reaches the
     printer through a module global, so replacing that global in this child -
-    which is ours, and single-threaded, and about to train - is how the counts
-    become data. The lookup is checked first: if mlx-lm moves the printer, this
-    fails loudly here instead of silently dropping the metric.
+    which is ours, single-threaded, and about to train - is how the counts become
+    data. The lookup is checked first: if mlx-lm moves the printer, this fails
+    loudly here instead of silently dropping the metric.
     """
     original = getattr(lora_module, "print_trainable_parameters", None)
     if original is None:
@@ -143,7 +116,7 @@ def emit_metrics(training_callback: type) -> Any:
 
 def main(argv: list[str] | None = None) -> int:
     """Train one run from the JSON specification in ``argv[1]``."""
-    spec = json.loads((sys.argv if argv is None else argv)[1])
+    spec = TrainingSpec(**json.loads((sys.argv if argv is None else argv)[1]))
 
     import mlx_lm.lora as lora
     from mlx_lm import load

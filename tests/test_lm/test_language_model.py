@@ -373,3 +373,19 @@ def test_saving_an_unfitted_model_writes_nothing(tmp_path):
         model.save(target)
     # the guard runs before the directory is made: no orphan meta.json
     assert not target.exists()
+
+
+# ---- streaming: the convention every model shares --------------------------
+
+
+def test_the_keras_stream_is_one_chunk_and_says_so(monkeypatch, mlp_model):
+    # This model can only decode a finished unit, so its stream is everything at
+    # once. The convention is still the stream, so a widget never special-cases
+    # which model it is looking at.
+    monkeypatch.setattr(mlp_model, "generate", lambda *a, **k: "the whole unit")
+    assert list(mlp_model.stream("prompt", 0.5, 7, 3)) == ["the whole unit"]
+
+
+def test_the_keras_stream_concatenates_to_generate(mlp_model):
+    chunks = list(mlp_model.stream("the", temperature=0.0, max_new_tokens=5))
+    assert "".join(chunks) == mlp_model.generate("the", temperature=0.0, max_new_tokens=5)

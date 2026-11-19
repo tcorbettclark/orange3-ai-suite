@@ -5,30 +5,32 @@ directly here: the specification it accepts, the metrics it writes, and the two
 ways it can be lied to by a future mlx-lm.
 """
 
+import dataclasses
 import sys
 import types
 from types import SimpleNamespace
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.lora import _child
-from orangecontrib.ai_suite.kernel.lora._protocol import MARKER, decode
+from orangecontrib.ai_suite.kernel.lora.mlx import child as _child
+from orangecontrib.ai_suite.kernel.lora.mlx.protocol import MARKER, decode
+from orangecontrib.ai_suite.kernel.lora.mlx.train import TrainingSpec
 
-SPEC = {
-    "model": "the-base",
-    "data": "/runs/1/data",
-    "adapter_path": "/runs/1/adapter",
-    "mask_prompt": True,
-    "iters": 7,
-    "learning_rate": 2e-5,
-    "num_layers": 3,
-    "batch_size": 2,
-    "max_seq_length": 64,
-    "steps_per_report": 1,
-    "steps_per_eval": 2,
-    "save_every": 3,
-    "seed": 11,
-}
+SPEC = TrainingSpec(
+    model="the-base",
+    data="/runs/1/data",
+    adapter_path="/runs/1/adapter",
+    mask_prompt=True,
+    iters=7,
+    learning_rate=2e-5,
+    num_layers=3,
+    batch_size=2,
+    max_seq_length=64,
+    steps_per_report=1,
+    steps_per_eval=2,
+    save_every=3,
+    seed=11,
+)
 
 
 class _TrainingCallback:
@@ -67,24 +69,22 @@ def test_the_spec_fills_the_namespace_mlx_lm_reads():
 
 def test_a_text_run_does_not_mask_the_prompt():
     args = SimpleNamespace(trust_remote_code=False)
-    _child.apply_spec(args, {**SPEC, "mask_prompt": False})
+    _child.apply_spec(args, dataclasses.replace(SPEC, mask_prompt=False))
     assert args.mask_prompt is False
 
 
-@pytest.mark.parametrize("name", sorted(SPEC))
-def test_a_missing_setting_is_refused(name):
-    args = SimpleNamespace(trust_remote_code=False)
-    spec = {key: value for key, value in SPEC.items() if key != name}
-    with pytest.raises(KeyError, match="missing"):
-        _child.apply_spec(args, spec)
+def test_the_spec_is_rebuilt_by_name_so_a_stray_key_cannot_be_ignored():
+    # The child rebuilds TrainingSpec from the JSON the parent sent, so a field
+    # added on one side and not the other is an error here, not a setting that
+    # quietly never arrives.
+    import dataclasses
 
-
-def test_an_unknown_setting_is_refused():
-    # The parent derives the spec from LoRAOptions; a key the child cannot apply
-    # means a setting was added and would otherwise be dropped in silence.
-    args = SimpleNamespace(trust_remote_code=False)
-    with pytest.raises(KeyError, match="mlx-lm cannot use"):
-        _child.apply_spec(args, {**SPEC, "grad_checkpoint": True})
+    payload = dataclasses.asdict(SPEC)
+    with pytest.raises(TypeError, match="grad_checkpoint"):
+        TrainingSpec(**payload, grad_checkpoint=True)
+    for name in sorted(payload):
+        with pytest.raises(TypeError, match="required"):
+            TrainingSpec(**{k: v for k, v in payload.items() if k != name})
 
 
 # ---- the metrics -----------------------------------------------------------

@@ -1,10 +1,10 @@
 """The training child's wire format: one JSON metric per stdout line.
 
-Both ends of this protocol are ours - :mod:`._child` writes with :func:`encode`,
-:mod:`._protocol`'s reader decodes with :func:`decode` - so the format has one
+Both ends of this protocol are inside :mod:`..mlx` - :mod:`child` writes with
+:func:`encode`, :mod:`train` reads with :func:`decode` - so the format has one
 author and no parser to reverse-engineer. It lives in its own module because the
-reader (``training``) and the writer (``_child``, run with ``-m``) must be able to
-import it without importing each other.
+reader and the writer (run with ``-m``) must import it without importing each
+other.
 
 Every line the child does not mark is mlx-lm's own human log and is forwarded
 untouched, so the tail a failure message quotes still says what happened.

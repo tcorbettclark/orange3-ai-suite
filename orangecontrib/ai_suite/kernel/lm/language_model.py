@@ -186,6 +186,22 @@ class LanguageModel:
             context = context[1:] + [next_id]
         return self.tokenizer.decode(prompt_ids + generated)
 
+    def stream(
+        self,
+        prompt: str = "",
+        temperature: float = 1.0,
+        max_new_tokens: int = 64,
+        seed: int | None = None,
+    ):
+        """The text as it is produced - here, all of it at once.
+
+        The kernel convention is a stream, so that a widget can show text as it
+        arrives whatever model is connected. This one decodes a unit only when it
+        is finished, so its stream is a single chunk: a caller must concatenate
+        and never depend on where the boundaries fall.
+        """
+        yield self.generate(prompt, temperature, max_new_tokens, seed)
+
     def evaluate(self, text: str, batch_size: int = 256) -> dict[str, float]:
         """Loss and perplexity (e^loss) over the pairs of the given text.
 

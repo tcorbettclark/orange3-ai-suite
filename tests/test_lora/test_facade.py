@@ -14,6 +14,7 @@ EXPECTED = frozenset(
         "LoRAData",
         "LoRAOptions",
         "TrainingStopped",
+        "available",
         "split_for_training",
         "train_lora",
     }
@@ -27,12 +28,14 @@ def test_package_exports_only_the_use_case():
 
 
 def test_internals_live_in_their_own_module():
-    # Supported, but not part of the façade: the wire format shared with the
-    # training child, and the run's own helpers, belong to whoever owns the run.
-    from orangecontrib.ai_suite.kernel.lora._protocol import decode, encode
+    # Supported, but not part of the façade: the MLX boundary (its wire format,
+    # its runtime) and the run's own helpers belong to whoever owns the run.
+    from orangecontrib.ai_suite.kernel.lora import mlx
+    from orangecontrib.ai_suite.kernel.lora.mlx import protocol
     from orangecontrib.ai_suite.kernel.lora.model import _echo
     from orangecontrib.ai_suite.kernel.lora.training import _run_spec
 
     assert callable(_echo)
-    assert callable(encode) and callable(decode)
+    assert callable(protocol.encode) and callable(protocol.decode)
     assert callable(_run_spec)
+    assert callable(mlx.run_training)

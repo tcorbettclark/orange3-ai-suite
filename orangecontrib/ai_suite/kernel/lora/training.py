@@ -9,12 +9,11 @@ Two data formats:
    mlx-lm's prompt masking keeps the prompt tokens out of the loss, so only the
    completion is trained.
 
-The run is our own child module (:mod:`._child`) in a subprocess: it calls
-mlx-lm's Python API and writes one JSON metric per line to stdout, which
-:func:`._protocol.decode` reads. ``stop_requested`` terminates the child's
-process group; mlx-lm writes a checkpoint every ``save_every`` iterations and the
-final adapter after the last iteration, so a stop adopts the last checkpoint and
-records how far the run got.
+The run itself is :func:`.mlx.run_training`'s business: this module builds the
+specification, decides what a stopped run should leave behind, and keeps the run's
+scratch directory. mlx-lm writes a checkpoint every ``save_every`` iterations and
+the final adapter after the last iteration, so a stop adopts the last checkpoint
+and records how far the run got.
 
 The train/validation split is a run setting, not a property of the rows: it
 comes from :class:`LoRAOptions`, with the run's seed, so the two cannot
@@ -24,26 +23,20 @@ disagree.
 from __future__ import annotations
 
 import json
-import os
 import shutil
-import signal
-import subprocess
-import sys
 import tempfile
-import threading
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Literal
 
 from .._holdout import held_out_positions
-from ._protocol import decode
-from .model import _ADAPTER_CONFIG, _ADAPTER_WEIGHTS, LoRAAdapter
+from . import mlx
+from .mlx import TrainingSpec
+from .model import LoRAAdapter
 
 Format = Literal["text", "pairs"]
 Rows = list[str] | list[tuple[str, str]]
-
-_CHILD = "orangecontrib.ai_suite.kernel.lora._child"
 
 #: Name of one run's directory. In the shared temp root the name also says whose
 #: directory it is; inside a directory the caller named, only uniqueness is left
@@ -152,32 +145,6 @@ class LoRAData:
         return train, [self.rows[index] for index in sorted(held)]
 
 
-def _stage(format: Format, train: Rows, valid: Rows, directory: str | Path) -> Path:
-    """Write ``{train, valid}.jsonl`` in the format mlx-lm accepts.
-
-    ``valid.jsonl`` is omitted when there is no validation split: mlx-lm treats
-    a missing file as no validation but fails on an empty one. A stale file from
-    an earlier run is removed, so it cannot be picked up by mistake.
-    """
-    directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
-    if valid:
-        splits = [("train", train), ("valid", valid)]
-    else:
-        splits = [("train", train)]
-        stale = directory / "valid.jsonl"
-        if stale.exists():
-            stale.unlink()
-    for split, rows in splits:
-        with (directory / f"{split}.jsonl").open("w", encoding="utf-8") as f:
-            for row in rows:
-                record = (
-                    {"text": row} if format == "text" else {"prompt": row[0], "completion": row[1]}
-                )
-                f.write(json.dumps(record) + "\n")
-    return directory
-
-
 def split_for_training(data: LoRAData, options: LoRAOptions) -> tuple[Rows, Rows]:
     """The train and validation rows, refusing a validation batch mlx-lm cannot use.
 
@@ -204,55 +171,20 @@ def _run_spec(
     adapter_dir: str | Path,
     options: LoRAOptions,
     format: Format,
-) -> dict:
-    """The run as the child receives it: one dict, one spelling of "this run".
+) -> TrainingSpec:
+    """This run in mlx-lm's vocabulary: the one place the two sets of names meet.
 
     Paths are resolved here, and prompt masking follows the data format rather
-    than a caller's flag: SFT masks the prompt because the prompt is the
-    caller's text, not a target.
+    than a caller's flag: SFT masks the prompt because the prompt is the caller's
+    text, not a target.
     """
-    return {
-        "model": str(base_model),
-        "data": str(data_dir),
-        "adapter_path": str(adapter_dir),
-        "mask_prompt": format == "pairs",
+    return TrainingSpec(
+        model=str(base_model),
+        data=str(data_dir),
+        adapter_path=str(adapter_dir),
+        mask_prompt=format == "pairs",
         **{name: getattr(options, name) for name in _CHILD_OPTION_FIELDS},
-    }
-
-
-def _child_command(spec: dict) -> list[str]:
-    """The one way to start a run: our child module, and the run as one JSON argument."""
-    return [sys.executable, "-m", _CHILD, json.dumps(spec)]
-
-
-def _terminate(process: subprocess.Popen) -> None:
-    """Ask the child's process group to stop; it may already be gone."""
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        pass
-
-
-def _kill(process: subprocess.Popen) -> None:
-    """Stop the child's process group whether it agrees or not."""
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except (ProcessLookupError, PermissionError):
-        pass
-
-
-def _adapter_weights(adapter_dir: Path) -> Path | None:
-    """The final adapter if mlx-lm wrote it, else its newest numbered checkpoint."""
-    canonical = adapter_dir / _ADAPTER_WEIGHTS
-    if canonical.exists():
-        return canonical
-    checkpoints: list[tuple[int, Path]] = []
-    for path in adapter_dir.glob(f"*_{_ADAPTER_WEIGHTS}"):
-        try:
-            checkpoints.append((int(path.name.split("_", 1)[0]), path))
-        except ValueError:
-            continue
-    return max(checkpoints, key=lambda item: item[0])[1] if checkpoints else None
+    )
 
 
 def _run_directory(workdir: Path | None) -> Path:
@@ -317,78 +249,43 @@ def train_lora(
     train, valid = split_for_training(data, opts)
     run_dir = _run_directory(workdir)
     adapter_dir = run_dir / "adapter"
-    staged = _stage(data.format, train, valid, run_dir / "data")
-    adapter_dir.mkdir(parents=True, exist_ok=True)
-
-    cmd = _child_command(_run_spec(base_model, staged, adapter_dir, opts, data.format))
-    env = dict(os.environ, PYTHONUNBUFFERED="1")
-    tail: list[str] = []
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        env=env,
-        start_new_session=True,
+    spec = _run_spec(
+        base_model,
+        mlx.write_dataset(run_dir / "data", data.format, train, valid),
+        adapter_dir,
+        opts,
+        data.format,
     )
-    stopped = False
-    reader: threading.Thread | None = None
     try:
-        reader = threading.Thread(
-            target=_pump, args=(process, tail, on_metric, on_line), daemon=True
+        outcome = mlx.run_training(
+            spec, on_metric=on_metric, on_line=on_line, stop_requested=stop_requested
         )
-        reader.start()
-        while process.poll() is None:
-            if stop_requested is not None and stop_requested():
-                stopped = True
-                _terminate(process)
-                break
-            try:
-                process.wait(timeout=0.2)
-            except subprocess.TimeoutExpired:
-                pass
-        reader.join(timeout=10)
-        if process.returncode not in (0, None, -signal.SIGTERM):
-            tail_text = "".join(tail[-20:])
-            raise RuntimeError(
-                f"mlx_lm lora failed ({process.returncode}); the run directory "
-                f"{run_dir} keeps the staged data and log tail:\n{tail_text}"
-            )
-    finally:
-        # Nothing below may read the directory while the child can still write
-        # to it: mlx-lm saves a checkpoint straight to its final path, so a
-        # SIGTERM landing mid-write would leave a truncated file for
-        # _adapter_weights to prefer over an intact older one.
-        if process.poll() is None:
-            _terminate(process)
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                _kill(process)
-                process.wait()
-        if reader is not None:
-            reader.join()
+    except mlx.TrainingFailed as exc:
+        raise RuntimeError(
+            f"mlx_lm lora failed ({exc.returncode}); the run directory {run_dir} "
+            f"keeps the staged data and log tail:\n{''.join(exc.tail[-20:])}"
+        ) from exc
 
-    weights = _adapter_weights(adapter_dir)
+    weights = mlx.adapter_weights(adapter_dir)
     if weights is None:
-        if stopped:
+        if outcome.stopped:
             raise TrainingStopped(
                 "training was stopped before mlx-lm wrote a checkpoint "
                 "(save_every iterations must elapse first); nothing was adopted, and "
                 f"the run directory {run_dir} holds the log tail"
             )
         raise RuntimeError(f"training ended without adapter files; see {run_dir}")
-    canonical = adapter_dir / _ADAPTER_WEIGHTS
+    canonical = adapter_dir / mlx.ADAPTER_WEIGHTS
     completed = opts.iters
     if weights != canonical:
-        completed = int(weights.name.split("_", 1)[0])
+        completed = mlx.checkpoint_iteration(weights)
         shutil.copy2(weights, canonical)
         # mlx-lm writes one config per run, at the start (lora.py: save_config),
         # and none beside the numbered checkpoints, so the run's config is the
         # only one there is and it stays: the LoRA structure it describes does
         # not change mid-run. How far the run got is training["iters_completed"].
     adapter_config = {}
-    config_path = adapter_dir / _ADAPTER_CONFIG
+    config_path = adapter_dir / mlx.ADAPTER_CONFIG
     if config_path.exists():
         adapter_config = json.loads(config_path.read_text())
     return LoRAAdapter(
@@ -403,24 +300,3 @@ def train_lora(
         },
         name=name,
     )
-
-
-def _pump(
-    process: subprocess.Popen[str],
-    tail: list[str],
-    on_metric: Callable[[dict], None] | None,
-    on_line: Callable[[str], None] | None,
-) -> None:
-    """Stream the child's stdout: metrics to ``on_metric``, everything else as a log line."""
-    assert process.stdout is not None
-    for line in process.stdout:
-        metric = decode(line)
-        if metric is not None:
-            if on_metric is not None:
-                on_metric(metric)
-            continue  # the data is consumed; the tail keeps the human log only
-        tail.append(line)
-        if len(tail) > 200:
-            tail.pop(0)
-        if on_line is not None:
-            on_line(line)

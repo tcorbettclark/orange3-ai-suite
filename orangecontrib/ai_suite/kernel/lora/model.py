@@ -9,28 +9,14 @@ run that produced it. Loading the artifact reproduces the trained setup.
 from __future__ import annotations
 
 import json
-import math
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-_MLX_IMPORT_ERROR = (
-    "MLX not available - orange3-ai-suite[lora] requires macOS on Apple Silicon "
-    "(pip install orange3-ai-suite[lora])"
-)
+from . import mlx
 
-_ADAPTER_WEIGHTS = "adapters.safetensors"
-_ADAPTER_CONFIG = "adapter_config.json"
 _META_FILE = "lora_meta.json"
-_EVAL_WINDOW = 512  # ids per perplexity window; fixed so runs stay comparable
-
-
-def _require_mlx() -> None:
-    try:
-        import mlx_lm  # noqa: F401
-    except ImportError as exc:
-        raise ImportError(_MLX_IMPORT_ERROR) from exc
 
 
 def _echo(prompt: str, completion: str) -> str:
@@ -50,20 +36,6 @@ def _echo(prompt: str, completion: str) -> str:
     return prompt + sep + completion
 
 
-def _segments(ids: list[int], max_tokens: int, window: int) -> list[list[int]]:
-    """Windows of at most ``window`` inputs, plus the target that follows each.
-
-    Consecutive windows share one id: the last target of one window is the final
-    input of the next, so every id after the first is scored exactly once. Only
-    the first ``max_tokens`` ids are used.
-    """
-    if window < 2:
-        raise ValueError("window must be at least 2")
-    limit = min(len(ids), max_tokens)
-    step = window - 1
-    return [ids[start : min(start + window, limit)] for start in range(0, limit - 1, step)]
-
-
 @dataclass
 class LoRAAdapter:
     """The fine-tuning artifact: adapter files + base-model identity, one unit."""
@@ -81,12 +53,12 @@ class LoRAAdapter:
         path with no weights raises instead of silently saving a base model.
         """
         src = Path(self.adapter_path) if self.adapter_path is not None else None
-        if src is not None and not (src / _ADAPTER_WEIGHTS).is_file():
-            raise FileNotFoundError(f"no {_ADAPTER_WEIGHTS} in {src}")
+        if src is not None and not (src / mlx.ADAPTER_WEIGHTS).is_file():
+            raise FileNotFoundError(f"no {mlx.ADAPTER_WEIGHTS} in {src}")
         out = Path(dest)
         out.mkdir(parents=True, exist_ok=True)
         if src is not None:
-            for fname in (_ADAPTER_WEIGHTS, _ADAPTER_CONFIG):
+            for fname in (mlx.ADAPTER_WEIGHTS, mlx.ADAPTER_CONFIG):
                 if (src / fname).exists():
                     shutil.copy2(src / fname, out / fname)
         (out / _META_FILE).write_text(
@@ -111,7 +83,7 @@ class LoRAAdapter:
         src = Path(path)
         if (src / _META_FILE).exists():
             meta = json.loads((src / _META_FILE).read_text())
-            has_weights = (src / _ADAPTER_WEIGHTS).exists()
+            has_weights = (src / mlx.ADAPTER_WEIGHTS).exists()
             return cls(
                 base_model=meta["base_model"],
                 adapter_path=str(src) if has_weights else None,
@@ -143,7 +115,7 @@ class LoRAModel:
         training: dict[str, Any] | None = None,
         name: str = "",
     ):
-        _require_mlx()
+        mlx.require()
         self.base_model = base_model
         self.adapter_path = adapter_path
         self.adapter_enabled = adapter_path is not None
@@ -152,12 +124,9 @@ class LoRAModel:
         self._models: dict[bool, tuple[Any, Any]] = {}  # variant -> (model, tokenizer)
 
     def _variant(self, with_adapter: bool) -> tuple[Any, Any]:
-        from mlx_lm import load
-
         if with_adapter not in self._models:
-            self._models[with_adapter] = load(
-                self.base_model,
-                adapter_path=self.adapter_path if with_adapter else None,
+            self._models[with_adapter] = mlx.load_model(
+                self.base_model, self.adapter_path if with_adapter else None
             )
         return self._models[with_adapter]
 
@@ -166,6 +135,41 @@ class LoRAModel:
         """Travels with the model (kernel convention; shared by both variants)."""
         return self._variant(self.adapter_enabled)[1]
 
+    def stream(
+        self,
+        prompt: str = "",
+        temperature: float = 1.0,
+        max_new_tokens: int = 64,
+        seed: int | None = None,
+    ):
+        """The text as it is produced: the prompt echoed, then the completion in chunks.
+
+        Temperature 0 is greedy and negative raises. The chunks are mlx-lm's, so
+        they are arbitrary slices of text rather than words; concatenating them
+        reproduces :meth:`generate`, which is exactly that concatenation. The
+        first item is the prompt (echoed, per the kernel convention), so a caller
+        can show it before the model has produced anything.
+        """
+        if temperature < 0:
+            raise ValueError("temperature must be >= 0 (0 = greedy)")
+        model, tokenizer = self._variant(self.adapter_enabled)
+        chunks = mlx.stream_text(
+            model,
+            tokenizer,
+            prompt,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+            seed=seed,
+        )
+        first = next(chunks, None)
+        if first is None:
+            yield prompt
+            return
+        # mlx-lm returns the completion only, and does not say whether it starts
+        # with a space, so the separator is decided once, against the first chunk.
+        yield _echo(prompt, first)
+        yield from chunks
+
     def generate(
         self,
         prompt: str = "",
@@ -173,32 +177,8 @@ class LoRAModel:
         max_new_tokens: int = 64,
         seed: int | None = None,
     ) -> str:
-        """Temperature sampling; 0 means greedy, and negative raises.
-
-        The sampling loop lives inside ``mlx_lm`` rather than in the kernel,
-        but the convention surface is identical to the Keras models. mlx-lm
-        exposes temperature through a sampler object rather than a kwarg.
-        """
-        if temperature < 0:
-            raise ValueError("temperature must be >= 0 (0 = greedy)")
-        from mlx.core import random as mx_random
-        from mlx_lm.generate import generate
-        from mlx_lm.sample_utils import make_sampler
-
-        model, tokenizer = self._variant(self.adapter_enabled)
-        if seed is not None:
-            mx_random.seed(int(seed))
-        output = generate(
-            model,
-            tokenizer,
-            prompt=prompt,
-            max_tokens=int(max_new_tokens),
-            sampler=make_sampler(temp=float(temperature)),
-            verbose=False,
-        )
-        # mlx-lm returns the completion only; the kernel convention is the full
-        # text (prompt echoed), matching the Keras LanguageModel.
-        return _echo(prompt, output)
+        """The whole text: :meth:`stream` joined up, so there is one sampling path."""
+        return "".join(self.stream(prompt, temperature, max_new_tokens, seed))
 
     def evaluate(self, text: str, max_tokens: int = 4000) -> dict:
         """Loss and perplexity over ``text``, in fixed 512-token windows.
@@ -209,26 +189,8 @@ class LoRAModel:
         and returns NaN. ``adapter_enabled`` applies here too: turn it off to
         score the raw base model.
         """
-        if max_tokens < 2:
-            raise ValueError("max_tokens must be at least 2")
-        import mlx.core as mx
-        import mlx.nn as nn
-
         model, tokenizer = self._variant(self.adapter_enabled)
-        ids = tokenizer.encode(text)
-        if len(ids) < 2:
-            return {"loss": float("nan"), "perplexity": float("nan")}
-        nll_sum, n_tokens = 0.0, 0
-        for segment in _segments(ids, max_tokens, _EVAL_WINDOW):
-            x = mx.array([segment[:-1]])
-            targets = mx.array(segment[1:])
-            logits = model(x)
-            log_probs = nn.log_softmax(logits.reshape(-1, logits.shape[-1]), axis=-1)
-            picked = log_probs[mx.arange(len(segment) - 1), targets]
-            nll_sum += float(-picked.sum())
-            n_tokens += len(segment) - 1
-        loss = nll_sum / max(n_tokens, 1)
-        return {"loss": float(loss), "perplexity": float(math.exp(loss))}
+        return mlx.evaluate_text(model, tokenizer, text, max_tokens=max_tokens)
 
     def artifact(self) -> LoRAAdapter:
         """The model's adapter as a standalone artifact, ready to save."""
