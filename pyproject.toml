@@ -1,10 +1,11 @@
 # orange3-ai-suite packaging.
 #
-# Dependency floors are the versions used for development. The MLX extra is
-# pinned exactly: the tuner internals are less stable than Keras's fit.
+# The Orange add-on: ten widgets and the signal adapters that convert between
+# Orange objects and edu-ai-suite's types. The model and feature logic is
+# edu-ai-suite, a plain-Python dependency with no Orange and no Qt.
 #
-# Layout: orangecontrib.ai_suite bundles the Orange widgets and a plain-Python
-# kernel in one distribution - one wheel, one install, three toolbox categories.
+# Dependency floors are the versions used for development; the LoRA extra
+# forwards to edu-ai-suite's own extra.
 
 [build-system]
 requires = ["hatchling>=1.26"]
@@ -13,47 +14,34 @@ build-backend = "hatchling.build"
 [project]
 name = "orange3-ai-suite"
 version = "0.0.1"
-description = "Teaching neural networks and LLMs inside Orange: interpretable image features, tiny Keras language models, MLX LoRA fine-tuning."
+description = "Teaching neural networks and LLMs inside Orange: ten widgets over edu-ai-suite's image features, tiny Keras language models and MLX LoRA fine-tuning."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 
-# Base: what the pure-Python kernel needs. numpy/scipy are also pulled in by
-# Orange itself, so this costs nothing there and keeps plain-Python kernel
-# tests runnable. Orange3 is deliberately absent: the Orange environment
-# already provides it, and the kernel must be installable headless.
 dependencies = [
     "numpy>=1.26",
-    "scipy>=1.11",
-    # The widget suite is meant to work out of the box: image features need
-    # OpenCV, the language models need Keras on a TensorFlow backend, and the
-    # architectures are scikit-learn estimators.
     "opencv-python-headless>=4.12,<5",
-    "datasets>=5.1",
-    "pillow>=10",
-    "keras>=3.10.0",
-    "tensorflow>=2.19.0",  # keras' backend, declared rather than implied
-    "scikit-learn>=1.4",
+    "edu-ai-suite>=0.0.1",
 ]
 
 [project.optional-dependencies]
-# Only LoRA is optional: MLX is Apple-silicon-only, so it cannot be a hard
-# requirement. Everything else is a plain dependency.
-lora = [
-    # Apple-silicon-only: mlx is not portable.
-    'mlx-lm[train]==0.32.2; platform_machine == "arm64" and sys_platform == "darwin"',
-    # The downloader and cache use the Hub; mlx-lm pulls it in, but the
-    # downloader names it directly.
-    "huggingface-hub>=0.29",
-]
+# The widgets' LoRA features need MLX, which edu-ai-suite owns. The extra is
+# forwarded so pip install "orange3-ai-suite[lora]" still installs it.
+lora = ["edu-ai-suite[lora]>=0.0.1"]
 
-# Development-only tooling (PEP 735 group, installed by `uv sync` by default).
 [dependency-groups]
 dev = [
     "pytest>=8",
-    "opencv-python-headless>=4.12,<5",
     "huggingface-hub>=0.29",
+    "scikit-learn>=1.4",
 ]
+
+[project.entry-points."orange.widgets"]
+"Language Models" = "orangecontrib.ai_suite.widgets"
+
+[project.entry-points."Orange.widgets"]
+"Language Models" = "orangecontrib.ai_suite.widgets"
 
 [tool.hatch.build.targets.wheel]
 packages = ["orangecontrib"]
@@ -62,15 +50,6 @@ packages = ["orangecontrib"]
 # deliberately registered under both spellings ("orange.widgets" per the
 # namespace package, "Orange.widgets" per older discovery code) - keep both.
 
-[project.entry-points."orange.widgets"]
-"Language Models" = "orangecontrib.ai_suite.widgets"
-
-[project.scripts]
-orange-ai-assets = "orangecontrib.ai_suite.kernel.assets.cli:main"
-
-[project.entry-points."Orange.widgets"]
-"Language Models" = "orangecontrib.ai_suite.widgets"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q -m 'not slow'"
@@ -78,11 +57,7 @@ markers = [
     "slow: end-to-end runs needing converted-model loads (run with '-m slow')",
 ]
 filterwarnings = [
-    # Keras emits a DeprecationWarning about numpy 2's __array__ copy protocol
-    # from third-party code, not from this project.
     "ignore::DeprecationWarning:keras.*",
-    # orange-canvas-core warns about its own legacy localization module path;
-    # nothing to do in this codebase.
     "ignore::DeprecationWarning:orangecanvas.*",
 ]
 
@@ -95,4 +70,4 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
 ignore = ["RUF001", "RUF003", "RUF005"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["orangecontrib", "synth"]
+known-first-party = ["orangecontrib"]
