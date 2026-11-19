@@ -4,6 +4,7 @@ These run in plain Python - no Orange, no Qt - and need only the package's own
 dependencies.
 """
 
+import json
 import math
 import os
 
@@ -334,6 +335,28 @@ def test_save_load_round_trip(mlp_model, tmp_path):
     assert loaded.evaluate("the cat sat on the mat.")["perplexity"] == pytest.approx(
         mlp_model.evaluate("the cat sat on the mat.")["perplexity"]
     )
+
+
+def test_the_record_names_the_package_that_wrote_it(mlp_model, tmp_path):
+    # `meta.json` is the name a saved model directory carries, for this model and for the
+    # LoRA artifact alike, so the record says which package wrote it.
+    import orangecontrib.ai_suite.kernel.lm as lm
+
+    path = mlp_model.save(tmp_path / "named.nnlm")
+    meta = json.loads((path / "meta.json").read_text())
+    assert meta["created_by"] == lm.__name__
+
+
+def test_another_packages_record_is_refused(tmp_path):
+    # A LoRA artifact's directory has a `meta.json` too; reading it as a Keras model
+    # would half-work, so it is refused instead.
+    path = tmp_path / "not-ours"
+    path.mkdir()
+    (path / "meta.json").write_text(
+        json.dumps({"created_by": "orangecontrib.ai_suite.kernel.lora"})
+    )
+    with pytest.raises(ValueError, match="not a Keras language model"):
+        LanguageModel.load(path)
 
 
 def test_language_model_is_serialisable_in_principle(mlp_model):

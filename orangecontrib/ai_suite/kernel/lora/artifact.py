@@ -1,9 +1,9 @@
 """The fine-tuning artifact: the adapter files, and the base model they fit.
 
-A :class:`LoRAAdapter` is a directory holding the adapter weights, its config and a
-``lora_meta.json`` with the base-model identity and the run that produced it. Reading
-and writing it is plain Python: no mlx import, so an artifact can be inspected and
-reshaped on a machine that cannot train.
+A :class:`LoRAAdapter` is a directory holding the adapter weights, mlx-lm's config and a
+``meta.json`` naming the base model and recording the run that produced it. Reading and
+writing it is plain Python: no mlx import, so an artifact can be inspected and reshaped
+on a machine that cannot train.
 """
 
 from __future__ import annotations
@@ -16,7 +16,11 @@ from typing import Any
 
 from . import mlx_layout
 
-_META_FILE = "lora_meta.json"
+#: The artifact's own record, and the one file that makes a directory an artifact. The
+#: name is shared with the Keras model's directory, so the record says which package
+#: wrote it - and :meth:`LoRAAdapter.load` refuses one that says anything else.
+_META_FILE = "meta.json"
+_CREATED_BY = "orangecontrib.ai_suite.kernel.lora"
 
 
 @dataclass
@@ -25,7 +29,7 @@ class LoRAAdapter:
 
     base_model: str  # path or HF repo id of the base model
     adapter_path: str | None  # None = the raw base model itself (no adapter)
-    training: dict[str, Any]  # options, mlx-lm adapter config, iterations reached
+    training: dict[str, Any]  # options, iterations reached, whether a stop cut it short
     name: str = ""
 
     def save(self, dest: str | Path) -> Path:
@@ -46,9 +50,10 @@ class LoRAAdapter:
         (out / _META_FILE).write_text(
             json.dumps(
                 {
+                    "created_by": _CREATED_BY,
                     "base_model": self.base_model,
-                    "training": self.training,
                     "name": self.name,
+                    "training": self.training,
                 },
                 indent=1,
             )
@@ -59,12 +64,18 @@ class LoRAAdapter:
     def load(cls, path: str | Path) -> LoRAAdapter:
         """Read an adapter directory, or a raw model directory as the base model.
 
-        An artifact carries ``lora_meta.json``; a directory without it is a plain
-        MLX model directory, loaded with the adapter off.
+        A directory carrying ``meta.json`` is an artifact, and a ``meta.json`` written by
+        another package raises; one with no record at all is a plain MLX model directory,
+        loaded with the adapter off.
         """
         src = Path(path)
         if (src / _META_FILE).exists():
             meta = json.loads((src / _META_FILE).read_text())
+            creator = meta.get("created_by")
+            if creator != _CREATED_BY:
+                raise ValueError(
+                    f"{src} was written by {creator!r}, not by {_CREATED_BY}: not a LoRA artifact"
+                )
             has_weights = (src / mlx_layout.ADAPTER_WEIGHTS).exists()
             return cls(
                 base_model=meta["base_model"],

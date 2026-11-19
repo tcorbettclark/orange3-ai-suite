@@ -291,10 +291,30 @@ def test_adapter_artifact_round_trip(tmp_path):
         training={"options": {"iters": 300}},
     )
     saved = adapter.save(tmp_path / "adapter")
-    assert (saved / "lora_meta.json").exists()
+    assert (saved / "meta.json").exists()
     loaded = LoRAAdapter.load(saved)
     assert loaded.base_model == "some/base-model"
     assert loaded.training["options"]["iters"] == 300
+
+
+def test_the_record_names_the_package_that_wrote_it(tmp_path):
+    # One `meta.json` name is shared with the Keras model's directory, so the record has
+    # to say which package wrote it - and it says it as the qualified package name.
+    import orangecontrib.ai_suite.kernel.lora as lora
+
+    saved = LoRAAdapter(base_model="b", adapter_path=None, training={}).save(tmp_path / "a")
+    meta = json.loads((saved / "meta.json").read_text())
+    assert meta["created_by"] == lora.__name__
+
+
+def test_another_packages_record_is_refused(tmp_path):
+    # Pointing an artifact reader at a Keras model directory must say so, rather than
+    # read whichever of its keys happen to match.
+    saved = tmp_path / "not-an-artifact"
+    saved.mkdir()
+    (saved / "meta.json").write_text(json.dumps({"created_by": "orangecontrib.ai_suite.kernel.lm"}))
+    with pytest.raises(ValueError, match="not a LoRA artifact"):
+        LoRAAdapter.load(saved)
 
 
 def test_adapter_without_adapters_loads_fine(tmp_path):

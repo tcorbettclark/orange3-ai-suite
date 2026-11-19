@@ -27,7 +27,11 @@ from .training import (
     epoch_callback,
 )
 
+#: The model directory's own record. The name is shared with the LoRA artifact's, so the
+#: record says which package wrote it - and :meth:`LanguageModel.load` refuses one that
+#: says anything else.
 _META_FILE = "meta.json"
+_CREATED_BY = "orangecontrib.ai_suite.kernel.lm"
 _MODEL_FILE = "model.keras"
 
 
@@ -216,6 +220,7 @@ class LanguageModel:
         out = Path(path)
         out.mkdir(parents=True, exist_ok=True)
         meta = {
+            "created_by": _CREATED_BY,
             "architecture_name": self.architecture.architecture_name(),
             "architecture_params": self.architecture.get_params(),
             "training": asdict(self.training) if self.training is not None else None,
@@ -228,9 +233,19 @@ class LanguageModel:
 
     @classmethod
     def load(cls, path: str | Path) -> LanguageModel:
-        """Load a model directory saved by :meth:`save`."""
+        """Load a model directory saved by :meth:`save`; another package's raises.
+
+        A ``meta.json`` written by anything other than this package is refused rather than
+        read for whatever of its keys happen to match.
+        """
         src = Path(path)
         meta = json.loads((src / _META_FILE).read_text())
+        creator = meta.get("created_by")
+        if creator != _CREATED_BY:
+            raise ValueError(
+                f"{src} was written by {creator!r}, not by {_CREATED_BY}: "
+                "not a Keras language model"
+            )
         return cls(
             architecture=architecture_from_dict(meta),
             tokenizer=tokenizer_from_dict(meta["tokenizer"]),

@@ -16,14 +16,14 @@
 - Standard Orange **Save Model / Load Model** do not fit:
   - they pickle `Orange.base.Model`
   - our Keras `LanguageModel` and MLX `LoRAModel` are different object types
-  - our artifacts are directories (`meta.json` / `lora_meta.json` plus weights), not single pickle files.
+  - our artifacts are directories (`meta.json` plus weights), not single pickle files.
 
 ## Future Load LM scope
 
 Auto-detect and load:
 
 1. Keras LM directory (`meta.json` + `model.keras`)
-2. LoRA adapter directory (`lora_meta.json` + adapter weights)
+2. LoRA adapter directory (`meta.json` + adapter weights)
 3. Raw MLX model directory (`config.json` + safetensors), including converted BritLLM 4-bit
 4. Optionally a Hugging Face repo id, if `mlx_lm` can load it on the machine
 
@@ -34,6 +34,11 @@ Do **not** promise support for:
 - PyTorch-only models
 - models too large for available memory
 - arbitrary unquantised models
+
+Both kinds carry the same `meta.json`, and it starts with `created_by`, the qualified
+name of the package that wrote it (`orangecontrib.ai_suite.kernel.lm` or
+`...kernel.lora`), so the two are told apart by the record rather than by the file names
+around it. Each loader refuses the other's.
 
 State the supported backends in the widget.
 

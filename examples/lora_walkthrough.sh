@@ -60,7 +60,7 @@ if [ ! -d "$model" ]; then
 fi
 printf 'model: %s\n' "$model"
 
-# Point the viewer at the model directory and it says so: no lora_meta.json, so
+# Point the viewer at the model directory and it says so: no meta.json, so
 # nothing that claims to be a trained artifact.
 run_step "what a model directory looks like to LoRA" \
     "${PY[@]}" examples/lora_inspect.py "$model"

@@ -219,7 +219,10 @@ def test_a_completed_run_reports_its_events_and_yields_the_artifact(fake_mlx_lm,
     assert adapter.training["iters_completed"] == 3
     assert adapter.training["stopped"] is False
     assert {type(event) for event in seen} == {Params, TrainReport, ValReport}
-    config = adapter.training["adapter_config"]
+    # mlx-lm's own description of the adapter: a file beside the weights, written once at
+    # the start of the run, and not copied into our record.
+    assert "adapter_config" not in adapter.training
+    config = json.loads((adapter_dir / "adapter_config.json").read_text())
     assert config["fine_tune_type"] == "lora"
     assert config["mask_prompt"] is False
 
@@ -255,7 +258,8 @@ def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
         options=_options(iters=1),
         workdir=tmp_path,
     )
-    assert adapter.training["adapter_config"]["mask_prompt"] is True
+    config = json.loads((Path(adapter.adapter_path) / "adapter_config.json").read_text())
+    assert config["mask_prompt"] is True
     asked = json.loads((Path(adapter.adapter_path) / "asked.json").read_text())
     assert asked["mask_prompt"] is True
 
@@ -272,7 +276,8 @@ def test_a_finished_run_that_checkpointed_is_not_read_as_stopped(fake_mlx_lm, tm
     )
     assert adapter.training["iters_completed"] == 3
     assert adapter.training["stopped"] is False
-    assert adapter.training["adapter_config"]["iters"] == 3
+    config = json.loads((Path(adapter.adapter_path) / "adapter_config.json").read_text())
+    assert config["iters"] == 3
 
 
 def test_two_runs_never_share_a_directory(fake_mlx_lm, tmp_path):
@@ -300,9 +305,9 @@ def test_stop_adopts_the_last_checkpoint(fake_mlx_lm, tmp_path):
     assert adapter.training["stopped"] is True
 
     # The adopted checkpoint keeps the run's config, because that is the only
-    # config mlx-lm writes (once, before training). How far the run got is
-    # recorded by iters_completed, not by the config.
-    config = adapter.training["adapter_config"]
+    # config mlx-lm writes (once, before training), and it describes the run that was
+    # asked for. How far this one got is iters_completed, in our record.
+    config = json.loads((adapter_dir / "adapter_config.json").read_text())
     assert config["fine_tune_type"] == "lora"
     assert config["iters"] == 1000
     assert not list(adapter_dir.glob("*_adapter_config.json")), "mlx-lm writes none"

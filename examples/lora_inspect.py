@@ -5,10 +5,10 @@ pointing at what ``examples/lora_train.py --save`` wrote - or at a plain MLX mod
 directory, which it will tell you is not an artifact. No MLX and no base model are
 needed: everything below is read from the artifact's own files.
 
-The three are ``lora_meta.json`` (the base model, the run's settings, how far it got),
-``adapter_config.json`` (mlx-lm's description of the adapter) and
-``adapters.safetensors``, whose layout is eight bytes of header length, then that many
-bytes of JSON naming each tensor, its dtype and its shape, then the weights.
+The three are ``meta.json`` (which package wrote the artifact, the base model, the run's
+settings, how far it got), ``adapter_config.json`` (mlx-lm's description of the adapter)
+and ``adapters.safetensors``, whose layout is eight bytes of header length, then that
+many bytes of JSON naming each tensor, its dtype and its shape, then the weights.
 """
 
 import argparse
@@ -18,6 +18,10 @@ import struct
 from pathlib import Path
 
 import orangecontrib.ai_suite.kernel.lora as lora
+
+META = "meta.json"
+ADAPTER_CONFIG = "adapter_config.json"
+ADAPTER_WEIGHTS = "adapters.safetensors"
 
 
 def tensor_header(weights: Path) -> dict:
@@ -48,24 +52,39 @@ def sizes(directory: Path) -> list[str]:
     return [f"{name}  {human(size)}B" for size, name in sorted(found)]
 
 
+def read(path: Path) -> dict:
+    """A JSON file as a dict, or nothing at all when it is not there."""
+    return json.loads(path.read_text()) if path.is_file() else {}
+
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("path", help="an artifact directory, or a plain MLX model directory")
 args = parser.parse_args()
 
 directory = Path(args.path)
-adapter = lora.LoRAAdapter.load(directory)
 
-if not (directory / "lora_meta.json").is_file():
+if not (directory / META).is_file():
     print(f"{directory}  {human(directory_bytes(directory))}B")
-    print("  no lora_meta.json, so this is not an artifact: it is read as the base model")
+    print("  no meta.json, so this is not an artifact: it is read as the base model")
     print("  itself, with the adapter off.")
-    if (directory / "adapter_config.json").is_file():
+    if (directory / ADAPTER_CONFIG).is_file():
         print("  adapter_config.json is here all the same: a run's adapter directory looks")
         print("  like this before `save`, and only `save` adds the record.")
     raise SystemExit(0)
 
+try:
+    adapter = lora.LoRAAdapter.load(directory)
+except ValueError as exc:  # a meta.json that another package wrote
+    raise SystemExit(str(exc)) from exc
+
+meta = json.loads((directory / META).read_text())
 record = adapter.training
+options = record.get("options") or {}
+config = read(directory / ADAPTER_CONFIG)
+lora_parameters = config.get("lora_parameters") or {}
+
 print(f"artifact    {directory}")
+print(f"  written by  {meta.get('created_by')}")
 print(f"  name        {adapter.name or '(unnamed)'}")
 
 # The adapter is a delta, so none of the model it adjusts is in this directory: the
@@ -82,40 +101,34 @@ else:
     print(f"  missing     no such directory from here ({base.resolve()})")
     print("              mlx-lm looks the name up as a Hugging Face repo id instead")
 
-print(
-    f"\nrun         {record.get('iters_completed')} of {record.get('options', {}).get('iters')}"
-    f" iterations, stopped {record.get('stopped')}"
-)
-options = record.get("options", {})
-print(
-    f"  options     lr {options.get('learning_rate')}, batch {options.get('batch_size')},"
-    f" max_seq {options.get('max_seq_length')}, val {options.get('validation_fraction')},"
-    f" seed {options.get('seed')}"
-)
-print(
-    f"  cadence     report every {options.get('steps_per_report')}, evaluate every"
-    f" {options.get('steps_per_eval')}, checkpoint every {options.get('save_every')}"
-)
-
-# The paths the run recorded are in the scratch directory the caller owned, so they
-# outlive it or not: this is what says whether the artifact is self-contained.
-for key in ("run_dir",):
-    where = record.get(key)
-    if where:
-        print(f"  {key:11s} {where}  ({'present' if Path(where).exists() else 'gone'})")
-data = record.get("adapter_config", {}).get("data")
-if data:
-    print(f"  data        {data}  ({'present' if Path(data).exists() else 'gone'})")
+if record:
+    print(
+        f"\nrun         {record.get('iters_completed')} of {options.get('iters')} iterations,"
+        f" stopped {record.get('stopped')}"
+    )
+    print(
+        f"  options     lr {options.get('learning_rate')}, batch {options.get('batch_size')},"
+        f" max_seq {options.get('max_seq_length')}, val {options.get('validation_fraction')},"
+        f" seed {options.get('seed')}"
+    )
+    print(
+        f"  cadence     report every {options.get('steps_per_report')}, evaluate every"
+        f" {options.get('steps_per_eval')}, checkpoint every {options.get('save_every')}"
+    )
+    # The paths the run recorded point into the scratch the caller owned, so they
+    # outlive it or not: this is what says whether the artifact is self-contained.
+    for key, where in (("run_dir", record.get("run_dir")), ("data", config.get("data"))):
+        if where:
+            print(f"  {key:11s} {where}  ({'present' if Path(where).exists() else 'gone'})")
+else:
+    print("\nrun         no record in meta.json: nothing says how this was made")
 
 if adapter.adapter_path is None:
     print("\nadapter     none: this artifact names a base model and no adapter")
     raise SystemExit(0)
 
-adapter_dir = Path(adapter.adapter_path)
-weights = adapter_dir / "adapters.safetensors"
-config = record.get("adapter_config", {})
-lora_parameters = config.get("lora_parameters") or {}
-print(f"\nadapter     {', '.join(sizes(adapter_dir))}")
+weights = directory / ADAPTER_WEIGHTS
+print(f"\nadapter     {', '.join(sizes(directory))}")
 print(
     f"  config      {config.get('fine_tune_type')}, rank {lora_parameters.get('rank')},"
     f" dropout {lora_parameters.get('dropout')}, scale {lora_parameters.get('scale')}"

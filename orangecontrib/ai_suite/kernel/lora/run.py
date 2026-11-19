@@ -8,7 +8,6 @@ directory it owns, and adopts whatever the child left there as a
 
 from __future__ import annotations
 
-import json
 import shutil
 import tempfile
 import threading
@@ -199,16 +198,11 @@ class TrainingRun:
             # and none beside the numbered checkpoints, so the run's config is the
             # only one there is and it stays: the LoRA structure it describes does
             # not change mid-run. How far the run got is training["iters_completed"].
-        adapter_config = {}
-        config_path = adapter_dir / mlx_layout.ADAPTER_CONFIG
-        if config_path.exists():
-            adapter_config = json.loads(config_path.read_text())
         return LoRAAdapter(
             base_model=str(self.base_model),
             adapter_path=str(adapter_dir),
             training={
                 "options": asdict(self.options),
-                "adapter_config": adapter_config,
                 "iters_completed": completed,
                 "stopped": completed < self.options.iters,
                 "run_dir": str(run_dir),
