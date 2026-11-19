@@ -1,9 +1,10 @@
 """LM Generator: generate text with any kernel-convention model.
 
-The input is any object exposing ``generate(prompt, temperature,
-max_new_tokens, seed)``: the kernel's Keras ``LanguageModel``, a
-``LoRAModel``, or a saved artifact loaded from disk. The output is a
-one-column Table of generations.
+The input is any object exposing ``stream(prompt, temperature,
+max_new_tokens, seed)``: the kernel's Keras ``LanguageModel``, a ``LoRAModel``,
+or a saved artifact loaded from disk. The text stream is what makes generation
+watchable - text appears as the model writes it, and Stop acts on the next chunk
+- and the output is still a one-column Table of complete generations.
 
 Temperature is the most instructive knob in language-model demos: low values
 repeat, high values dissolve into word salad.
@@ -11,12 +12,57 @@ repeat, high values dissolve into word salad.
 
 from __future__ import annotations
 
+import traceback
+
+from AnyQt.QtCore import QThread, pyqtSignal
+from AnyQt.QtWidgets import QPlainTextEdit
 from Orange.data import Table
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import generations_table
+
+
+class _GenerationWorker(QThread):
+    """Streams the model's text off the GUI thread: one signal per chunk."""
+
+    chunk = pyqtSignal(int, str)  # generation index, text delta
+    finished_ok = pyqtSignal(object)  # list[str]
+    failed = pyqtSignal(str)
+
+    def __init__(self, model, prompt, temperature, max_new_tokens, n_generations, seed):
+        super().__init__()
+        self._model = model
+        self._prompt = prompt
+        self._temperature = temperature
+        self._max_new_tokens = max_new_tokens
+        self._n_generations = n_generations
+        self._seed = seed
+        self._stop = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            outcomes = []
+            for index in range(self._n_generations):
+                seed = None if self._seed < 0 else self._seed + index
+                parts = []
+                for piece in self._model.stream(
+                    self._prompt, self._temperature, self._max_new_tokens, seed
+                ):
+                    if self._stop:
+                        break
+                    parts.append(piece)
+                    self.chunk.emit(index, piece)
+                outcomes.append("".join(parts))
+                if self._stop:
+                    break
+            self.finished_ok.emit(outcomes)
+        except Exception:
+            self.failed.emit(traceback.format_exc())
 
 
 class OWLMGenerator(OWWidget):
@@ -45,7 +91,7 @@ class OWLMGenerator(OWWidget):
         generations = Output("Generations", Table)
 
     class Warning(OWWidget.Warning):
-        not_generative = Msg("The connected model does not expose generate().")
+        not_generative = Msg("The connected model does not expose stream().")
 
     class Error(OWWidget.Error):
         generation_failed = Msg("Generation failed: {}")
@@ -84,14 +130,26 @@ class OWLMGenerator(OWWidget):
             "Use LoRA adapter (when available)",
         )
         self._adapter_check.setEnabled(False)
-        gui.button(self.controlArea, self, "Generate", callback=self.generate)
+        buttons = gui.hBox(self.controlArea)
+        self._generate_button = gui.button(buttons, self, "Generate", callback=self.generate)
+        self._stop_button = gui.button(buttons, self, "Stop", callback=self.stop_generation)
+        self._stop_button.setEnabled(False)
         gui.rubber(self.controlArea)
+
+        box = gui.widgetBox(self.mainArea, "Generations")
+        self.view = QPlainTextEdit()
+        self.view.setReadOnly(True)
+        self.view.setPlaceholderText("Press Generate: the text appears here as it is written.")
+        box.layout().addWidget(self.view)
+
+        self.worker: _GenerationWorker | None = None
+        self._texts: list[str] = []
 
     @Inputs.model
     def set_model(self, model):
         self.model = model
         self.Warning.not_generative(
-            shown=model is not None and not callable(getattr(model, "generate", None))
+            shown=model is not None and not callable(getattr(model, "stream", None))
         )
         supports_adapter = hasattr(model, "adapter_enabled")
         self._adapter_check.setEnabled(supports_adapter)
@@ -99,27 +157,70 @@ class OWLMGenerator(OWWidget):
             self.use_adapter = bool(model.adapter_enabled)
 
     def generate(self):
+        self._run(blocking=False)
+
+    def run_generation_blocking(self):
+        """Same-thread variant for tests/debugging."""
+        self._run(blocking=True)
+
+    def _run(self, blocking: bool):
+        if self.worker is not None and self.worker.isRunning():
+            return
         self.Outputs.generations.send(None)
         self.Error.generation_failed.clear()
-        if self.model is None or not callable(getattr(self.model, "generate", None)):
+        if self.model is None or not callable(getattr(self.model, "stream", None)):
             return
         if hasattr(self.model, "adapter_enabled"):
             self.model.adapter_enabled = self.use_adapter
-        seed = self.seed
-        try:
-            outcomes = [
-                self.model.generate(
-                    self.prompt,
-                    self.temperature,
-                    self.max_new_tokens,
-                    None if seed < 0 else seed + i,
-                )
-                for i in range(self.n_generations)
-            ]
-        except Exception as exc:
-            self.Error.generation_failed(f"{type(exc).__name__}: {exc}")
-            return
-        self.Outputs.generations.send(generations_table(outcomes))
+        self.view.clear()
+        self._texts = []
+        worker = _GenerationWorker(
+            self.model,
+            self.prompt,
+            self.temperature,
+            self.max_new_tokens,
+            self.n_generations,
+            self.seed,
+        )
+        worker.chunk.connect(self._on_chunk)
+        worker.finished_ok.connect(self._on_done)
+        worker.failed.connect(self._on_failed)
+        self.worker = worker
+        self._set_running(True)
+        if blocking:
+            worker.run()
+        else:
+            worker.start()
+
+    def stop_generation(self):
+        if self.worker is not None:
+            self.worker.stop()
+
+    def _set_running(self, running: bool) -> None:
+        """One switch for the two buttons: a run has a Stop, an idle widget a Generate."""
+        self._generate_button.setEnabled(not running)
+        self._stop_button.setEnabled(running)
+
+    def _on_chunk(self, index: int, text: str) -> None:
+        if index >= len(self._texts):
+            self._texts.append(text)
+        else:
+            self._texts[index] += text
+        self.view.setPlainText("\n\n".join(self._texts))
+        bar = self.view.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
+    def _on_done(self, outcomes) -> None:
+        self._set_running(False)
+        self._texts = list(outcomes)
+        if self._texts:
+            self.view.setPlainText("\n\n".join(self._texts))
+        self.Outputs.generations.send(generations_table(list(outcomes)))
+
+    def _on_failed(self, traceback_text: str) -> None:
+        self._set_running(False)
+        detail = traceback_text.strip().splitlines()[-1] if traceback_text.strip() else "?"
+        self.Error.generation_failed(detail)
 
 
 if __name__ == "__main__":  # pragma: no cover - dev preview

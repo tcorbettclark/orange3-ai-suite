@@ -173,6 +173,12 @@ context is padded out with BOS, or when a unit is shorter than `w`.
   hook adds one.
 - **prompt** — the user's text, tokenized and trimmed to its last unit, used as
   the first context of a generation.
+- **text stream** — a model's text as it is produced: a generator whose chunks a
+  caller concatenates, and *not* the id `stream` above. Every model in the suite
+  has one - its `stream` method, with `generate` as the text stream joined up -
+  so a widget can show text arriving without knowing which model it is looking
+  at. Where the chunks fall is the library's business: mlx-lm slices
+  arbitrarily, the Keras models yield the finished unit in one piece.
 - **generation** — repeat: context → logits → pick one id → append it → drop the
   oldest id. It stops at EOS or at the token cap, and a sampled BOS is dropped
   rather than appended.

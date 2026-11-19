@@ -159,14 +159,16 @@ moving to dedicated Load LM/Save LM widgets.
 ### LM Generator
 
 Generates text from any model that exposes the kernel convention
-`generate(prompt, temperature, max_new_tokens, seed)`. This covers Keras
-`LanguageModel` objects and MLX `LoRAModel` objects, so the same widget serves
-from-scratch models and fine-tuned base models.
+`stream(prompt, temperature, max_new_tokens, seed)` — and `generate`, which is
+that text stream joined up. This covers Keras `LanguageModel` objects and MLX
+`LoRAModel` objects, so the same widget serves from-scratch models and fine-tuned
+base models.
 
 The prompt, temperature, maximum new tokens, number of generations and seed are
 all controls. Low temperature is repetitive; high temperature dissolves into
-word salad. Generations are emitted as a one-column Table that Corpus Viewer
-and Orange3-Text widgets can read. For LoRA models, a **Use LoRA adapter**
+word salad. Text appears in the widget as it is written, and **Stop** keeps what
+has been generated so far. Generations are emitted as a one-column Table that
+Corpus Viewer and Orange3-Text widgets can read. For LoRA models, a **Use LoRA adapter**
 checkbox switches between the adapted model and its raw base model. Model
 persistence is intentionally not part of the training or generation widgets; a
 dedicated Load LM/Save LM pair will own that role.
@@ -440,11 +442,12 @@ model.evaluate(held_out_text)  # {'loss': ..., 'perplexity': ...}
 model.adapter_enabled = False  # the same base model, before adaptation
 ```
 
-`train_lora` runs the documented `python -m mlx_lm lora` command in a
-subprocess and streams parsed metrics. Stopping terminates the whole child
-process tree. mlx-lm writes a checkpoint every `save_every` iterations; a stop
-adopts the newest checkpoint and records `iters_completed`, while a stop before
-the first one raises `TrainingStopped` and produces no model.
+`train_lora` reports per-iteration metrics while it runs, and stopping ends the
+run and keeps the newest checkpoint: mlx-lm writes one every `save_every`
+iterations, so `iters_completed` records how far the run got, while a stop before
+the first one raises `TrainingStopped` and produces no model. The training runs in
+its own process - `lora.mlx` hides that, along with mlx-lm's API and file
+conventions, so the rest of `lora/` never sees a subprocess.
 
 ## Datasets and workflows
 
@@ -545,7 +548,8 @@ orangecontrib/
           _measurements.py  measurements shared by more than one feature
       lm/         tokenizer (with its stats), pairs, architectures,
                   training options/results, LanguageModel with embedded tokenizer
-      lora/       LoRA data formats, MLX training subprocess, artifact/model objects
+      lora/       LoRA data formats, split, run directory, artifact/model objects
+        mlx/         the boundary: mlx-lm's API, its files, and the training child
       assets/     Hugging Face assets: download cache policy, prepare, asset registry
       text/       plain text into training rows, behind one facade
         _clean.py    raw text -> clean text (Gutenberg, page numbers, reflow)
