@@ -37,6 +37,11 @@ def human(count: float) -> str:
     return str(count)
 
 
+def directory_bytes(directory: Path) -> int:
+    """How many bytes of files a directory holds, following the links a Hub cache uses."""
+    return sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
+
+
 def sizes(directory: Path) -> list[str]:
     """The files in a directory, smallest first, as 'name  size'."""
     found = [(path.stat().st_size, path.name) for path in directory.iterdir() if path.is_file()]
@@ -51,7 +56,7 @@ directory = Path(args.path)
 adapter = lora.LoRAAdapter.load(directory)
 
 if not (directory / "lora_meta.json").is_file():
-    print(f"{directory}")
+    print(f"{directory}  {human(directory_bytes(directory))}B")
     print("  no lora_meta.json, so this is not an artifact: it is read as the base model")
     print("  itself, with the adapter off.")
     if (directory / "adapter_config.json").is_file():
@@ -62,9 +67,20 @@ if not (directory / "lora_meta.json").is_file():
 record = adapter.training
 print(f"artifact    {directory}")
 print(f"  name        {adapter.name or '(unnamed)'}")
-exists = "a directory, present" if Path(adapter.base_model).is_dir() else "no local directory"
-print(f"  base model  {adapter.base_model}")
-print(f"              {exists}: a repo id is resolved when the model is loaded, not here")
+
+# The adapter is a delta, so none of the model it adjusts is in this directory: the
+# recorded name is the whole of the dependency, and it is resolved from wherever this
+# is run rather than from where the artifact was made.
+base = Path(adapter.base_model)
+print("\ndependency  the model this adapter adjusts; none of it is in this directory")
+print(f"  recorded    {adapter.base_model}")
+if base.is_dir():
+    print(f"  found       a directory, {human(directory_bytes(base))}B on disk")
+elif base.exists():
+    print(f"  found       not a directory: {base.resolve()}")
+else:
+    print(f"  missing     no such directory from here ({base.resolve()})")
+    print("              mlx-lm looks the name up as a Hugging Face repo id instead")
 
 print(
     f"\nrun         {record.get('iters_completed')} of {record.get('options', {}).get('iters')}"
