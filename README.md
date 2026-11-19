@@ -362,11 +362,6 @@ In the widget, **Feature guide…** opens the same page, the selected feature's
 title, sentence and intuition are shown beside its values, and **Technical
 details…** opens the mechanics for that one feature.
 
-What that plain baseline produces, cell by cell, is shown by
-`examples/image_pixels.py` (`uv run python examples/image_pixels.py`); it prints
-one photograph as a grid of numbers and as characters, with the column name of
-every value.
-
 A runnable script lives in `examples/image_features.py`
 (`uv run python examples/image_features.py`). It reads three real cloud
 photographs from `examples/` (credits in `examples/CREDITS.md`) and shows the
