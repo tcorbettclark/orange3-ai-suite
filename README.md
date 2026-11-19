@@ -449,6 +449,10 @@ artifact and compares the base model with its adapter, text and perplexity both.
 `examples/lora_artifact.py` needs no MLX at all: it shows what the artifact directory
 carries and what it refuses to write.
 
+`examples/lora_walkthrough.sh` runs all three in order, printing each command as it
+goes: `bash examples/lora_walkthrough.sh`. It fetches the pinned model itself and
+takes about twenty seconds once the 1.50 GB is cached.
+
 ## Datasets and workflows
 
 ```python
