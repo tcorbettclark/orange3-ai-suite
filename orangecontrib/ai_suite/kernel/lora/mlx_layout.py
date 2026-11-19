@@ -45,29 +45,29 @@ def write_dataset(directory: str | Path, format: str, train: list, valid: list) 
 
 
 def adapter_weights(adapter_dir: str | Path) -> Path | None:
-    """The final adapter if mlx-lm wrote it, else its newest numbered checkpoint.
+    """The file to load as the adapter: the final one, else the newest checkpoint.
 
-    A stopped run leaves ``{iteration:07d}_adapters.safetensors`` files and no
-    final adapter, so the newest is what the run actually reached.
+    A stopped run leaves ``{iteration:07d}_adapters.safetensors`` files and no final
+    adapter, so the newest is what the run actually reached.
     """
     adapter_dir = Path(adapter_dir)
     canonical = adapter_dir / ADAPTER_WEIGHTS
     if canonical.exists():
         return canonical
-    checkpoints: list[tuple[int, Path]] = []
-    for path in adapter_dir.glob(f"*_{ADAPTER_WEIGHTS}"):
+    found = checkpoints(adapter_dir)
+    return found[-1][1] if found else None
+
+
+def checkpoints(adapter_dir: str | Path) -> list[tuple[int, Path]]:
+    """The numbered checkpoints a run leaves behind, oldest first: ``(iteration, path)``.
+
+    mlx-lm writes the unnumbered adapter on every save as well as the numbered file,
+    so a run that is still going has both; only these say how far it got.
+    """
+    found: list[tuple[int, Path]] = []
+    for path in Path(adapter_dir).glob(f"*_{ADAPTER_WEIGHTS}"):
         try:
-            checkpoints.append((int(path.name.split("_", 1)[0]), path))
+            found.append((int(path.name.split("_", 1)[0]), path))
         except ValueError:
             continue
-    return max(checkpoints, key=lambda item: item[0])[1] if checkpoints else None
-
-
-def checkpoint_iteration(weights: Path) -> int | None:
-    """The iteration a numbered checkpoint belongs to, or None for the final adapter."""
-    if weights.name == ADAPTER_WEIGHTS:
-        return None
-    try:
-        return int(weights.name.split("_", 1)[0])
-    except ValueError:
-        return None
+    return sorted(found)

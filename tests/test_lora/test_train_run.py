@@ -131,8 +131,10 @@ def train_model(args, model, train_set, valid_set, training_callback=None):
     print_trainable_parameters(model)
     for it in range(1, min(args.iters, 3) + 1):
         if it % args.save_every == 0:
-            # mlx-lm writes numbered weights only; the config is one per run,
+            # mlx-lm writes the unnumbered adapter on every save and the numbered one
+            # beside it, so a run mid-flight has both; the config is one per run,
             # written once before training starts.
+            (out / "adapters.safetensors").write_bytes(b"weights")
             (out / f"{it:07d}_adapters.safetensors").write_bytes(b"weights")
         training_callback.on_train_loss_report(
             {"iteration": it, "train_loss": 1.0 / it, "tokens_per_second": 184.0}
@@ -256,6 +258,21 @@ def test_a_pairs_run_masks_the_prompt_in_the_child(fake_mlx_lm, tmp_path):
     assert adapter.training["adapter_config"]["mask_prompt"] is True
     asked = json.loads((Path(adapter.adapter_path) / "asked.json").read_text())
     assert asked["mask_prompt"] is True
+
+
+def test_a_finished_run_that_checkpointed_is_not_read_as_stopped(fake_mlx_lm, tmp_path):
+    # The unnumbered adapter is written on every save, not only at the end, so its
+    # presence cannot be what decides that a run finished: iters_completed would be
+    # the iterations asked for rather than the ones reached.
+    _events, adapter = _run(
+        base_model="base-model",
+        data=_data(),
+        options=_options(iters=3, save_every=1),
+        workdir=tmp_path,
+    )
+    assert adapter.training["iters_completed"] == 3
+    assert adapter.training["stopped"] is False
+    assert adapter.training["adapter_config"]["iters"] == 3
 
 
 def test_two_runs_never_share_a_directory(fake_mlx_lm, tmp_path):

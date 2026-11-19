@@ -177,19 +177,23 @@ class TrainingRun:
         self, run_dir: Path, adapter_dir: Path, outcome: mlx_process.Outcome | None
     ) -> LoRAAdapter:
         """Turn whatever the run left in the adapter directory into an artifact."""
-        weights = mlx_layout.adapter_weights(adapter_dir)
+        reached = mlx_layout.checkpoints(adapter_dir)
+        stopped = outcome is not None and outcome.stopped
+        if stopped and not reached:
+            raise TrainingStopped(
+                "training was stopped before mlx-lm wrote a checkpoint "
+                "(save_every iterations must elapse first); nothing was adopted, and "
+                f"the run directory {run_dir} holds the log tail"
+            )
+        # mlx-lm writes the unnumbered adapter on every save as well as at the end, so
+        # its presence says nothing about whether the run finished: the numbered
+        # checkpoints are what say how far a stopped one got.
+        weights = reached[-1][1] if stopped else mlx_layout.adapter_weights(adapter_dir)
         if weights is None:
-            if outcome is not None and outcome.stopped:
-                raise TrainingStopped(
-                    "training was stopped before mlx-lm wrote a checkpoint "
-                    "(save_every iterations must elapse first); nothing was adopted, and "
-                    f"the run directory {run_dir} holds the log tail"
-                )
             raise RuntimeError(f"training ended without adapter files; see {run_dir}")
+        completed = reached[-1][0] if stopped else self.options.iters
         canonical = adapter_dir / mlx_layout.ADAPTER_WEIGHTS
-        completed = self.options.iters
         if weights != canonical:
-            completed = mlx_layout.checkpoint_iteration(weights)
             shutil.copy2(weights, canonical)
             # mlx-lm writes one config per run, at the start (lora.py: save_config),
             # and none beside the numbered checkpoints, so the run's config is the
