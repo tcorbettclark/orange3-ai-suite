@@ -1,9 +1,9 @@
 """Where kernel code lives, and which modules are support code.
 
 The kernel is organised by domain; ``images`` is the image domain, holding the
-image pipeline (``decode``, ``resize``, ``flatten``) and the ``features`` package
-built on it. A leading underscore marks support code that nothing outside
-``images`` may import.
+image pipeline (``decode``, ``resize``, ``flatten``, and ``pixels`` composing
+them) and the ``features`` package built on it. A leading underscore marks
+support code that nothing outside ``images`` may import.
 """
 
 import ast
@@ -27,17 +27,31 @@ def _feature_modules() -> set[str]:
     return files | directories
 
 
-def test_the_image_domain_has_three_parts():
+def test_the_image_domain_has_five_parts():
     assert {p.name for p in IMAGES.iterdir() if p.suffix == ".py"} == {
         "__init__.py",
         "decode.py",
         "flatten.py",
+        "pixels.py",
         "resize.py",
     }
     assert (IMAGES / "features").is_dir()
     # no second home for the same code
     assert not (KERNEL / "features").exists()
     assert not (IMAGES / "features" / "decode.py").exists()
+
+
+def test_the_kernel_root_holds_domains_and_their_shared_steps_only():
+    # A domain package per subject, plus the shared steps that two domains need:
+    # the table is the decision, and a new file here has to be argued for.
+    assert {p.name for p in KERNEL.iterdir() if p.is_dir() and not p.name.startswith("__")} == {
+        "assets",
+        "images",
+        "lm",
+        "lora",
+        "text",
+    }
+    assert {p.name for p in KERNEL.glob("*.py")} == {"__init__.py", "_holdout.py"}
 
 
 def test_every_feature_module_is_declared_public_or_support():

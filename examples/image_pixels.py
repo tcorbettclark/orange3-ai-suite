@@ -4,11 +4,12 @@ Run it from the repository root:
 
     uv run python examples/image_pixels.py [photo] [grid size]
 
-The plain baseline is three kernel steps, and the Image Pixels widget composes
-them: ``decode`` (luma, [0, 1]), ``resize`` (a fixed square resolution) and
-``flatten`` (one row, with a coordinate name per cell). None of them reads a file
-or builds a table - the widget supplies those. This script shows what the three
-steps guarantee:
+The plain baseline is three kernel steps composed by one kernel function, and
+the Image Pixels widget calls that function too: ``decode`` (luma, [0, 1]),
+``resize`` (a fixed square resolution) and ``flatten`` (one row, with a
+coordinate name per cell) as ``images.pixels.pixel_row``. None of them reads a
+file or builds a table - the widget supplies those. This script shows what the
+composition guarantees:
 
 * values are luma in [0, 1], in row-major order;
 * there are exactly ``size * size`` of them, and the grid size is passed in;
@@ -22,18 +23,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.images.decode import to_luminance, to_unit_scale
-from orangecontrib.ai_suite.kernel.images.flatten import flatten
-from orangecontrib.ai_suite.kernel.images.resize import resize_square
+from orangecontrib.ai_suite.kernel.images.pixels import pixel_row
 
 HERE = Path(__file__).parent
 RAMP = " .:-=+*#%@"  # ten steps from dark to bright
-
-
-def pixel_row(image: np.ndarray, size: int) -> tuple[np.ndarray, tuple[str, ...]]:
-    """The widget's pipeline, in the open: decode, resize, flatten."""
-    grid = resize_square(to_unit_scale(to_luminance(image)), size)
-    return flatten(grid)
 
 
 def load(path: Path) -> np.ndarray:

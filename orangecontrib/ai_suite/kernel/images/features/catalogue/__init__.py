@@ -31,6 +31,7 @@ from collections.abc import Iterable
 from ..feature import Feature
 from .anti_diagonal_profile_peaks import AntiDiagonalProfilePeaks
 from .autocorrelation_half_width import AutocorrelationHalfWidth
+from .blue_minus_red_mean import BlueMinusRedMean
 from .bluish_fraction import BluishFraction
 from .bright_fraction import BrightFraction
 from .centre_of_mass_x import CentreOfMassX
@@ -51,7 +52,6 @@ from .horizontal_spread import HorizontalSpread
 from .intensity_std import IntensityStd
 from .kurtosis import Kurtosis
 from .left_right_symmetry import LeftRightSymmetry
-from .blue_minus_red_mean import BlueMinusRedMean
 from .mean_chroma import MeanChroma
 from .mean_gradient_magnitude import MeanGradientMagnitude
 from .mean_intensity import MeanIntensity

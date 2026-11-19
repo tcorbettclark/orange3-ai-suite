@@ -64,12 +64,7 @@ class PixelValuesWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.images.decode import (
-                to_luminance,
-                to_unit_scale,
-            )
-            from orangecontrib.ai_suite.kernel.images.flatten import flatten
-            from orangecontrib.ai_suite.kernel.images.resize import resize_square
+            from orangecontrib.ai_suite.kernel.images.pixels import pixel_row
 
             rows = []
             names: tuple[str, ...] = ()
@@ -84,8 +79,7 @@ class PixelValuesWorker(QThread):
                     n_unreadable += 1
                 else:
                     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                    grid = resize_square(to_unit_scale(to_luminance(rgb)), self._size)
-                    values, names = flatten(grid)
+                    values, names = pixel_row(rgb, self._size)
                     rows.append(values)
                     readable.append(source)
                 self.progress.emit(int(100 * (n + 1) / total))
