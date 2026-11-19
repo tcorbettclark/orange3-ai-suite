@@ -185,10 +185,15 @@ class OWBritLLMModels(OWWidget):
         if self.path is not None:
             self._emit()
             return
+        # This widget owns the choice of transfer inside Orange: the Hub is
+        # usually imported by then, so this sets its constant, not just the env.
+        from orangecontrib.ai_suite.kernel.assets.hf import prefer_classic_lfs
+
+        transfer = prefer_classic_lfs()
         asset = self._asset()
         self._start(
             lambda report: ensure(asset, on_progress=report),
-            f"Downloading {asset.name}...",
+            f"Downloading {asset.name} - {transfer}...",
             total=asset.size_bytes,
         )
 

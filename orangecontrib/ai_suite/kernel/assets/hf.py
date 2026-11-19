@@ -11,10 +11,13 @@ The Hub cache is ``HF_HUB_CACHE``, else ``$HF_HOME/hub``, else
 ``HF_DATASETS_CACHE``/``HF_HOME`` and prepared folders live under its
 ``prepared`` subdirectory.
 
-Transfers use the classic Hugging Face LFS path by default. It leaves a
-resumable ``.incomplete`` file under ``blobs`` and is more reliable than Xet for
-these artifacts. Set ``HF_HUB_DISABLE_XET=0`` to opt into Xet at download time;
-the choice is applied when a download runs, never at import.
+Transfers use the classic Hugging Face LFS path. It leaves a resumable
+``.incomplete`` file under ``blobs`` and is more reliable than Xet for these
+artifacts. There is no per-download switch for that: the Hub reads
+``HF_HUB_DISABLE_XET`` once, when it is imported, so the choice is process-wide
+and belongs to the entry point that owns it - :func:`prefer_classic_lfs`, called
+by the ``orange-ai-assets`` CLI and the BritLLM Models widget. Nothing here
+changes a global on import, and no download decides it on the caller's behalf.
 """
 
 from __future__ import annotations
@@ -38,26 +41,45 @@ _VERIFIED = ".orange3-verified.json"
 _PREPARED = ".orange3-prepared.json"
 
 
-def _prefer_classic_lfs() -> None:
-    """Prefer the classic LFS transfer over Xet; called at download time, never
-    at import, so importing this module changes no process-global state.
+#: The Hub's own switch. Read once, when ``huggingface_hub.constants`` is
+#: imported, so setting it later only works through the constant itself.
+_XET_ENV = "HF_HUB_DISABLE_XET"
+_OPT_OUT = {"0", "false", "no", "off"}
 
-    Classic LFS leaves a resumable ``.incomplete`` file under ``blobs`` and is
-    more reliable for these artifacts. The ``setdefault`` lets an explicit
-    ``HF_HUB_DISABLE_XET=0`` opt in; if ``huggingface_hub`` was imported first,
-    its constant is already fixed, so patch it (``file_download`` reads it at
-    call time).
+
+def prefer_classic_lfs() -> str:
+    """Ask the Hub for the classic LFS transfer, once, at a process entry point.
+
+    There is no per-download parameter for this (``snapshot_download`` takes
+    none), so the library's own lever is the one used: ``HF_HUB_DISABLE_XET``,
+    read into ``huggingface_hub.constants`` when that module is *imported* and
+    then consulted by ``is_xet_available()`` on every download. Two consequences,
+    both handled here rather than left to chance:
+
+    - setting the variable now covers every import that has not happened yet, so
+      a fresh process gets classic LFS;
+    - inside Orange the Hub is often already imported, in which case the
+      variable alone changes nothing, so the constant - the value the library
+      actually reads - is set too. That is documented library behaviour, not a
+      patch of private state.
+
+    An explicit ``HF_HUB_DISABLE_XET=0`` (and its synonyms) opts back into Xet,
+    and is left alone. Returns a one-line note for a caller that logs it; the
+    function is idempotent, so calling it twice is harmless.
+
+    Re-importing the library instead would be worse than useful: modules that
+    already did ``from huggingface_hub import ...`` keep the old objects, and the
+    process would hold two copies of a library with a native extension.
     """
-    disable_xet = os.environ.setdefault("HF_HUB_DISABLE_XET", "1").lower() not in {
-        "0",
-        "false",
-        "no",
-        "off",
-    }
-    if disable_xet and "huggingface_hub.constants" in sys.modules:
-        import huggingface_hub.constants as _hf_constants
+    if os.environ.get(_XET_ENV, "").strip().lower() in _OPT_OUT:
+        return f"Xet transfer (as asked by {_XET_ENV}=0)"
+    os.environ[_XET_ENV] = "1"
+    if "huggingface_hub.constants" not in sys.modules:
+        return "classic LFS transfer"
+    import huggingface_hub.constants
 
-        _hf_constants.HF_HUB_DISABLE_XET = True
+    huggingface_hub.constants.HF_HUB_DISABLE_XET = True
+    return "classic LFS transfer (the Hub was already imported)"
 
 
 class AssetError(RuntimeError):
@@ -122,7 +144,6 @@ def _snapshot_download(
 ) -> Path:
     from huggingface_hub import snapshot_download
 
-    _prefer_classic_lfs()
     kwargs: dict[str, Any] = {
         "repo_id": asset.repo_id,
         "repo_type": asset.repo_type,

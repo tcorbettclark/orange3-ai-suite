@@ -17,9 +17,7 @@ def test_nothing_is_downloaded_before_the_click(qapp, monkeypatch):
     assert calls == []
 
 
-def test_download_sends_the_local_path(
-    qapp, tmp_path, monkeypatch, capture, qapp_process_events
-):
+def test_download_sends_the_local_path(qapp, tmp_path, monkeypatch, capture, qapp_process_events):
     model = tmp_path / "model"
     model.mkdir()
     monkeypatch.setattr(mod, "cached_path", lambda asset: None)
@@ -44,9 +42,7 @@ def test_download_sends_the_local_path(
     assert not w.Error.download_failed.is_shown()
 
 
-def test_a_cached_model_is_used_on_click(
-    qapp, tmp_path, monkeypatch, capture, qapp_process_events
-):
+def test_a_cached_model_is_used_on_click(qapp, tmp_path, monkeypatch, capture, qapp_process_events):
     model = tmp_path / "model"
     model.mkdir()
     monkeypatch.setattr(mod, "cached_path", lambda asset: model)

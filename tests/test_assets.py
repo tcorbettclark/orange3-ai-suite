@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import shutil
 import time
 
@@ -15,6 +16,7 @@ from orangecontrib.ai_suite.kernel.assets.hf import (
     _repo_folder,
     cached_path,
     ensure,
+    prefer_classic_lfs,
     verify,
 )
 from orangecontrib.ai_suite.kernel.assets.mnist import _prepare_mnist
@@ -265,3 +267,84 @@ def test_cli_list_reports_cache_status(tmp_path, capsys):
     output = capsys.readouterr().out
     assert "cache" in output
     assert output.count("missing") == 3
+
+
+# ---- the transfer policy: owned by an entry point, never by an import ------
+
+
+def test_importing_the_assets_module_decides_nothing(monkeypatch):
+    # The lesson of the previous round: a helper module must not change process
+    # state, so the choice is made by the entry point that owns it.
+    import subprocess
+    import sys
+
+    probe = (
+        "import os, sys;"
+        "import orangecontrib.ai_suite.kernel.assets.hf;"
+        "print(os.environ.get('HF_HUB_DISABLE_XET'), 'huggingface_hub.constants' in sys.modules)"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "HF_HUB_DISABLE_XET"}
+    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, env=env)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.split() == ["None", "False"]
+
+
+def test_a_fresh_process_gets_classic_lfs_from_the_environment():
+    # In a subprocess, because the test session may already have imported the Hub.
+    import subprocess
+    import sys
+
+    probe = (
+        "import os;"
+        "from orangecontrib.ai_suite.kernel.assets.hf import prefer_classic_lfs;"
+        "print(prefer_classic_lfs());"
+        "print(os.environ['HF_HUB_DISABLE_XET'])"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "HF_HUB_DISABLE_XET"}
+    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, env=env)
+    assert done.returncode == 0, done.stderr
+    # nothing imported the Hub yet, so the environment variable is enough
+    assert done.stdout.splitlines() == ["classic LFS transfer", "1"]
+
+
+@pytest.mark.parametrize("value", ["0", "false", "No", " OFF "])
+def test_an_explicit_opt_in_is_left_alone(monkeypatch, value):
+    monkeypatch.setenv("HF_HUB_DISABLE_XET", value)
+    note = prefer_classic_lfs()
+    assert os.environ["HF_HUB_DISABLE_XET"] == value  # not overwritten
+    assert note.startswith("Xet transfer")
+
+
+def test_an_already_imported_hub_gets_the_constant_set(monkeypatch):
+    # Inside Orange the Hub is usually imported before a widget runs, and the
+    # env var is then read by nobody: the constant is what is_xet_available()
+    # consults on every download.
+    import sys
+    import types
+
+    constants = types.ModuleType("huggingface_hub.constants")
+    constants.HF_HUB_DISABLE_XET = False
+    hub = types.ModuleType("huggingface_hub")
+    hub.constants = constants
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.constants", constants)
+    monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+
+    note = prefer_classic_lfs()
+    assert constants.HF_HUB_DISABLE_XET is True
+    assert note.endswith("(the Hub was already imported)")
+
+
+def test_calling_it_twice_is_harmless(monkeypatch):
+    monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+    assert prefer_classic_lfs() == prefer_classic_lfs()
+
+
+def test_the_cli_states_the_choice_it_made(monkeypatch, capsys):
+    from orangecontrib.ai_suite.kernel.assets.cli import main
+
+    monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+    assert main(["list"]) == 0
+    captured = capsys.readouterr()
+    assert captured.err.startswith("transfer: ")
+    assert os.environ["HF_HUB_DISABLE_XET"] == "1"
