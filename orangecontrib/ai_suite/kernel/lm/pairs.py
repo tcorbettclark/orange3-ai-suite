@@ -28,7 +28,7 @@ from itertools import pairwise
 
 import numpy as np
 
-from .._split import key_order
+from .._holdout import held_out_positions
 from .tokenizer import BOS_ID, EOS_ID, stream_units
 
 
@@ -70,24 +70,14 @@ class Pairs:
     # ---- splitting ---------------------------------------------------------
 
     def split(self, validation_fraction: float = 0.1, seed: int = 0) -> tuple[Pairs, Pairs]:
-        """Unit-level train/validation split, deterministic under a seed.
+        """Unit-level train/validation split: a stride over the units, from the seed.
 
-        Units are selected by a salted hash of their own ids, in key order, so
-        the split is a function of ``(seed, the units)`` - never of the order the
-        corpus arrived in: reordering or re-fetching the corpus cannot change it.
-        The hashing itself is shared with lora's row split (see
-        :mod:`.._split`); this method owns only the unit-level policy. It is
-        *not* stable under appending. The held-out count is a fraction of
-        the unit count and the selection is a prefix in key order, so a new unit
-        whose key sorts inside that prefix evicts one that was held out before.
-
-        Selection is atomic per key: two units with identical ids hash alike and
-        are therefore always assigned together, so a unit can never appear in
-        both train and validation. Atomicity can overshoot
-        ``validation_fraction`` when a large group is taken, and if *every* unit
-        is identical the ratio wins instead - duplicates then straddle the
-        split, which is unavoidable when there is only one distinct unit in the
-        corpus.
+        Held-out units are chosen by position (see :mod:`.._holdout`), so the
+        split is a function of ``(seed, the order of the corpus)`` and of nothing
+        else. It follows corpus order: reordering or appending units can move a
+        unit from one side to the other, so a reproducible run re-reads the same
+        corpus in the same order. Units with identical ids are no exception -
+        they are positions like any other and may land on different sides.
         """
         if not 0.0 < validation_fraction < 1.0:
             raise ValueError("validation_fraction must be strictly between 0 and 1")
@@ -95,28 +85,8 @@ class Pairs:
         if n < 2:
             raise ValueError("need at least 2 units to split")
 
-        groups: dict[bytes, list[int]] = {}
-        for index, key in enumerate(
-            self.targets[a:b].tobytes() for a, b in pairwise(self._offsets())
-        ):
-            groups.setdefault(key, []).append(index)
-
-        target = min(max(1, round(n * validation_fraction)), n - 1)
-        val_units: list[int] = []
-        group_keys = list(groups)
-        for key in (group_keys[i] for i in key_order(group_keys, seed)):
-            group = groups[key]
-            if len(val_units) >= target or len(val_units) + len(group) >= n:
-                break  # enough held out, and training keeps at least one unit
-            val_units.extend(group)
-        if not val_units:
-            # Every unit is identical: keeping duplicates apart would leave a
-            # one-unit validation set, which is useless. Honour the ratio and
-            # accept the overlap - it is unavoidable here.
-            val_units = list(groups[sorted(groups)[0]][:target])
-
         is_val = np.zeros(n, dtype=bool)
-        is_val[val_units] = True
+        is_val[held_out_positions(n, validation_fraction, seed)] = True
         return self._gather(np.flatnonzero(~is_val)), self._gather(np.flatnonzero(is_val))
 
     def _gather(self, units: np.ndarray) -> Pairs:
@@ -144,9 +114,9 @@ def make_pairs(stream: Sequence[int], context_width: int) -> Pairs:
     target. Every id in the stream is predicted exactly once, so the result
     holds exactly ``len(stream)`` pairs.
 
-    A stream that does not end with EOS, or that contains two EOS in a row, is
-    rejected: only ``Tokenizer.encode`` produces a stream that carries its own
-    unit structure.
+    A stream that does not end with EOS, that contains two EOS in a row, or that
+    carries a BOS is rejected: only ``Tokenizer.encode`` produces a stream that
+    carries its own unit structure, and in that stream BOS is never data.
     """
     if int(context_width) != context_width or context_width < 1:
         raise ValueError("context_width must be a whole number >= 1")
@@ -154,25 +124,27 @@ def make_pairs(stream: Sequence[int], context_width: int) -> Pairs:
     ids = np.asarray(stream, dtype=np.int32)
     if len(ids) == 0:
         raise ValueError("stream is empty: empty or whitespace-only text has no units")
-    ends = np.flatnonzero(ids == EOS_ID)
-    if len(ends) == 0 or ends[-1] != len(ids) - 1:
+    if BOS_ID in ids:
+        raise ValueError(
+            "stream carries <bos>: it opens a context and is never data, so this "
+            "only accepts a stream from Tokenizer.encode"
+        )
+    # Unit structure is stream_units' to derive, and the shape of what it
+    # returns is the whole validation: a non-empty last entry means the stream
+    # did not end with EOS; an empty entry anywhere else is a doubled EOS.
+    units = stream_units(ids)
+    if units[-1]:
         raise ValueError(
             "stream must end with <eos>: every unit is terminated, so this only "
             "accepts a stream from Tokenizer.encode"
         )
-    starts = np.concatenate(([0], ends[:-1] + 1))
-    if (ends - starts < 1).any():
+    units.pop()  # the empty entry after the final EOS: the last pair predicts it
+    if not all(units):
         raise ValueError("stream has an empty unit (two <eos> in a row)")
 
     contexts = np.full((len(ids), context_width), BOS_ID, dtype=np.int32)
     targets = np.empty(len(ids), dtype=np.int32)
     row = 0
-    # BOS is kept in unit content here so a stray one counts as data; encode
-    # never emits it, so the two paths agree on every stream encode produces.
-    # The validation guarantees the stream ends with EOS, whose trailing empty
-    # entry stream_units added; drop it so the last pair is the EOS prediction.
-    units = stream_units(ids, keep_bos=True)
-    units.pop()
     for unit in units:
         seq = np.concatenate(([BOS_ID], np.asarray(unit, dtype=np.int32), [EOS_ID]))
         for i in range(1, len(seq)):

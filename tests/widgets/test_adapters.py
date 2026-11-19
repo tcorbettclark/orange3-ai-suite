@@ -65,8 +65,9 @@ def test_checkpoint_table_columns_and_sample():
     ]
     table = checkpoint_table(rows)
     # Structural tie: the columns are the kernel's own epoch-stats key order,
-    # imported from the producing module - not a copy spelled here.
-    from orangecontrib.ai_suite.kernel.lm import EPOCH_STATS_KEYS
+    # taken from the leaf module that names them - not a copy spelled here, and
+    # not an import that would drag Keras into the widget layer.
+    from orangecontrib.ai_suite.kernel.lm.stats import EPOCH_STATS_KEYS
 
     assert [v.name for v in table.domain.attributes] == list(EPOCH_STATS_KEYS)
     assert table.domain.metas[0].name == "sample"
@@ -79,3 +80,19 @@ def test_checkpoint_table_tolerates_missing_sample():
     table = checkpoint_table(rows)
     assert not np.isnan(table[0, "perplexity"])
     assert str(table.metas[0, 0]) == ""
+
+
+def test_importing_the_adapters_does_not_import_the_ml_stack():
+    # adapters is imported by the image widgets too, and the epoch-stats key order
+    # it needs lives beside a module that imports Keras (about two seconds and a
+    # few hundred megabytes). The constant is therefore read lazily, in
+    # checkpoint_table, and this pins that.
+    import pathlib
+    import subprocess
+    import sys
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    probe = "import sys, orangecontrib.ai_suite.adapters; print('keras' in sys.modules)"
+    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, cwd=root)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "False", done.stdout

@@ -8,8 +8,10 @@ leak into the tests).
 
 import dataclasses
 
+import numpy as np
 import pytest
 
+from orangecontrib.ai_suite.kernel.lm.pairs import make_pairs
 from orangecontrib.ai_suite.kernel.lm.tokenizer import (
     BOS,
     BOS_ID,
@@ -20,6 +22,7 @@ from orangecontrib.ai_suite.kernel.lm.tokenizer import (
     CharTokenizer,
     Tokenizer,
     WordTokenizer,
+    stream_units,
     tokenizer_from_dict,
     tokenizer_from_text,
     tokenizers,
@@ -272,3 +275,40 @@ def test_error_paths():
         CharTokenizer(tokens=("a", UNK, EOS), counts=(1, 0, 0), total_token_count=1)
     with pytest.raises(ValueError, match="same length"):
         CharTokenizer(tokens=(BOS, UNK, EOS, "a"), counts=(0, 0, 0), total_token_count=0)
+
+
+# ---- unit structure: one spelling, shared by decode and make_pairs --------
+
+
+@pytest.mark.parametrize(
+    ("stream", "expected"),
+    [
+        ([], [[]]),  # no ids: one empty unit, and make_pairs refuses it earlier
+        ([EOS_ID], [[], []]),  # one terminated unit, then the empty tail
+        ([3, 4, EOS_ID], [[3, 4], []]),
+        ([3, EOS_ID, 4, EOS_ID], [[3], [4], []]),
+        ([3, EOS_ID, EOS_ID], [[3], [], []]),  # a doubled EOS is an empty unit
+        ([3, EOS_ID, 4], [[3], [4]]),  # unterminated: the tail is still a unit
+        ([BOS_ID, 3, EOS_ID], [[3], []]),  # BOS is context, never content
+        ([3, BOS_ID, 4, EOS_ID], [[3, 4], []]),  # ... anywhere in the unit
+        (np.array([3, 4, EOS_ID]), [[3, 4], []]),  # any iterable of ids
+    ],
+)
+def test_stream_units_splits_at_the_eos_boundaries(stream, expected):
+    assert stream_units(stream) == expected
+
+
+def test_the_two_consumers_see_the_same_units():
+    # decode and make_pairs both derive unit structure from this one function,
+    # so a stream of two sentences is two units for each of them.
+    tok = tokenizer_from_text("AB. CD.", "char")
+    stream = tok.encode("AB. CD.")
+    assert len(stream_units(stream)) - 1 == 2  # the trailing empty tail, dropped
+    assert len(make_pairs(stream, context_width=2).pairs_per_unit) == 2
+    assert tok.decode(stream) == "AB. CD."
+
+
+def test_decode_keeps_unterminated_text_and_drops_bos():
+    tok = tokenizer_from_text("AB. CD.", "char")
+    ids = tok.encode("AB.")  # ends with EOS
+    assert tok.decode([BOS_ID, *ids[:-1]]) == "AB."  # no EOS: still rendered

@@ -3,8 +3,9 @@
 from .architecture import LSTM, MLP, Architecture, Bigram, architectures
 from .language_model import LanguageModel
 from .pairs import make_pairs
+from .stats import EPOCH_STATS_KEYS
 from .tokenizer import Tokenizer, tokenizer_from_text, tokenizers
-from .training import EPOCH_STATS_KEYS, TrainingOptions
+from .training import TrainingOptions
 
 __all__ = [
     "EPOCH_STATS_KEYS",

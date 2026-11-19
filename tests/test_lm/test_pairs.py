@@ -102,6 +102,19 @@ def test_error_paths():
         make_pairs([A, EOS, EOS], context_width=2)
     with pytest.raises(ValueError, match="empty unit"):
         make_pairs([EOS, A, EOS], context_width=2)
+    # BOS opens a context and is never data, so it has no pair and no target.
+    with pytest.raises(ValueError, match="carries <bos>"):
+        make_pairs([BOS, A, EOS], context_width=2)
+    with pytest.raises(ValueError, match="carries <bos>"):
+        make_pairs([A, BOS, B, EOS], context_width=2)
+
+
+def test_bos_is_never_a_target():
+    # The contract in one assertion: a stream from encode has BOS in no unit, so
+    # no target is ever BOS - every target is a token or an EOS.
+    tok = tokenizer_from_text("AB. CD.", "char")
+    pairs = make_pairs(tok.encode("AB. CD."), context_width=2)
+    assert BOS not in set(pairs.targets.tolist())
 
 
 # ---- what the split does and does not promise ------------------------------
@@ -115,27 +128,24 @@ def _one_token_units(tokens):
     return stream
 
 
-def test_split_survives_reordering_but_not_appending():
+def test_split_follows_corpus_order():
     units = list(range(100, 120))
-    base = make_pairs(_one_token_units(units), context_width=1)
-    _train, val = base.split(0.1, seed=0)
-    held_out = set(val.targets.tolist())
+    # Every 10th unit, so positions 0 and 10 of twenty.
+    stream = _one_token_units(units)
+    assert _val_first_targets(stream, validation_fraction=0.1) == [100, 110]
 
-    # Reordering and re-fetching cannot change the assignment: hashes do not care.
-    reordered = make_pairs(_one_token_units(list(reversed(units))), context_width=1)
-    _train, val_reordered = reordered.split(0.1, seed=0)
-    assert set(val_reordered.targets.tolist()) == held_out
+    # Reordering moves units across the split: the rule reads positions, and
+    # re-reading the same corpus in a different order is a different split.
+    reversed_stream = _one_token_units(list(reversed(units)))
+    assert _val_first_targets(reversed_stream, validation_fraction=0.1) == [119, 109]
 
-    # Appending can: the held-out count follows the unit count, and selection is a
-    # prefix in key order, so a new unit that sorts inside it evicts an old one.
-    evicted = set()
-    for extra in range(200, 400):
-        grown = make_pairs(_one_token_units([*units, extra]), context_width=1)
-        _train, val_grown = grown.split(0.1, seed=0)
-        evicted = held_out - set(val_grown.targets.tolist())
-        if evicted:
-            break
-    assert evicted, "the docs say appending is not stable; this pins that"
+    # Appending can only add: the stride is unchanged, so a unit already held
+    # out stays held out and any new one is added - never an eviction, which is
+    # what a prefix-in-key-order rule could not promise.
+    grown = make_pairs(_one_token_units([*units, 200]), context_width=1)
+    _train, val_grown = grown.split(0.1, seed=0)
+    starts = [0] + [i + 1 for i, t in enumerate(val_grown.targets[:-1]) if t == EOS]
+    assert [int(val_grown.targets[s]) for s in starts] == [100, 110, 200]
 
 
 # ---- end to end: an encoded corpus is a self-describing stream -------------
@@ -237,7 +247,7 @@ def test_pairs_per_unit_is_derived_from_targets():
     assert "pairs_per_unit" not in vars(pairs)
 
 
-# ---- split keying: content, not corpus order ------------------------------
+# ---- what the split is a function of: position, not content ----------------
 
 
 def _val_first_targets(stream, seed=0, validation_fraction=0.25):
@@ -247,27 +257,28 @@ def _val_first_targets(stream, seed=0, validation_fraction=0.25):
     return [int(val.targets[s]) for s in starts]
 
 
-def test_split_is_independent_of_corpus_order():
-    # Same units delivered in a different order: the same units are held out.
+def test_reordering_the_corpus_changes_the_assignment():
+    # Same units, delivered in a different order: the stride reads positions, so
+    # different units are held out. This is the documented contract.
     units = [[3, 4], [5, 6], [7, 8], [9, 10]]
     stream = [x for unit in units for x in (*unit, EOS)]
     reversed_stream = [x for unit in reversed(units) for x in (*unit, EOS)]
-    assert _val_first_targets(stream) == _val_first_targets(reversed_stream)
+    assert _val_first_targets(stream) != _val_first_targets(reversed_stream)
 
 
-def test_identical_units_are_never_split():
-    # A duplicated unit hashes alike, so both copies land on the same side.
-    stream = [x for u in ([3, 4], [5, 6], [3, 4], [7, 8]) for x in (*u, EOS)]
+def test_identical_units_are_ordinary_positions():
+    # Nothing hashes the unit's ids, so a duplicated unit gets no special
+    # treatment: with the copies at adjacent positions, exactly one of them is
+    # held out whichever way the stride falls.
+    stream = [x for u in ([3, 4], [3, 4], [5, 6], [7, 8]) for x in (*u, EOS)]
+    pairs = make_pairs(stream, 1)
     for seed in range(20):
-        pairs = make_pairs(stream, 1)
         _train, val = pairs.split(validation_fraction=0.5, seed=seed)
-        in_val = sum(1 for t in val.targets[::3] if int(t) == 3)
-        assert in_val in (0, 2), f"seed {seed} split the duplicate: {in_val} in validation"
+        assert sum(1 for t in val.targets[::3] if int(t) == 3) == 1, seed
 
 
-def test_split_honours_the_ratio_when_every_unit_is_identical():
-    # Keeping duplicates apart is impossible here, and a one-unit validation set
-    # would be useless, so the ratio wins and training still keeps a unit.
+def test_the_ratio_wins_when_every_unit_is_identical():
+    # There is nothing to keep apart here, and the stride does not try.
     stream = [x for _ in range(3) for x in (3, 4, EOS)]
     train, val = make_pairs(stream, 1).split(validation_fraction=0.99)
     assert len(val.pairs_per_unit) == 2

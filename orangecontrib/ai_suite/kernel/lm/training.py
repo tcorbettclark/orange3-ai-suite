@@ -17,18 +17,7 @@ from dataclasses import dataclass
 
 import keras
 
-EpochStats = dict  # keys: EPOCH_STATS_KEYS, plus what a hook adds
-
-#: The ordered keys of an epoch-stats record, produced here and read by the
-#: widget-side checkpoint table. One spelling: the callback builds the dict
-#: from this tuple, so the producer and the columns cannot drift apart.
-EPOCH_STATS_KEYS = (
-    "epoch",
-    "loss",
-    "val_loss",
-    "perplexity",
-    "val_perplexity",
-)
+from .stats import EpochStats
 
 
 @dataclass(frozen=True)
@@ -54,6 +43,8 @@ class TrainingOptions:
             raise ValueError("learning_rate must be > 0")
         if not 0.0 < self.validation_fraction < 1.0:
             raise ValueError("validation_fraction must be strictly between 0 and 1")
+        if self.seed < 0:
+            raise ValueError("seed must be >= 0")
 
 
 @dataclass(frozen=True)
@@ -108,14 +99,15 @@ def epoch_callback(
     def emit(epoch: int, logs: dict) -> None:
         loss = logs.get("loss")
         val_loss = logs.get("val_loss")
-        values = (
-            epoch + 1,
-            float(loss) if loss is not None else float("nan"),
-            float(val_loss) if val_loss is not None else float("nan"),
-            math.exp(loss) if loss is not None else float("nan"),
-            math.exp(val_loss) if val_loss is not None else float("nan"),
+        # Named, one argument per key: the dict's order is EpochStats' business
+        # (and the checkpoint table's), never this call's.
+        stats = EpochStats(
+            epoch=epoch + 1,
+            loss=float(loss) if loss is not None else float("nan"),
+            val_loss=float(val_loss) if val_loss is not None else float("nan"),
+            perplexity=math.exp(loss) if loss is not None else float("nan"),
+            val_perplexity=math.exp(val_loss) if val_loss is not None else float("nan"),
         )
-        stats: EpochStats = dict(zip(EPOCH_STATS_KEYS, values))
         on_epoch(stats)
 
     class _EpochCallback(keras.callbacks.Callback):

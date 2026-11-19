@@ -20,9 +20,9 @@ import numpy as np
 
 from .architecture import Architecture, architecture_from_dict
 from .pairs import make_pairs
-from .tokenizer import BOS_ID, EOS_ID, Tokenizer, tokenizer_from_dict, stream_units
+from .stats import EpochStats
+from .tokenizer import BOS_ID, EOS_ID, Tokenizer, stream_units, tokenizer_from_dict
 from .training import (
-    EpochStats,
     TrainingOptions,
     TrainingResults,
     compile_keras_model,
@@ -103,9 +103,9 @@ class LanguageModel:
         """Train on one text and return self, so the call can be chained.
 
         Pairs are built at the architecture's own context width and split by
-        unit, so no unit is on both sides - except the degenerate corpus whose
-        units are all identical, which :meth:`Pairs.split` documents. ``options`` carries everything about
-        the run and nothing about the architecture. The Keras model is assigned
+        unit, so the same unit is held out for the whole run whatever the
+        epoch. ``options`` carries everything about the run and nothing about
+        the architecture. The Keras model is assigned
         before fitting begins, so an ``on_epoch`` hook can generate from the model
         as it currently stands - that is where a per-epoch sample belongs, not in
         the training settings.
