@@ -19,7 +19,7 @@ Image Features is already set to working size 56 and groups A-F.
 
 If the Import Images path is stale, open **Import Images**, click the folder
 button and choose the prepared MNIST `train/` directory. Run
-`orange-ai-assets fetch mnist-digits` first if it is not cached; the command
+`assets fetch mnist-digits` first if it is not cached; the command
 prints the prepared root.
 
 **From scratch:**

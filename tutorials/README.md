@@ -12,14 +12,14 @@ extending the widgets.
 2. Work from the repository root so the generated `demo/*.ows` paths are easy
    to re-point.
 3. The MNIST and CCSN assets are pinned Hub datasets, prepared by
-   `orange-ai-assets fetch mnist-digits` and `fetch ccsn-clouds`; the BritLLM
+   `assets fetch mnist-digits` and `assets fetch ccsn-clouds`; the BritLLM
    model is optional for the LoRA tutorials. Text tutorials use a public-domain
    `.txt` downloaded by the reader.
 
 ```bash
-orange-ai-assets fetch mnist-digits
-orange-ai-assets fetch ccsn-clouds
-orange-ai-assets fetch britllm-4bit   # optional LoRA model
+assets fetch mnist-digits
+assets fetch ccsn-clouds
+assets fetch britllm-4bit   # optional LoRA model
 ```
 
 ## Conventions

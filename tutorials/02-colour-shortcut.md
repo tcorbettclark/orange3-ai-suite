@@ -6,7 +6,7 @@ the deliberate shortcut.
 ## Prepare the corpus
 
 ```bash
-orange-ai-assets fetch ccsn-clouds
+assets fetch ccsn-clouds
 ```
 
 This prepares the five-genus CCSN subset (Ac, Sc, Cu, Cb, Ci) and its

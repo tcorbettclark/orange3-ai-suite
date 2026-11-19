@@ -19,7 +19,8 @@ the canvas and press **Download** (1.4 GB); the model is cached in the Hugging
 Face hub cache (`HF_HOME`, default `~/.cache/huggingface`). Connect its
 **Model path** output to **Base model** on LoRA Pre-trainer or LoRA SFT.
 
-Keras, TensorFlow and OpenCV are plain dependencies, so one sync is enough:
+Keras, TensorFlow and OpenCV arrive through edu-ai-suite, so one sync covers
+all three:
 
 ```bash
 uv sync
@@ -39,16 +40,16 @@ and **Visualize**.
 The image tutorials use two pinned Hugging Face assets; no `demo/` or `data/`
 checkout is needed:
 
-- **MNIST digits** - `orange-ai-assets fetch mnist-digits` (or
+- **MNIST digits** - `assets fetch mnist-digits` (or
   `get_mnist()`). The prepared root has `train/` and `val/`, 28x28, 500/100
   images per digit.
-- **CCSN clouds** - `orange-ai-assets fetch ccsn-clouds` (or `get_clouds()`).
+- **CCSN clouds** - `assets fetch ccsn-clouds` (or `get_clouds()`).
   The prepared root has `ac/`, `sc/`, `cu/`, `cb/`, `ci/` and `CREDITS.md`.
   The CCSN database is CC0; cite Zhang et al. (2018), *CloudNet*.
 
 Both commands print the prepared root; use it for **Import Images**. The
 BritLLM model is downloaded by the **BritLLM Models** widget (or headlessly
-with `orange-ai-assets fetch britllm-4bit`); the command prints
+with `assets fetch britllm-4bit`); the command prints
 the snapshot path to paste into **Base model**.
 
 For the language-model tutorials, download a public-domain short story. The
@@ -105,7 +106,7 @@ The repository ships two canvases:
 Use **File > Open** and choose one. The Import Images paths inside are
 machine-local. If a path is stale, open **Import Images**, click the folder
 button and point it at the prepared MNIST `train/` or CCSN root printed by
-`orange-ai-assets fetch mnist-digits` / `orange-ai-assets fetch ccsn-clouds`.
+`assets fetch mnist-digits` / `assets fetch ccsn-clouds`.
 
 If you prefer to build from scratch, every tutorial lists the widgets and
 links.
