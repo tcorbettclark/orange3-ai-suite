@@ -60,9 +60,11 @@ if the bracket is removed or the installed version falls outside it.
 
 ## Ordering
 
-When `edu-ai-suite` changes an API used here: it publishes first, this package
-raises the floor and adapts in one commit, then this package releases. Never
-release against an unpublished dependency.
+`edu-ai-suite` may publish a breaking minor at any time; the bracket keeps it out
+of this package until the widening above is done. The order is: it publishes,
+this package tests against the new line and widens the bracket in one commit,
+then this package releases. Never raise the floor to a version that is not on
+PyPI.
 
 ## If a publish fails
 

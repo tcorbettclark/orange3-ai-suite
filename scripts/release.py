@@ -25,18 +25,20 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-ORANGE_PYTHON = os.environ.get("ORANGE_PYTHON", "/Applications/Orange.app/Contents/MacOS/python")
-
 CONFIG = {
     "package": "orange3-ai-suite",
     "tests": [
         ["uv", "run", "pytest"],
-        [ORANGE_PYTHON, "-m", "pytest", "tests/widgets"],
+        [
+            os.environ.get("ORANGE_PYTHON", "/Applications/Orange.app/Contents/MacOS/python"),
+            "-m",
+            "pytest",
+            "tests/widgets",
+        ],
     ],
     "test_env": {"QT_QPA_PLATFORM": "offscreen"},
     "smoke": "import orangecontrib.ai_suite as add_on; print(add_on.__file__)",
     "dependency": "edu-ai-suite",
-    "publish_gate": False,
 }
 
 
@@ -104,7 +106,7 @@ def run_tests():
     env = {**os.environ, **CONFIG["test_env"]}
     for command in CONFIG["tests"]:
         if command[0].startswith("/") and not pathlib.Path(command[0]).exists():
-            fail(f"{command[0]} does not exist; set ORANGE_PYTHON")
+            fail(f"{command[0]} does not exist")
         run(command, env=env)
 
 
@@ -165,21 +167,6 @@ def check_dependency():
         fail(f"{dependency} {lower_text} is not on PyPI")
 
 
-def print_gate(version, wheel):
-    if not CONFIG["publish_gate"]:
-        return
-    say("the downstream gate")
-    print(
-        "Before publishing a minor, run the add-on's widget suite against this\n"
-        "candidate wheel in the Orange interpreter, then restore the published one:\n\n"
-        f"  uv pip install --python {ORANGE_PYTHON} --force-reinstall --no-deps {wheel}\n"
-        f"  (cd ../orange3-ai-suite && QT_QPA_PLATFORM=offscreen {ORANGE_PYTHON}"
-        " -m pytest tests/widgets)\n"
-        f"  uv pip install --python {ORANGE_PYTHON} {CONFIG['package']}=={version}\n\n"
-        "Pass --gate-confirmed to --publish when it is green."
-    )
-
-
 def cmd_check():
     check_tree()
     version = current_version()
@@ -194,7 +181,6 @@ def cmd_check():
     wheel = build()
     smoke(wheel)
     check_dependency()
-    print_gate(version, wheel)
     say(f"ready: {CONFIG['package']} {version}")
 
 
@@ -212,9 +198,7 @@ def publish_version(version):
     say(f"published {CONFIG['package']} {version}")
 
 
-def cmd_release(kind, publish, gate_confirmed, dry_run):
-    if publish and CONFIG["publish_gate"] and kind != "patch" and not gate_confirmed:
-        fail("--publish needs --gate-confirmed for a minor or major")
+def cmd_release(kind, publish, dry_run):
     cmd_check()
     version = current_version()
     following = run(
@@ -261,9 +245,6 @@ def main():
     release.add_argument("kind", choices=["patch", "minor", "major"])
     release.add_argument("--publish", action="store_true", help="upload and verify on PyPI")
     release.add_argument(
-        "--gate-confirmed", action="store_true", help="the downstream suite passed"
-    )
-    release.add_argument(
         "--dry-run", action="store_true", help="print the next version; write nothing"
     )
     commands.add_parser("verify", help="compare the project, the tag, PyPI and dist/")
@@ -271,7 +252,7 @@ def main():
     if arguments.command == "check":
         cmd_check()
     elif arguments.command == "release":
-        cmd_release(arguments.kind, arguments.publish, arguments.gate_confirmed, arguments.dry_run)
+        cmd_release(arguments.kind, arguments.publish, arguments.dry_run)
     else:
         cmd_verify()
 
