@@ -456,6 +456,13 @@ and produces no model. The training runs in its own process - a module whose nam
 begins `mlx_` hides that, along with mlx-lm's API and file conventions, so the rest of
 `lora/` never sees a subprocess.
 
+Three runnable scripts show the layer below that façade, where mlx-lm's own names
+are visible. `examples/lora_mlx_run.py` stages rows, describes one run and prints
+the events as they arrive; `examples/lora_mlx_generate.py` uses the directory it
+prints to compare the base model with its adapter, text and perplexity both; and
+`examples/lora_mlx_artifact.py` needs no MLX at all, showing which file in a run's
+directory counts as the adapter and how a stop still leaves one.
+
 ## Datasets and workflows
 
 ```python
