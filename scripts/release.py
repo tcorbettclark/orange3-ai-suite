@@ -1,15 +1,30 @@
 #!/usr/bin/env python3
-"""Release this package: check the tree, bump the version, tag, push and publish.
+"""Release this package: check, bump, tag, publish and verify.
 
-check writes no tracked file; it rebuilds dist/. release writes pyproject.toml and
-uv.lock, commits release: X.Y.Z, creates the annotated tag vX.Y.Z, pushes main and
-the tag, and with --publish uploads the artifacts and verifies them on PyPI.
-publish uploads the version already tagged at HEAD, so a tagged release can reach
-PyPI later without a second bump. verify compares the project, the tag at HEAD,
-and the digests PyPI records for the artifacts in dist/.
+Commands:
+  check      every pre-release check; writes no tracked file, rebuilds dist/
+  release    bump the version, test, rebuild, commit, tag and push
+  publish    upload the version already tagged at HEAD
+  verify     compare the tag at HEAD with the digests PyPI serves
 
-The settings are [tool.release] in pyproject.toml, and this file is identical in
-both repositories.
+Typical usage:
+  check before deciding, then see the next version without writing:
+    uv run python scripts/release.py check
+    uv run python scripts/release.py release patch --dry-run
+
+  release and upload in one go:
+    uv run python scripts/release.py release patch --publish
+
+  tag now, publish later from the same commit:
+    uv run python scripts/release.py release patch
+    uv run python scripts/release.py publish
+
+  confirm what was published:
+    uv run python scripts/release.py verify
+
+The version is written once, in pyproject.toml; the tag is made from it. The
+settings are [tool.release] in pyproject.toml. A published version is never
+reused: a broken 0.0.2 becomes 0.0.3.
 """
 
 from __future__ import annotations
@@ -326,18 +341,20 @@ def cmd_verify():
 def main():
     global CONFIG
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        prog="release",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("check", help="run every pre-release check; write no tracked file")
-    release = commands.add_parser("release", help="bump, test, commit, tag and push")
+    commands.add_parser("check", help="every pre-release check; write no tracked file")
+    release = commands.add_parser("release", help="bump, test, rebuild, commit, tag and push")
     release.add_argument("kind", choices=["patch", "minor", "major"])
     release.add_argument("--publish", action="store_true", help="upload and verify on PyPI")
     release.add_argument(
         "--dry-run", action="store_true", help="print the next version; write nothing"
     )
     commands.add_parser("publish", help="upload the version already tagged at HEAD")
-    commands.add_parser("verify", help="compare the project, the tag, PyPI and dist/")
+    commands.add_parser("verify", help="compare the tag at HEAD with the digests PyPI serves")
     arguments = parser.parse_args()
     CONFIG = load_config()
     if arguments.command == "check":

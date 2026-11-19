@@ -33,8 +33,8 @@ and `${NAME}` or `${NAME:-default}` in a command is read from the environment.
 the cached 4-bit model. On a machine without MLX they skip, which is the most
 such a machine can say about that path.
 
-`scripts/release.py` is identical in both repositories. Change one and copy it to
-the other; `diff` is the sync check.
+`scripts/release.py` holds nothing repository-specific; copy it wherever it is
+needed, and `diff` is the sync check.
 
 ## The release
 
