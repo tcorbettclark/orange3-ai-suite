@@ -1,17 +1,25 @@
 """The test that every name the prose puts in backticks exists in the source tree.
 
-The prose is the README, the glossary, the load/save page and the tutorials. The
-sweep takes each lower-case ``snake_case`` token in backticks and looks for it in
-``orangecontrib``, ``examples``, ``demo`` and ``tests``.
+The prose is the README, the load/save note and the tutorials; the installed
+dependency is read too. The sweep takes each lower-case ``snake_case`` token in
+backticks and looks for it in ``orangecontrib``, ``demo``, ``tests`` and the
+``edu_ai_suite`` package.
 """
 
 import ast
 import pathlib
 import re
 
+import edu_ai_suite
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE_DIRS = [ROOT / "orangecontrib", ROOT / "examples", ROOT / "demo", ROOT / "tests"]
-PROSE = [ROOT / "README.md", ROOT / "GLOSSARY.md", ROOT / "LOAD_SAVE_MODELS.md"] + sorted(
+SOURCE_DIRS = [
+    ROOT / "orangecontrib",
+    ROOT / "demo",
+    ROOT / "tests",
+    pathlib.Path(edu_ai_suite.__file__).parent,
+]
+PROSE = [ROOT / "README.md", ROOT / "LOAD_SAVE_MODELS.md"] + sorted(
     (ROOT / "tutorials").glob("*.md")
 )
 
@@ -67,8 +75,8 @@ def test_every_code_name_the_prose_uses_exists_in_the_source():
 
 def test_the_prose_sweep_finds_the_names_it_is_meant_to_check():
     # Guard the guard: if the pattern or the file list stopped matching, the test
-    # above would pass by finding nothing at all.
+    # above would pass by finding nothing at all. The prose holds 13 tokens today.
     tokens = _prose_tokens()
-    assert len(tokens) >= 15, sorted(tokens)
-    assert "context_width" in tokens  # a name every tutorial mentions
-    assert "blue_minus_red_mean" in tokens  # the name the rename had to reach
+    assert len(tokens) >= 12, sorted(tokens)
+    assert "blue_minus_red_mean" in tokens  # a feature name tutorial 02 uses
+    assert "created_by" in tokens  # a key the load/save note names

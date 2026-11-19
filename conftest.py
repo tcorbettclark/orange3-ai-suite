@@ -1,10 +1,9 @@
-# Route test collection by environment.
-#
-# Kernel tests must run in a plain Python without Orange or Qt. Widget tests
-# need the Orange interpreter with a working Qt binding (offscreen is enough),
-# so they are collected only when Orange and Qt actually import. A module
-# spec is not enough: partial installs exist.
-import importlib
+"""Drop the widget tests when the interpreter cannot import Orange and Qt.
+
+Kernel tests run in a plain Python; widget tests need the Orange interpreter with
+a working Qt binding (offscreen is enough). A module spec is not enough: partial
+installs exist, so the imports are attempted.
+"""
 
 
 def _orange_usable() -> bool:
@@ -17,24 +16,4 @@ def _orange_usable() -> bool:
         return False
 
 
-if not _orange_usable():
-    collect_ignore = ["tests/widgets"]
-else:
-    collect_ignore = []
-
-if importlib.util.find_spec("cv2") is None:
-    collect_ignore += [
-        f"tests/test_{name}.py"
-        for name in (
-            "colour",
-            "extract",
-            "photometry",
-            "preprocess",
-            "profiles",
-            "spatial",
-            "stability",
-            "symmetry",
-            "texture",
-            "topology",
-        )
-    ]
+collect_ignore = [] if _orange_usable() else ["tests/widgets"]
