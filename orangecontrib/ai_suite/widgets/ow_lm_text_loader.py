@@ -29,7 +29,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Msg, Output, OWWidget
 
-from orangecontrib.ai_suite.kernel.text import (
+from edu_ai_suite.text import (
     CleanOptions,
     RowGranularity,
     clean_text,

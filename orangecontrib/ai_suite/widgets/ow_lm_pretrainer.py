@@ -16,7 +16,7 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import checkpoint_table, corpus_text
-from orangecontrib.ai_suite.kernel.lm import (
+from edu_ai_suite.lm import (
     LanguageModel,
     TrainingOptions,
     architectures,

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.images.features import FeatureOptions, features_of_group
+from edu_ai_suite.images.features import FeatureOptions, features_of_group
 from synth import cloud_image, uniform_image
 
 OPTS = FeatureOptions()

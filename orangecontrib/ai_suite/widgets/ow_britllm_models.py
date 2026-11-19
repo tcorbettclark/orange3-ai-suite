@@ -24,8 +24,8 @@ from AnyQt.QtWidgets import (
 from Orange.widgets import gui
 from Orange.widgets.widget import Msg, Output, OWWidget
 
-from orangecontrib.ai_suite.kernel.assets.catalogue import MODEL_ASSETS
-from orangecontrib.ai_suite.kernel.assets.hf import (
+from edu_ai_suite.assets.catalogue import MODEL_ASSETS
+from edu_ai_suite.assets.hf import (
     Asset,
     Progress,
     cached_path,
@@ -184,7 +184,7 @@ class OWBritLLMModels(OWWidget):
             return
         # This widget owns the choice of transfer inside Orange: the Hub is
         # usually imported by then, so this sets its constant, not just the env.
-        from orangecontrib.ai_suite.kernel.assets.hf import prefer_classic_lfs
+        from edu_ai_suite.assets.hf import prefer_classic_lfs
 
         transfer = prefer_classic_lfs()
         asset = self._asset()

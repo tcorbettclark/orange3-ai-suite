@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.flatten import flatten
+from edu_ai_suite.images.flatten import flatten
 
 
 @pytest.mark.parametrize("size", [1, 3, 10])

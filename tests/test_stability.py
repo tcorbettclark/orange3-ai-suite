@@ -8,7 +8,7 @@ within tolerance.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.features import (
+from edu_ai_suite.images.features import (
     FeatureOptions,
     all_count_feature_names,
     extract_features,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.text import (
+from edu_ai_suite.text import (
     CleanOptions,
     QAPair,
     RowGranularity,
@@ -160,7 +160,7 @@ def test_a_string_is_not_a_granularity():
 def test_rows_do_not_change_the_sentences_the_model_sees():
     # The table shape is not the model's unit: joining the rows and splitting
     # sentences again must give the same sentences whatever the granularity.
-    from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text
+    from edu_ai_suite.lm import tokenizer_from_text
 
     text = "The cat sat. A dog barked.\n\nNothing else happened that day."
     tokenizer = tokenizer_from_text(text, "word")
@@ -232,7 +232,7 @@ def test_a_non_page_number_line_survives(line):
 def test_the_page_number_pattern_never_matches_an_empty_numeral(line):
     # Pinned at the pattern, not only at the outcome: a blank line is the
     # paragraph break, and the rule that removes numbers must not touch it.
-    from orangecontrib.ai_suite.kernel.text._clean import _PAGE_NUMBER
+    from edu_ai_suite.text._clean import _PAGE_NUMBER
 
     assert _PAGE_NUMBER.match(line) is None
 

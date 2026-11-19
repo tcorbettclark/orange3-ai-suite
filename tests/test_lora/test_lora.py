@@ -1,4 +1,4 @@
-"""``orangecontrib.ai_suite.kernel.lora``: the data, artifact, protocol and training tests.
+"""``edu_ai_suite.lora``: the data, artifact, protocol and training tests.
 
 Data, artifact and protocol tests always run; the end-to-end training tests need the
 converted ``britllm-4bit`` model on disk and skip without it. No test here imports
@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.assets.britllm import BRITLLM_4BIT
-from orangecontrib.ai_suite.kernel.assets.hf import cached_path
-from orangecontrib.ai_suite.kernel.lora import (
+from edu_ai_suite.assets.britllm import BRITLLM_4BIT
+from edu_ai_suite.assets.hf import cached_path
+from edu_ai_suite.lora import (
     LoRAAdapter,
     LoRAData,
     LoRAModel,
@@ -27,15 +27,15 @@ from orangecontrib.ai_suite.kernel.lora import (
     split_for_training,
     train_lora,
 )
-from orangecontrib.ai_suite.kernel.lora.mlx_process import command as child_command
-from orangecontrib.ai_suite.kernel.lora.mlx_protocol import (
+from edu_ai_suite.lora.mlx_process import command as child_command
+from edu_ai_suite.lora.mlx_protocol import (
     MARKER,
     decode,
     encode,
 )
-from orangecontrib.ai_suite.kernel.lora.mlx_runtime import segments as _segments
-from orangecontrib.ai_suite.kernel.lora.model import _echo
-from orangecontrib.ai_suite.kernel.lora.run import _run_spec
+from edu_ai_suite.lora.mlx_runtime import segments as _segments
+from edu_ai_suite.lora.model import _echo
+from edu_ai_suite.lora.run import _run_spec
 
 _NO_MODEL = (
     "pinned 4-bit model not cached — use the BritLLM Models widget or "
@@ -180,7 +180,7 @@ def test_an_event_round_trips_through_the_wire_format(event):
 
 
 def test_every_event_type_has_a_wire_name():
-    from orangecontrib.ai_suite.kernel.lora.mlx_protocol import _BY_KIND, _KINDS
+    from edu_ai_suite.lora.mlx_protocol import _BY_KIND, _KINDS
 
     assert set(_KINDS) == {Params, TrainReport, ValReport}
     assert set(_BY_KIND) == {"params", "train", "val"}
@@ -259,7 +259,7 @@ def test_the_command_runs_the_boundary_child_with_the_spec_as_one_argument():
     # to know that training is a process at all.
     spec = _run_spec("base", "/data", "/adapter", LoRAOptions(iters=1), "text")
     cmd = child_command(spec)
-    assert cmd[:3] == [sys.executable, "-m", "orangecontrib.ai_suite.kernel.lora.mlx_child"]
+    assert cmd[:3] == [sys.executable, "-m", "edu_ai_suite.lora.mlx_child"]
     payload = json.loads(cmd[3])
     assert payload["iters"] == 1
     assert set(payload) == {field.name for field in dataclasses.fields(spec)}
@@ -300,7 +300,7 @@ def test_adapter_artifact_round_trip(tmp_path):
 def test_the_record_names_the_package_that_wrote_it(tmp_path):
     # One `meta.json` name is shared with the Keras model's directory, so the record has
     # to name it - and it does so as the qualified package name.
-    import orangecontrib.ai_suite.kernel.lora as lora
+    import edu_ai_suite.lora as lora
 
     saved = LoRAAdapter(base_model="b", adapter_path=None, training={}).save(tmp_path / "a")
     meta = json.loads((saved / "meta.json").read_text())
@@ -312,7 +312,7 @@ def test_another_packages_record_is_refused(tmp_path):
     # read whichever of its keys happen to match.
     saved = tmp_path / "not-an-artifact"
     saved.mkdir()
-    (saved / "meta.json").write_text(json.dumps({"created_by": "orangecontrib.ai_suite.kernel.lm"}))
+    (saved / "meta.json").write_text(json.dumps({"created_by": "edu_ai_suite.lm"}))
     with pytest.raises(ValueError, match="not a LoRA artifact"):
         LoRAAdapter.load(saved)
 

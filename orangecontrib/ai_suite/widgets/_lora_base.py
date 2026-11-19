@@ -20,7 +20,7 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
-from orangecontrib.ai_suite.kernel.lora import (
+from edu_ai_suite.lora import (
     LoRAModel,
     LoRAOptions,
     Params,
@@ -31,7 +31,7 @@ from orangecontrib.ai_suite.kernel.lora import (
     split_for_training,
     train_lora,
 )
-from orangecontrib.ai_suite.kernel.lora import (
+from edu_ai_suite.lora import (
     available as lora_available,
 )
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from orangecontrib.ai_suite.kernel._holdout import held_out_positions
+from edu_ai_suite._holdout import held_out_positions
 
 
 @pytest.mark.parametrize(

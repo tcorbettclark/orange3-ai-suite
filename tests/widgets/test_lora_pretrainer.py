@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 from Orange.data import Domain, StringVariable, Table
 
-from orangecontrib.ai_suite.kernel.assets.britllm import BRITLLM_4BIT
-from orangecontrib.ai_suite.kernel.assets.hf import cached_path
+from edu_ai_suite.assets.britllm import BRITLLM_4BIT
+from edu_ai_suite.assets.hf import cached_path
 from orangecontrib.ai_suite.widgets.ow_lora_pretrainer import OWLoRAPretrainer
 
 MLX_OK = importlib.util.find_spec("mlx") is not None
@@ -76,7 +76,7 @@ def test_stop_before_adapter_routes_to_information(qapp):
 
 def test_progress_events_drive_the_note_and_the_curves(qapp):
     # The worker emits the kernel's typed events; the widget matches on the type.
-    from orangecontrib.ai_suite.kernel.lora import Params, TrainReport, ValReport
+    from edu_ai_suite.lora import Params, TrainReport, ValReport
 
     w = OWLoRAPretrainer()
     w.show()

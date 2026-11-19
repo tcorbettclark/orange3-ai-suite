@@ -96,7 +96,7 @@ def test_the_text_package_is_a_facade_over_private_steps():
 
 
 def test_the_text_facade_exports_every_public_name_and_nothing_private():
-    from orangecontrib.ai_suite.kernel import text as facade
+    from edu_ai_suite import text as facade
 
     assert facade.__all__ == list(dict.fromkeys(facade.__all__))  # no duplicates
     for name in facade.__all__:
@@ -160,7 +160,7 @@ def test_the_boundary_modules_never_import_the_rest_of_lora():
             # a deeper relative hop leaves the package; an absolute one names it
             elif level > 1:
                 offenders.append(f"{path.name}: {'.' * level}{module}")
-            elif module.startswith("orangecontrib.ai_suite.kernel.lora."):
+            elif module.startswith("edu_ai_suite.lora."):
                 tail = module.rsplit(".", 1)[-1]
                 if tail not in siblings:
                     offenders.append(f"{path.name}: {module}")
@@ -172,7 +172,7 @@ def test_the_child_is_a_program_and_nothing_imports_it():
     # name and must not import it, or the child's imports become the package's.
     import importlib.util
 
-    from orangecontrib.ai_suite.kernel.lora import mlx_process
+    from edu_ai_suite.lora import mlx_process
 
     found = importlib.util.find_spec(mlx_process._CHILD)
     assert found is not None and found.origin.endswith("/mlx_child.py")  # the name resolves

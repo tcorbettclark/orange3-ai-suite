@@ -3,7 +3,7 @@
 ``EXPECTED`` is the whole surface, compared against ``lora.__all__``.
 """
 
-import orangecontrib.ai_suite.kernel.lora as lora
+import edu_ai_suite.lora as lora
 
 EXPECTED = frozenset(
     {
@@ -32,9 +32,9 @@ def test_package_exports_only_the_use_case():
 def test_internals_live_in_their_own_module():
     # Supported, but not part of the façade: the boundary (its wire format, its run)
     # and the domain's own helpers belong to whoever owns the run.
-    from orangecontrib.ai_suite.kernel.lora import mlx_process, mlx_protocol
-    from orangecontrib.ai_suite.kernel.lora.model import _echo
-    from orangecontrib.ai_suite.kernel.lora.run import _run_spec
+    from edu_ai_suite.lora import mlx_process, mlx_protocol
+    from edu_ai_suite.lora.model import _echo
+    from edu_ai_suite.lora.run import _run_spec
 
     assert callable(_echo)
     assert callable(mlx_protocol.encode) and callable(mlx_protocol.decode)

@@ -7,9 +7,9 @@ malformed feature fails at import time.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.features import Feature
-from orangecontrib.ai_suite.kernel.images.features.catalogue import _build
-from orangecontrib.ai_suite.kernel.images.features.description import Description
+from edu_ai_suite.images.features import Feature
+from edu_ai_suite.images.features.catalogue import _build
+from edu_ai_suite.images.features.description import Description
 
 GOOD = Description(
     title="Probe",

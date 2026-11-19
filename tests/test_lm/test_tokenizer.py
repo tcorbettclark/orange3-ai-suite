@@ -10,8 +10,8 @@ import dataclasses
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm.pairs import make_pairs
-from orangecontrib.ai_suite.kernel.lm.tokenizer import (
+from edu_ai_suite.lm.pairs import make_pairs
+from edu_ai_suite.lm.tokenizer import (
     BOS,
     BOS_ID,
     EOS,

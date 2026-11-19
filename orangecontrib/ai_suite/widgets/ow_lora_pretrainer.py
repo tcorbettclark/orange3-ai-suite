@@ -40,7 +40,7 @@ class OWLoRAPretrainer(LoRATrainerBase):
     )
 
     def _make_lora_data(self):
-        from orangecontrib.ai_suite.kernel.lora import LoRAData
+        from edu_ai_suite.lora import LoRAData
 
         return LoRAData.from_texts(table_texts(self.data))
 

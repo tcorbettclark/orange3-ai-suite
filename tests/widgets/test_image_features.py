@@ -19,7 +19,7 @@ def test_image_paths_adapter(images_table, image_dir):
 
 
 def test_extraction_full_pipeline(qapp, capture, images_table, image_dir):
-    from orangecontrib.ai_suite.kernel.images.features import (
+    from edu_ai_suite.images.features import (
         get_group,  # default = A–F, colour excluded
     )
 
@@ -182,7 +182,7 @@ def test_group_toggle_auto_applies(qapp, capture, images_table):
 def test_cache_reuses_features_for_groups_and_preprocessing(
     qapp, capture, images_table, monkeypatch
 ):
-    import orangecontrib.ai_suite.kernel.images.features as features_module
+    import edu_ai_suite.images.features as features_module
 
     calls = []
     original = features_module.extract_features
@@ -214,7 +214,7 @@ def test_cache_reuses_features_for_groups_and_preprocessing(
 
 
 def test_description_is_surfaced_for_the_selected_feature(qapp, capture, images_table):
-    from orangecontrib.ai_suite.kernel.images import features
+    from edu_ai_suite.images import features
 
     w = OWImageFeatures()
     w.show()

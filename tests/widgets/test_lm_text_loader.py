@@ -137,7 +137,7 @@ def test_gutenberg_cleaning_is_applied(qapp, capture, tmp_path):
 
 
 def test_split_menu_is_the_kernel_vocabulary(qapp):
-    from orangecontrib.ai_suite.kernel.text import RowGranularity
+    from edu_ai_suite.text import RowGranularity
 
     w = OWLMTextLoader()
     combo = w.controls.row_granularity

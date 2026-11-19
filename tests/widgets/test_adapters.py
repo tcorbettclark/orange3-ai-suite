@@ -67,7 +67,7 @@ def test_checkpoint_table_columns_and_sample():
     # Structural tie: the columns are the kernel's own epoch-stats key order,
     # taken from the leaf module that names them - not a copy spelled here, and
     # not an import that would drag Keras into the widget layer.
-    from orangecontrib.ai_suite.kernel.lm.stats import EPOCH_STATS_KEYS
+    from edu_ai_suite.lm.stats import EPOCH_STATS_KEYS
 
     assert [v.name for v in table.domain.attributes] == list(EPOCH_STATS_KEYS)
     assert table.domain.metas[0].name == "sample"

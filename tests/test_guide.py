@@ -1,6 +1,6 @@
 """The feature guide: one page generated from the catalogue."""
 
-from orangecontrib.ai_suite.kernel.images.features import (
+from edu_ai_suite.images.features import (
     all_features,
     all_groups,
     feature_guide_markdown,

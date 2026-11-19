@@ -39,7 +39,7 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.widget import Input, Msg, Output, OWWidget
 
 from orangecontrib.ai_suite.adapters import image_paths
-from orangecontrib.ai_suite.kernel.images import features
+from edu_ai_suite.images import features
 
 # Group letters, titles and help text come from the kernel's group table.
 GROUP_LABELS = tuple(

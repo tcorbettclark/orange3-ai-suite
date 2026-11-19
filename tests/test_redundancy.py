@@ -9,7 +9,7 @@ import itertools
 
 import numpy as np
 
-from orangecontrib.ai_suite.kernel.images.features import all_feature_names, extract_features
+from edu_ai_suite.images.features import all_feature_names, extract_features
 from synth import band_image, cloud_image, digit8_image, ring_image, vertical_bar_image
 
 TOL = 1e-6  # well above float32 summation noise (~1e-8), below "close by chance"

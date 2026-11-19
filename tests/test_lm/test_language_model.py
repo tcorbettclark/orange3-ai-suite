@@ -13,19 +13,19 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # before any TF import
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import (
+from edu_ai_suite.lm import (
     LanguageModel,
     TrainingOptions,
     tokenizer_from_text,
 )
-from orangecontrib.ai_suite.kernel.lm.architecture import (
+from edu_ai_suite.lm.architecture import (
     LSTM,
     MLP,
     Bigram,
     architecture_from_dict,
     architectures,
 )
-from orangecontrib.ai_suite.kernel.lm.language_model import _sample
+from edu_ai_suite.lm.language_model import _sample
 
 CORPUS = "the cat sat on the mat. the cat saw the dog. a dog and a cat ran."
 
@@ -340,7 +340,7 @@ def test_save_load_round_trip(mlp_model, tmp_path):
 def test_the_record_names_the_package_that_wrote_it(mlp_model, tmp_path):
     # `meta.json` is the name a saved model directory carries, for this model and for the
     # LoRA artifact alike, so the record names the package that wrote it.
-    import orangecontrib.ai_suite.kernel.lm as lm
+    import edu_ai_suite.lm as lm
 
     path = mlp_model.save(tmp_path / "named.nnlm")
     meta = json.loads((path / "meta.json").read_text())
@@ -353,7 +353,7 @@ def test_another_packages_record_is_refused(tmp_path):
     path = tmp_path / "not-ours"
     path.mkdir()
     (path / "meta.json").write_text(
-        json.dumps({"created_by": "orangecontrib.ai_suite.kernel.lora"})
+        json.dumps({"created_by": "edu_ai_suite.lora"})
     )
     with pytest.raises(ValueError, match="not a Keras language model"):
         LanguageModel.load(path)

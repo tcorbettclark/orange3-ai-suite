@@ -63,7 +63,7 @@ class PixelValuesWorker(QThread):
 
     def run(self):
         try:
-            from orangecontrib.ai_suite.kernel.images.pixels import pixel_row
+            from edu_ai_suite.images.pixels import pixel_row
 
             rows = []
             names: tuple[str, ...] = ()

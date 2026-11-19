@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.features import (
+from edu_ai_suite.images.features import (
     GROUP_ORDER,
     FeatureOptions,
     all_count_feature_names,
@@ -55,7 +55,7 @@ def test_group_members_match_features_of_group():
 
 
 def test_catalogue_roster_matches_the_directory():
-    from orangecontrib.ai_suite.kernel.images.features import catalogue
+    from edu_ai_suite.images.features import catalogue
 
     directory = Path(catalogue.__file__).parent
     on_disk = {path.stem for path in directory.glob("*.py")} - {"__init__"}
@@ -65,7 +65,7 @@ def test_catalogue_roster_matches_the_directory():
 
 
 def test_catalogue_entries_are_feature_instances():
-    from orangecontrib.ai_suite.kernel.images.features import Feature, catalogue
+    from edu_ai_suite.images.features import Feature, catalogue
 
     for feature in catalogue.all_features():
         assert isinstance(feature, Feature)

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.resize import resize_square
+from edu_ai_suite.images.resize import resize_square
 
 
 def test_resize_stretches_the_whole_frame_to_a_square():

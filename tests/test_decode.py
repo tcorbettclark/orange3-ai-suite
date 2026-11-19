@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.decode import (
+from edu_ai_suite.images.decode import (
     drop_alpha,
     to_luminance,
     to_unit_scale,

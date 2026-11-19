@@ -6,7 +6,7 @@ and never feed back into training.
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text
+from edu_ai_suite.lm import tokenizer_from_text
 
 CORPUS = "the cat sat on the mat\nthe cat saw the dog\na dog and a cat"
 

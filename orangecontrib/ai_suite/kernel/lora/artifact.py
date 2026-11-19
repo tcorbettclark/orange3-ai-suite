@@ -20,7 +20,7 @@ from . import mlx_layout
 #: name is shared with the Keras model's directory, so the record names the package that
 #: wrote it - and :meth:`LoRAAdapter.load` rejects one that names anything else.
 _META_FILE = "meta.json"
-_CREATED_BY = "orangecontrib.ai_suite.kernel.lora"
+_CREATED_BY = "edu_ai_suite.lora"
 
 
 @dataclass

@@ -24,7 +24,7 @@ def test_data_input_builds_both_tokenizer_views(qapp, text_table, texts):
 
 
 def test_model_input_preferred_over_data(qapp, text_table):
-    from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text
+    from edu_ai_suite.lm import tokenizer_from_text
 
     model = type("M", (), {})()
     model.tokenizer = tokenizer_from_text("hello world", "word")

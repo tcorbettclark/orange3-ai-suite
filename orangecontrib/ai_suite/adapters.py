@@ -129,7 +129,7 @@ def checkpoint_table(stats: list[dict]) -> Table:
     function: the epoch-stats module imports Keras, and the image widgets import
     this module.
     """
-    from orangecontrib.ai_suite.kernel.lm.stats import EPOCH_STATS_KEYS as columns
+    from edu_ai_suite.lm.stats import EPOCH_STATS_KEYS as columns
 
     domain = Domain(
         [ContinuousVariable(name) for name in columns],

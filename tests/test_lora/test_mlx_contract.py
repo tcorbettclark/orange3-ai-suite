@@ -11,8 +11,8 @@ import pytest
 
 mlx_lm = pytest.importorskip("mlx_lm", reason="the lora extra (mlx-lm) is not installed")
 
-from orangecontrib.ai_suite.kernel.lora import mlx_child as _child  # noqa: E402
-from orangecontrib.ai_suite.kernel.lora.mlx_spec import TrainingSpec  # noqa: E402
+from edu_ai_suite.lora import mlx_child as _child  # noqa: E402
+from edu_ai_suite.lora.mlx_spec import TrainingSpec  # noqa: E402
 
 SPEC = TrainingSpec(
     model="the-base",
@@ -114,6 +114,6 @@ def test_the_rest_of_the_surface_is_where_the_boundary_expects_it():
 
 
 def test_the_runtime_asks_the_machine_a_question_before_importing_anything():
-    from orangecontrib.ai_suite.kernel.lora import mlx_runtime
+    from edu_ai_suite.lora import mlx_runtime
 
     assert mlx_runtime.available() is True  # mlx_lm is installed here, so the extra works

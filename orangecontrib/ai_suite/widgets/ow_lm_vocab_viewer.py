@@ -96,7 +96,7 @@ class OWLMVocabViewer(OWWidget):
         if table is not None:
             try:
                 text = corpus_text(table)
-                from orangecontrib.ai_suite.kernel.lm import tokenizer_from_text  # pure Python
+                from edu_ai_suite.lm import tokenizer_from_text  # pure Python
 
                 self._char_tokenizer = tokenizer_from_text(text, "char")
                 self._word_tokenizer = tokenizer_from_text(text, "word")

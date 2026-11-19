@@ -7,7 +7,7 @@ import math
 
 import pytest
 
-import orangecontrib.ai_suite.kernel.lm as lm
+import edu_ai_suite.lm as lm
 
 EXPECTED = frozenset(
     {
@@ -30,7 +30,7 @@ EXPECTED = frozenset(
 def test_the_epoch_stats_keys_are_a_view_of_the_record_they_name():
     # One spelling: the keys are the record's own annotations, in order, so the
     # checkpoint columns cannot be a list somebody forgot to update.
-    from orangecontrib.ai_suite.kernel.lm.stats import EPOCH_STATS_KEYS, EpochStats
+    from edu_ai_suite.lm.stats import EPOCH_STATS_KEYS, EpochStats
 
     assert list(EPOCH_STATS_KEYS) == list(EpochStats.__annotations__)
 
@@ -38,7 +38,7 @@ def test_the_epoch_stats_keys_are_a_view_of_the_record_they_name():
 def test_an_epoch_stats_record_puts_each_number_under_its_own_key():
     # The assertion a key-order test cannot make: distinguishable values, read
     # back by name, so a record built in the wrong order fails here.
-    from orangecontrib.ai_suite.kernel.lm.training import epoch_callback
+    from edu_ai_suite.lm.training import epoch_callback
 
     seen = []
     epoch_callback(on_epoch=seen.append).on_epoch_end(0, {"loss": 0.5, "val_loss": 1.5})
@@ -51,7 +51,7 @@ def test_an_epoch_stats_record_puts_each_number_under_its_own_key():
 
 
 def test_an_epoch_with_no_metric_reports_nan_rather_than_raising():
-    from orangecontrib.ai_suite.kernel.lm.training import epoch_callback
+    from edu_ai_suite.lm.training import epoch_callback
 
     seen = []
     epoch_callback(on_epoch=seen.append).on_epoch_end(2, {})
@@ -64,7 +64,7 @@ def test_an_epoch_with_no_metric_reports_nan_rather_than_raising():
 def test_a_hook_may_add_keys_of_its_own():
     # The record is a plain dict because the caller extends it: the per-epoch
     # sample is the hook's addition, and the checkpoint table carries it.
-    from orangecontrib.ai_suite.kernel.lm.training import epoch_callback
+    from edu_ai_suite.lm.training import epoch_callback
 
     seen = []
 
@@ -86,9 +86,9 @@ def test_package_exports_only_the_use_case():
 def test_internals_live_in_their_own_module():
     # Supported, but not part of the façade: the special ids are an invariant of
     # the encoding, and deserialisation belongs to whoever owns the format.
-    from orangecontrib.ai_suite.kernel.lm.architecture import architecture_from_dict
-    from orangecontrib.ai_suite.kernel.lm.stats import EpochStats
-    from orangecontrib.ai_suite.kernel.lm.tokenizer import BOS_ID, EOS_ID, UNK_ID
+    from edu_ai_suite.lm.architecture import architecture_from_dict
+    from edu_ai_suite.lm.stats import EpochStats
+    from edu_ai_suite.lm.tokenizer import BOS_ID, EOS_ID, UNK_ID
 
     assert (BOS_ID, UNK_ID, EOS_ID) == (0, 1, 2)
     assert callable(architecture_from_dict)

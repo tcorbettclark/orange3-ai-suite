@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.features import FeatureOptions
-from orangecontrib.ai_suite.kernel.images.features._preprocessing import (
+from edu_ai_suite.images.features import FeatureOptions
+from edu_ai_suite.images.features._preprocessing import (
     preprocess,
     preprocess_colour,
 )

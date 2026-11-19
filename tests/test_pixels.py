@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.images.pixels import pixel_row
+from edu_ai_suite.images.pixels import pixel_row
 
 
 def _rgb(height, width, value=0.5):

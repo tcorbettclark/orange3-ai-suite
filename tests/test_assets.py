@@ -8,9 +8,9 @@ import time
 
 import pytest
 
-from orangecontrib.ai_suite.kernel import assets
-from orangecontrib.ai_suite.kernel.assets.clouds import _prepare_clouds
-from orangecontrib.ai_suite.kernel.assets.hf import (
+from edu_ai_suite import assets
+from edu_ai_suite.assets.clouds import _prepare_clouds
+from edu_ai_suite.assets.hf import (
     Asset,
     AssetError,
     _repo_folder,
@@ -19,7 +19,7 @@ from orangecontrib.ai_suite.kernel.assets.hf import (
     prefer_classic_lfs,
     verify,
 )
-from orangecontrib.ai_suite.kernel.assets.mnist import _prepare_mnist
+from edu_ai_suite.assets.mnist import _prepare_mnist
 
 WEIGHTS = b"weights"
 
@@ -227,7 +227,7 @@ def test_prepare_ccsn_keeps_the_five_genera_and_credits(tmp_path):
 
 
 def test_cli_lists_all_assets(capsys):
-    from orangecontrib.ai_suite.kernel.assets.cli import main
+    from edu_ai_suite.assets.cli import main
 
     assert main(["list"]) == 0
     output = capsys.readouterr().out
@@ -237,7 +237,7 @@ def test_cli_lists_all_assets(capsys):
 
 
 def test_asset_getters_delegate_to_ensure(monkeypatch, tmp_path):
-    from orangecontrib.ai_suite.kernel.assets import britllm, clouds, mnist
+    from edu_ai_suite.assets import britllm, clouds, mnist
 
     calls = []
     for module, getter, name in (
@@ -261,7 +261,7 @@ def test_asset_getters_delegate_to_ensure(monkeypatch, tmp_path):
 
 
 def test_cli_list_reports_cache_status(tmp_path, capsys):
-    from orangecontrib.ai_suite.kernel.assets.cli import main
+    from edu_ai_suite.assets.cli import main
 
     assert main(["list", "--cache", str(tmp_path)]) == 0
     output = capsys.readouterr().out
@@ -280,7 +280,7 @@ def test_importing_the_assets_module_decides_nothing(monkeypatch):
 
     probe = (
         "import os, sys;"
-        "import orangecontrib.ai_suite.kernel.assets.hf;"
+        "import edu_ai_suite.assets.hf;"
         "print(os.environ.get('HF_HUB_DISABLE_XET'), 'huggingface_hub.constants' in sys.modules)"
     )
     env = {k: v for k, v in os.environ.items() if k != "HF_HUB_DISABLE_XET"}
@@ -296,7 +296,7 @@ def test_a_fresh_process_gets_classic_lfs_from_the_environment():
 
     probe = (
         "import os;"
-        "from orangecontrib.ai_suite.kernel.assets.hf import prefer_classic_lfs;"
+        "from edu_ai_suite.assets.hf import prefer_classic_lfs;"
         "print(prefer_classic_lfs());"
         "print(os.environ['HF_HUB_DISABLE_XET'])"
     )
@@ -341,7 +341,7 @@ def test_calling_it_twice_is_harmless(monkeypatch):
 
 
 def test_the_cli_states_the_choice_it_made(monkeypatch, capsys):
-    from orangecontrib.ai_suite.kernel.assets.cli import main
+    from edu_ai_suite.assets.cli import main
 
     monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
     assert main(["list"]) == 0

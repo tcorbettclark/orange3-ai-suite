@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass
 from .mlx_protocol import Event, decode
 from .mlx_spec import TrainingSpec
 
-_CHILD = "orangecontrib.ai_suite.kernel.lora.mlx_child"
+_CHILD = "edu_ai_suite.lora.mlx_child"
 
 #: How long a terminated child may take to die before it is killed outright.
 STOP_TIMEOUT = 10.0

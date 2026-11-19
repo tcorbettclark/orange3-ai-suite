@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from orangecontrib.ai_suite.kernel.lora import (
+from edu_ai_suite.lora import (
     LoRAAdapter,
     LoRAData,
     LoRAOptions,

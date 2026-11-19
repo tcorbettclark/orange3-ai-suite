@@ -8,8 +8,8 @@ stream in order, so there are ``len(stream)`` pairs, always.
 import numpy as np
 import pytest
 
-from orangecontrib.ai_suite.kernel.lm import make_pairs, tokenizer_from_text
-from orangecontrib.ai_suite.kernel.lm.pairs import Pairs
+from edu_ai_suite.lm import make_pairs, tokenizer_from_text
+from edu_ai_suite.lm.pairs import Pairs
 
 BOS, EOS = 0, 2
 A, B, C, D, E, F = 3, 4, 5, 6, 7, 8  # ids 0-2 are specials

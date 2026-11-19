@@ -31,7 +31,7 @@ from .training import (
 #: record names the package that wrote it - and :meth:`LanguageModel.load` rejects one
 #: that names anything else.
 _META_FILE = "meta.json"
-_CREATED_BY = "orangecontrib.ai_suite.kernel.lm"
+_CREATED_BY = "edu_ai_suite.lm"
 _MODEL_FILE = "model.keras"
 
 

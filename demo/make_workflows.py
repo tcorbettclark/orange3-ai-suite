@@ -18,7 +18,7 @@ from orangecanvas.registry.description import (
 )
 from orangecanvas.scheme import Scheme, SchemeLink, SchemeNode
 
-from orangecontrib.ai_suite.kernel.assets import get_clouds, get_mnist
+from edu_ai_suite.assets import get_clouds, get_mnist
 
 BASE = Path(__file__).resolve().parent
 
